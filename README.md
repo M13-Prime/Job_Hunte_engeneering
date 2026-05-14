@@ -5,8 +5,8 @@ recruter dans les domaines **Sustainability / AI / Data / ESG / CSR**, avant
 que les offres ne soient publiées. Envoie chaque matin un digest classé par
 priorité, avec entreprise, signal, personne à contacter et angle d'attaque.
 
-> Statut : **Phase 0 (squelette)**. Les collecteurs, le classifier LLM et le
-> digest email seront implémentés dans les phases suivantes.
+> Statut : **Phase 1**. Pipeline RSS -> dedup -> classifier LiteLLM ->
+> stockage opérationnel. Le digest email arrive en Phase 3.
 
 ## Stack
 
@@ -42,6 +42,22 @@ make test
 make lint
 make typecheck
 ```
+
+## Pipeline (Phase 1)
+
+```bash
+make collect            # lit les flux RSS configurés -> data/signals.db
+make classify           # classe le backlog via LLM_MODEL
+make pipeline           # = collect + classify
+make classify -- --limit 5   # ne classer que 5 items (debug / cost cap)
+```
+
+- `make collect` fetch chaque flux RSS de `config/sources.yaml` (cache local 6h),
+  dédoublonne par SHA256(source+url) et insère dans `raw_items`.
+- `make classify` itère sur les `raw_items` non classés, appelle
+  `litellm.acompletion` via le wrapper unique `classify()`, valide la sortie
+  avec Pydantic et insère un `Signal` quand `is_relevant=True`. Dédup
+  hebdomadaire par `(company_normalized, signal_type, ISO week)`.
 
 ## Configuration
 
@@ -98,8 +114,8 @@ d'échec du modèle principal).
 
 ## Roadmap
 
-- **Phase 0** *(en cours)* — squelette, modèles SQLAlchemy, config, demo.
-- **Phase 1** — collecteur RSS + classifier LiteLLM (pipeline E2E).
+- **Phase 0** — squelette, modèles SQLAlchemy, config, demo. ✅
+- **Phase 1** *(en cours)* — collecteur RSS + classifier LiteLLM (pipeline E2E). ✅
 - **Phase 2** — Pappers, GDELT, NewsAPI, France Travail (pics de recrutement).
 - **Phase 3** — digest email quotidien + APScheduler.
 - **Phase 4** — boucle de feedback (relevant / not_relevant / contacted).

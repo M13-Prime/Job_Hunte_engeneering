@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 UV ?= uv
 
-.PHONY: help install demo test lint typecheck format clean
+.PHONY: help install demo collect classify pipeline test lint typecheck format clean
 
 help:  ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*##/ { printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -11,6 +11,14 @@ install:  ## Sync dependencies (creates .venv via uv)
 
 demo:  ## Boot the Phase 0 skeleton end-to-end (init DB, load profile, insert sample row)
 	$(UV) run python -m signal_tracker.main
+
+collect:  ## Run one collection pass over configured RSS feeds
+	$(UV) run python scripts/collect.py
+
+classify:  ## Classify the unclassified backlog via the configured LLM
+	$(UV) run python scripts/classify.py
+
+pipeline: collect classify  ## collect + classify in one shot
 
 test:  ## Run pytest
 	$(UV) run pytest

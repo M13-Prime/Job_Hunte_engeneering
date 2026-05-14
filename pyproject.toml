@@ -45,6 +45,11 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+# Few-shot examples in the classifier prompt contain long French strings on
+# purpose; wrapping them would make the prompt unreadable.
+"src/signal_tracker/classifier/prompts.py" = ["E501"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true
