@@ -1,0 +1,38 @@
+# Profil utilisé pour scorer la pertinence des signaux.
+# Modifiable sans toucher au code.
+
+name: null  # ex: "Prénom Nom"
+
+domains:
+  - Sustainability
+  - AI
+  - Data Analysis
+  - ESG
+  - CSR
+
+target_roles:
+  - Data Analyst ESG
+  - AI for Sustainability
+  - Consultant CSRD
+  - ESG Strategist
+  - Climate Data Scientist
+  - Head of Data Sustainability
+  - Sustainability Analyst
+  - Carbon Data Lead
+
+geographies:
+  - France
+  - Europe
+  - Remote international  # secondaire
+
+target_company_types:
+  - Climate tech
+  - ESG SaaS
+  - Cabinets de conseil avec practice ESG/AI
+  - Grands groupes en transformation durable
+  - Scale-ups AI avec angle sustainability
+
+notes: |
+  Priorité : signaux français et européens. Le remote international est
+  secondaire. Préférence pour structures < 1000 personnes ou practices
+  internes claires.

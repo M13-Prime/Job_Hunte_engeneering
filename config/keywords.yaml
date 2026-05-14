@@ -1,0 +1,56 @@
+# Mots-clés utilisés par les collecteurs pour filtrer / cibler les recherches.
+# Phase 0 : valeurs initiales, à enrichir au fil de l'eau.
+
+executive_change:
+  - "nomme"
+  - "nouveau directeur"
+  - "nouvelle directrice"
+  - "Chief Sustainability Officer"
+  - "CSO"
+  - "Chief AI Officer"
+  - "Chief Data Officer"
+  - "Head of ESG"
+  - "VP Sustainability"
+  - "Director CSR"
+  - "appoints"
+  - "names"
+
+funding:
+  - "levée"
+  - "lève"
+  - "raises"
+  - "Series A"
+  - "Series B"
+  - "Series C"
+  - "seed round"
+  - "BPI"
+  - "EIC Accelerator"
+  - "Horizon Europe"
+  - "French Tech 2030"
+
+csrd_publication:
+  - "premier rapport CSRD"
+  - "premier DPEF"
+  - "rapport de durabilité"
+  - "sustainability report"
+
+sustainability_signals:
+  - "SBTi"
+  - "Science Based Targets"
+  - "Net Zero"
+  - "CDP"
+  - "trajectoire carbone"
+
+strategic_announcement:
+  - "double l'équipe"
+  - "double its team"
+  - "lance une practice"
+  - "launches a practice"
+  - "ouverture bureau"
+  - "opens office"
+
+acquisition:
+  - "acquiert"
+  - "rachète"
+  - "acquires"
+  - "acquisition"

@@ -1,0 +1,55 @@
+# Définition des sources collectées. Une source = entrée dans une des sections.
+# Phase 1 implémentera le collecteur RSS et lira `rss:` ci-dessous.
+
+rss:
+  - id: maddyness
+    name: Maddyness
+    url: https://www.maddyness.com/feed/
+    language: fr
+  - id: novethic
+    name: Novethic
+    url: https://www.novethic.fr/rss.html
+    language: fr
+  - id: carenews
+    name: Carenews
+    url: https://www.carenews.com/rss.xml
+    language: fr
+  - id: techcrunch
+    name: TechCrunch
+    url: https://techcrunch.com/feed/
+    language: en
+  - id: greenbiz
+    name: GreenBiz / Trellis
+    url: https://trellis.net/feed/
+    language: en
+  - id: sifted
+    name: Sifted
+    url: https://sifted.eu/feed
+    language: en
+  - id: frenchweb
+    name: Frenchweb
+    url: https://www.frenchweb.fr/feed
+    language: fr
+
+google_news:
+  # Phase 2 : queries Google News RSS construites dynamiquement
+  queries: []
+
+gdelt:
+  # Phase 2
+  enabled: false
+
+newsapi:
+  # Phase 2
+  enabled: false
+  queries: []
+
+pappers:
+  # Phase 2 : surveillance de changements de dirigeants
+  enabled: false
+  watchlist_siren: []
+
+france_travail:
+  # Phase 2 : détection de pics de recrutement
+  enabled: false
+  rome_codes: []  # ex: M1403, M1805
