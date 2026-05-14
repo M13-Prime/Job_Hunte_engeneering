@@ -5,8 +5,9 @@ recruter dans les domaines **Sustainability / AI / Data / ESG / CSR**, avant
 que les offres ne soient publiées. Envoie chaque matin un digest classé par
 priorité, avec entreprise, signal, personne à contacter et angle d'attaque.
 
-> Statut : **Phase 1**. Pipeline RSS -> dedup -> classifier LiteLLM ->
-> stockage opérationnel. Le digest email arrive en Phase 3.
+> Statut : **Phase 3**. Pipeline complet : RSS -> dedup -> classifier LiteLLM
+> -> stockage -> digest email quotidien (HTML + texte, SMTP ou Resend),
+> scheduling via APScheduler.
 
 ## Stack
 
@@ -58,6 +59,30 @@ make classify -- --limit 5   # ne classer que 5 items (debug / cost cap)
   `litellm.acompletion` via le wrapper unique `classify()`, valide la sortie
   avec Pydantic et insère un `Signal` quand `is_relevant=True`. Dédup
   hebdomadaire par `(company_normalized, signal_type, ISO week)`.
+
+## Digest email (Phase 3)
+
+```bash
+make digest ARGS=--dry-run                              # rendu console, aucun envoi
+make digest ARGS="--dry-run --preview-out preview.html" # +preview HTML local
+make digest                                             # envoi via SMTP / Resend
+make daily                                              # collect + classify + digest
+make schedule                                           # daemon APScheduler
+```
+
+Trois sections dans le digest, conformes au brief :
+
+1. 🔥 **À contacter aujourd'hui** — `total_score >= 80`
+2. 📊 **À investiguer cette semaine** — `60 <= total_score < 80`
+3. 👀 **Veille en cours** — entreprises avec ≥ 2 signaux faibles
+   (`total_score < 60`) cumulés sur 30 jours
+
+Les signaux déjà inclus dans un digest précédent sont filtrés via la table
+`digests_sent`. Le backend email est choisi automatiquement : Resend si
+`RESEND_API_KEY` est défini, sinon SMTP (`SMTP_HOST` + `SMTP_PORT` +
+identifiants). Si rien n'est configuré, le digest tombe en `--dry-run`. Le
+scheduler APScheduler tourne en cron quotidien à `DIGEST_SEND_HOUR` dans la
+timezone `DIGEST_TIMEZONE` (défaut `Europe/Paris`).
 
 ## Configuration
 
@@ -115,9 +140,9 @@ d'échec du modèle principal).
 ## Roadmap
 
 - **Phase 0** — squelette, modèles SQLAlchemy, config, demo. ✅
-- **Phase 1** *(en cours)* — collecteur RSS + classifier LiteLLM (pipeline E2E). ✅
-- **Phase 2** — Pappers, GDELT, NewsAPI, France Travail (pics de recrutement).
-- **Phase 3** — digest email quotidien + APScheduler.
+- **Phase 1** — collecteur RSS + classifier LiteLLM (pipeline E2E). ✅
+- **Phase 3** — digest email (HTML + texte) + APScheduler. ✅
+- **Phase 2** *(reportée)* — Pappers, GDELT, NewsAPI, France Travail (pics de recrutement).
 - **Phase 4** — boucle de feedback (relevant / not_relevant / contacted).
 - **Phase 5** *(optionnel)* — mini dashboard FastAPI.
 

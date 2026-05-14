@@ -1,0 +1,44 @@
+Signal Tracker — {{ data.generated_at.strftime("%A %d %B %Y") }}
+
+Bonjour{% if data.user_name %} {{ data.user_name }}{% endif %},
+
+{{ data.hot|length }} opportunite(s) a contacter aujourd'hui · {{ data.investigate|length }} a investiguer cette semaine · {{ data.watch|length }} entreprise(s) en veille.
+
+{% if data.is_empty %}
+Pas de nouveau signal aujourd'hui.
+{% endif %}
+
+{% if data.hot %}
+=== A CONTACTER AUJOURD'HUI (score >= 80) ===
+{% for s in data.hot %}
+[{{ "%.1f"|format(s.score) }} · {{ s.signal_type }}] {{ s.company_name }}
+  {{ s.summary_fr }}
+  {% if s.suggested_angle %}Angle : {{ s.suggested_angle }}{% endif %}
+  {% if s.target_contact_name or s.target_contact_role %}Contact : {{ s.target_contact_name or "?" }} - {{ s.target_contact_role or "?" }}{% endif %}
+  Source : {{ s.url }}
+
+{% endfor %}
+{% endif %}
+
+{% if data.investigate %}
+=== A INVESTIGUER CETTE SEMAINE (score 60-79) ===
+{% for s in data.investigate %}
+[{{ "%.1f"|format(s.score) }} · {{ s.signal_type }}] {{ s.company_name }}
+  {{ s.summary_fr }}
+  {% if s.suggested_angle %}Angle : {{ s.suggested_angle }}{% endif %}
+  Source : {{ s.url }}
+
+{% endfor %}
+{% endif %}
+
+{% if data.watch %}
+=== VEILLE EN COURS ===
+{% for w in data.watch %}
+{{ w.company }} · {{ w.count }} signaux ({{ w.signal_types|join(", ") }})
+  {{ w.latest_summary }}
+
+{% endfor %}
+{% endif %}
+
+--
+Genere par signal-tracker · {{ data.generated_at.strftime("%Y-%m-%d %H:%M UTC") }}

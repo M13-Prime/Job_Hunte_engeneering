@@ -55,6 +55,8 @@ class Settings(BaseSettings):
 
     # Runtime
     digest_send_hour: int = 7
+    digest_timezone: str = "Europe/Paris"
+    dashboard_base_url: str | None = None
     log_level: str = "INFO"
     db_path: str = "data/signals.db"
 

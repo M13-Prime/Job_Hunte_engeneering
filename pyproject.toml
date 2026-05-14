@@ -38,6 +38,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/signal_tracker"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"src/signal_tracker/notifier/templates" = "signal_tracker/notifier/templates"
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
