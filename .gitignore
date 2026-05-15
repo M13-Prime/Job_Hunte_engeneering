@@ -61,6 +61,14 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# Signal Tracker local data
+*.db
+data/signals.db
+data/preview.html
+data/cache/
+data/pappers_snapshots/
+data/france_travail_history.json
+
 # Flask stuff:
 instance/
 .webassets-cache
