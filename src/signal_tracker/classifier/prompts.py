@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from textwrap import dedent
 
+from signal_tracker.classifier.feedback import FeedbackExample, render_examples_block
 from signal_tracker.classifier.schemas import ClassifierInput
 from signal_tracker.config import UserProfile
 
@@ -217,14 +218,34 @@ CLASSIFIER_PROMPT_V1 = dedent(
 ).strip()
 
 
-def render_system_prompt(profile: UserProfile) -> str:
-    """Inject the user profile into the versioned prompt template."""
-    return CLASSIFIER_PROMPT_V1.format(
+def render_system_prompt(
+    profile: UserProfile,
+    *,
+    extra_examples: list[FeedbackExample] | None = None,
+) -> str:
+    """Inject the user profile into the versioned prompt template.
+
+    Optionally appends feedback-derived few-shot examples ("dynamic shots")
+    so the classifier can learn from prior user judgments.
+    """
+    base = CLASSIFIER_PROMPT_V1.format(
         domains=", ".join(profile.domains) or "(none)",
         target_roles=", ".join(profile.target_roles) or "(none)",
         geographies=", ".join(profile.geographies) or "(none)",
         target_company_types=", ".join(profile.target_company_types) or "(none)",
         notes=(profile.notes or "(none)").strip(),
+    )
+    if not extra_examples:
+        return base
+    return (
+        base
+        + "\n\n-----------------\n"
+        + "DYNAMIC EXAMPLES FROM PRIOR USER FEEDBACK\n"
+        + "-----------------\n"
+        + "Treat the POSITIVE entries as the strongest signal of what the user "
+        + "wants surfaced; treat the NEGATIVE entries as the kind of items they "
+        + "have explicitly rejected before.\n\n"
+        + render_examples_block(extra_examples)
     )
 
 

@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select
 
+from signal_tracker.classifier.feedback import load_feedback_examples
 from signal_tracker.classifier.llm import classify
 from signal_tracker.classifier.schemas import ClassificationResult, ClassifierInput
 from signal_tracker.collectors.base import BaseCollector, CollectedItem
@@ -233,6 +234,14 @@ async def run_classification(
 
     report = ClassificationReport()
 
+    # Load dynamic few-shot examples from past user feedback (Phase 4).
+    feedback_examples = load_feedback_examples(db)
+    if feedback_examples:
+        logger.info(
+            "pipeline.feedback_examples_loaded",
+            extra={"count": len(feedback_examples)},
+        )
+
     with db.session() as session:
         stmt = select(RawItem).where(RawItem.classified.is_(False)).order_by(RawItem.id)
         if limit is not None:
@@ -248,7 +257,7 @@ async def run_classification(
             published_at=raw.published_at,
         )
         try:
-            result = await classify(item, profile)
+            result = await classify(item, profile, extra_examples=feedback_examples)
         except Exception as exc:
             report.errors += 1
             logger.error(

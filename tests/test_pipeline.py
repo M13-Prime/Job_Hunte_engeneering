@@ -99,7 +99,7 @@ async def test_run_classification_creates_signals_and_dedups(
         "https://example.com/sig3": irrelevant_payload,
     }
 
-    async def fake_classify(item, _profile):  # type: ignore[no-untyped-def]
+    async def fake_classify(item, _profile, **_kwargs):  # type: ignore[no-untyped-def]
         return call_results[item.url]
 
     monkeypatch.setattr("signal_tracker.pipeline.classify", fake_classify)

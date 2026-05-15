@@ -20,6 +20,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from signal_tracker.classifier.feedback import FeedbackExample
 from signal_tracker.classifier.prompts import (
     CLASSIFIER_PROMPT_VERSION,
     render_system_prompt,
@@ -50,6 +51,8 @@ _RETRYABLE: tuple[type[BaseException], ...] = (
 async def classify(
     item: ClassifierInput,
     profile: UserProfile,
+    *,
+    extra_examples: list[FeedbackExample] | None = None,
 ) -> ClassificationResult:
     """Classify a collected item via the LLM configured in LLM_MODEL.
 
@@ -67,7 +70,10 @@ async def classify(
     )
 
     messages = [
-        {"role": "system", "content": render_system_prompt(profile)},
+        {
+            "role": "system",
+            "content": render_system_prompt(profile, extra_examples=extra_examples),
+        },
         {"role": "user", "content": render_user_prompt(item)},
     ]
 
