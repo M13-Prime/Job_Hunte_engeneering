@@ -11,6 +11,10 @@ from sqlalchemy import select
 from signal_tracker.classifier.llm import classify
 from signal_tracker.classifier.schemas import ClassificationResult, ClassifierInput
 from signal_tracker.collectors.base import BaseCollector, CollectedItem
+from signal_tracker.collectors.france_travail import FranceTravailCollector
+from signal_tracker.collectors.gdelt import GdeltCollector
+from signal_tracker.collectors.newsapi import NewsApiCollector
+from signal_tracker.collectors.pappers import PappersCollector
 from signal_tracker.collectors.rss import FeedConfig, RSSCollector
 from signal_tracker.config import UserProfile, get_settings, load_sources, load_user_profile
 from signal_tracker.storage import Database, init_db
@@ -41,15 +45,65 @@ class ClassificationReport:
 def build_default_collectors() -> list[BaseCollector]:
     """Instantiate collectors enabled in ``config/sources.yaml``.
 
-    Phase 1 only exposes the RSS collector; later phases will append GDELT,
-    NewsAPI, Pappers, France Travail.
+    Each section is gated on either a presence check (RSS feeds list) or an
+    explicit ``enabled: true`` flag. API keys come from the runtime settings
+    (.env), so a missing key skips the collector with a warning.
     """
     sources = load_sources()
+    settings = get_settings()
     collectors: list[BaseCollector] = []
 
     rss_feeds = [FeedConfig.from_dict(raw) for raw in sources.get("rss", [])]
     if rss_feeds:
         collectors.append(RSSCollector(rss_feeds))
+
+    gdelt_cfg = sources.get("gdelt") or {}
+    if gdelt_cfg.get("enabled"):
+        gdelt_queries = GdeltCollector.queries_from_yaml(gdelt_cfg)
+        if gdelt_queries:
+            collectors.append(GdeltCollector(gdelt_queries))
+        else:
+            logger.warning("pipeline.gdelt_no_queries")
+
+    newsapi_cfg = sources.get("newsapi") or {}
+    if newsapi_cfg.get("enabled"):
+        if not settings.newsapi_key:
+            logger.warning("pipeline.newsapi_skipped reason=missing_NEWSAPI_KEY")
+        else:
+            newsapi_queries = NewsApiCollector.queries_from_yaml(newsapi_cfg)
+            if newsapi_queries:
+                collectors.append(
+                    NewsApiCollector(settings.newsapi_key, newsapi_queries)
+                )
+
+    pappers_cfg = sources.get("pappers") or {}
+    if pappers_cfg.get("enabled"):
+        if not settings.pappers_api_key:
+            logger.warning("pipeline.pappers_skipped reason=missing_PAPPERS_API_KEY")
+        else:
+            watchlist = PappersCollector.watchlist_from_yaml(pappers_cfg)
+            if watchlist:
+                collectors.append(
+                    PappersCollector(settings.pappers_api_key, watchlist)
+                )
+
+    ft_cfg = sources.get("france_travail") or {}
+    if ft_cfg.get("enabled"):
+        if not (settings.france_travail_client_id and settings.france_travail_client_secret):
+            logger.warning(
+                "pipeline.france_travail_skipped "
+                "reason=missing_FRANCE_TRAVAIL_CLIENT_ID/SECRET"
+            )
+        else:
+            ft_config = FranceTravailCollector.from_yaml(ft_cfg)
+            if ft_config.rome_codes:
+                collectors.append(
+                    FranceTravailCollector(
+                        client_id=settings.france_travail_client_id,
+                        client_secret=settings.france_travail_client_secret,
+                        config=ft_config,
+                    )
+                )
 
     return collectors
 

@@ -1,5 +1,4 @@
 # Définition des sources collectées. Une source = entrée dans une des sections.
-# Phase 1 implémentera le collecteur RSS et lira `rss:` ci-dessous.
 
 rss:
   - id: maddyness
@@ -31,25 +30,47 @@ rss:
     url: https://www.frenchweb.fr/feed
     language: fr
 
-google_news:
-  # Phase 2 : queries Google News RSS construites dynamiquement
-  queries: []
-
 gdelt:
-  # Phase 2
   enabled: false
+  queries:
+    - id: csrd_fr
+      query: '"CSRD" sourcelang:fre'
+      timespan: 24h
+      max_records: 100
+    - id: chief_sustainability_officer
+      query: '"Chief Sustainability Officer"'
+      timespan: 24h
+      max_records: 100
+    - id: climate_tech_funding
+      query: '"climate tech" (raises OR funding OR Series)'
+      timespan: 24h
+      max_records: 100
 
 newsapi:
-  # Phase 2
   enabled: false
-  queries: []
+  queries:
+    - id: csrd_fr
+      query: CSRD OR "rapport durabilité" OR ESG
+      language: fr
+      page_size: 50
+    - id: ai_sustainability_en
+      query: "(AI OR \"machine learning\") AND (sustainability OR climate OR ESG)"
+      language: en
+      page_size: 50
 
 pappers:
-  # Phase 2 : surveillance de changements de dirigeants
   enabled: false
-  watchlist_siren: []
+  watchlist: []
+  # Examples (uncomment + set the real SIREN to track a company):
+  # - { siren: "552120222", label: "Carbone 4" }
+  # - "552120222"
 
 france_travail:
-  # Phase 2 : détection de pics de recrutement
   enabled: false
-  rome_codes: []  # ex: M1403, M1805
+  rome_codes:
+    - M1403  # Études et prospectives socio-économiques
+    - M1805  # Études et développement informatique
+    - M1402  # Conseil en organisation et management d'entreprise
+  surge_min_count: 3
+  surge_z_threshold: 1.5
+  history_window_days: 30
