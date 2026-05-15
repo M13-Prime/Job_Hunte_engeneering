@@ -5,9 +5,12 @@ recruter dans les domaines **Sustainability / AI / Data / ESG / CSR**, avant
 que les offres ne soient publiées. Envoie chaque matin un digest classé par
 priorité, avec entreprise, signal, personne à contacter et angle d'attaque.
 
-> Statut : **Phase 3**. Pipeline complet : RSS -> dedup -> classifier LiteLLM
-> -> stockage -> digest email quotidien (HTML + texte, SMTP ou Resend),
-> scheduling via APScheduler.
+> Statut : **Phases 0 → 5 livrées**. Pipeline complet :
+> RSS / GDELT / NewsAPI / Pappers / France Travail → dedup → classifier
+> LiteLLM (avec few-shot dynamiques tirés du feedback utilisateur) → stockage
+> → digest email quotidien (HTML+texte, SMTP/Resend, APScheduler) →
+> dashboard FastAPI local pour parcourir, donner du feedback et gérer une
+> watchlist.
 
 ## Stack
 
@@ -141,10 +144,46 @@ d'échec du modèle principal).
 
 - **Phase 0** — squelette, modèles SQLAlchemy, config, demo. ✅
 - **Phase 1** — collecteur RSS + classifier LiteLLM (pipeline E2E). ✅
+- **Phase 2** — GDELT, NewsAPI, Pappers (diff dirigeants), France Travail (pic + moving avg). ✅
 - **Phase 3** — digest email (HTML + texte) + APScheduler. ✅
-- **Phase 2** *(reportée)* — Pappers, GDELT, NewsAPI, France Travail (pics de recrutement).
-- **Phase 4** — boucle de feedback (relevant / not_relevant / contacted).
-- **Phase 5** *(optionnel)* — mini dashboard FastAPI.
+- **Phase 4** — boucle de feedback (CLI `feedback`) + few-shot dynamiques. ✅
+- **Phase 5** — dashboard FastAPI single-page (signaux + feedback + watchlist). ✅
+
+## Sources additionnelles (Phase 2)
+
+Tout est désactivé par défaut dans `config/sources.yaml` — passe `enabled: true`
+puis renseigne la clé correspondante dans `.env`.
+
+| Source | Auth | Comportement |
+|--------|------|--------------|
+| **GDELT 2.0** | aucune | recherche par requête, top 100 articles/24h |
+| **NewsAPI** | `NEWSAPI_KEY` | recherche v2, free tier 100 req/jour |
+| **Pappers** | `PAPPERS_API_KEY` | snapshot par SIREN, émet un signal quand l'ensemble des `representants` change |
+| **France Travail** | `FRANCE_TRAVAIL_CLIENT_ID` + `_SECRET` | OAuth2, compte les offres/jour/entreprise sur les ROME ciblés, émet un signal quand `today >= max(min_count, mean + z·std)` sur 30 jours |
+
+## Boucle de feedback (Phase 4)
+
+```bash
+make feedback ARGS="--list"                       # signaux en attente
+make feedback ARGS="42 --action contacted"        # marque #42 comme contacté
+make feedback ARGS="42 --action not_relevant"     # marque comme non pertinent
+```
+
+Les signaux marqués `contacted` / `relevant` / `not_relevant` sont injectés
+comme few-shot supplémentaires dans le prompt classifier sur les runs
+suivants (jusqu'à 3 positifs + 3 négatifs sur 60 jours).
+
+## Dashboard local (Phase 5)
+
+```bash
+make dashboard       # http://127.0.0.1:8000 (uvicorn, --reload)
+```
+
+- Liste des signaux filtrable (feedback, score min)
+- Boutons "contacté / relevant / not relevant" (POST → MAJ DB)
+- Watchlist d'entreprises prioritaires (ajout / suppression)
+- Le lien "Marquer comme contacté" du digest email pointe ici si
+  `DASHBOARD_BASE_URL` est défini.
 
 ## Garde-fous
 

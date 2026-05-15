@@ -132,3 +132,17 @@ class DigestSent(Base):
     )
     recipient: Mapped[str] = mapped_column(String(256))
     signal_ids: Mapped[list[int]] = mapped_column(JSON)
+
+
+class WatchlistEntry(Base):
+    """Companies the user wants to prioritize in scoring (Phase 5 dashboard)."""
+
+    __tablename__ = "watchlist"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company_name: Mapped[str] = mapped_column(String(512))
+    normalized_name: Mapped[str] = mapped_column(String(512), unique=True, index=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )

@@ -18,6 +18,9 @@ dependencies = [
     "python-dotenv>=1.0.1",
     "pyyaml>=6.0.1",
     "rich>=13.7.1",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-multipart>=0.0.20",
 ]
 
 [project.optional-dependencies]
@@ -29,6 +32,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "vcrpy>=6.0.1",
     "types-pyyaml>=6.0.12",
+    "httpx>=0.27.0",
 ]
 
 [build-system]
@@ -40,6 +44,7 @@ packages = ["src/signal_tracker"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "src/signal_tracker/notifier/templates" = "signal_tracker/notifier/templates"
+"src/signal_tracker/dashboard/templates" = "signal_tracker/dashboard/templates"
 
 [tool.ruff]
 line-length = 100
@@ -52,6 +57,10 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 # Few-shot examples in the classifier prompt contain long French strings on
 # purpose; wrapping them would make the prompt unreadable.
 "src/signal_tracker/classifier/prompts.py" = ["E501"]
+# `param: T = Depends(...)` is the canonical FastAPI dependency-injection
+# idiom; B008 (no function call in argument defaults) flags it as a false
+# positive there.
+"src/signal_tracker/dashboard/app.py" = ["B008"]
 
 [tool.mypy]
 python_version = "3.11"

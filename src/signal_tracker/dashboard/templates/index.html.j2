@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Signal Tracker — Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --text: #1f2937; --muted: #6b7280;
+    --accent: #1d4ed8; --hot: #b91c1c; --inv: #1d4ed8; --watch: #92400e;
+    --border: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { background: white; border-bottom: 1px solid var(--border); padding: 16px 24px; }
+  header h1 { margin: 0; font-size: 18px; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 18px; }
+  .filters form { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .filters label { font-size: 13px; color: var(--muted); }
+  .filters input, .filters select { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+  .signal { padding: 12px 0; border-top: 1px solid var(--border); }
+  .signal:first-child { border-top: 0; }
+  .signal-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .signal-head .company { font-weight: 600; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; background: #f3f4f6; color: var(--muted); }
+  .badge.hot { background: #fef2f2; color: var(--hot); }
+  .badge.investigate { background: #eff6ff; color: var(--inv); }
+  .badge.watch { background: #fffbeb; color: var(--watch); }
+  .signal-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .signal-summary { font-size: 13px; margin: 6px 0; }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .actions form { margin: 0; }
+  .actions button { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: white; font-size: 12px; cursor: pointer; }
+  .actions button.contacted { border-color: var(--hot); color: var(--hot); }
+  .actions button.relevant { border-color: var(--inv); color: var(--inv); }
+  .actions button.not_relevant { border-color: var(--muted); color: var(--muted); }
+  .feedback-tag { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+  .feedback-tag.contacted { background: #fef2f2; color: var(--hot); }
+  .feedback-tag.relevant { background: #eff6ff; color: var(--inv); }
+  .feedback-tag.not_relevant { background: #f3f4f6; color: var(--muted); }
+  .watchlist ul { list-style: none; padding: 0; margin: 0; }
+  .watchlist li { display: flex; justify-content: space-between; padding: 6px 0; border-top: 1px solid var(--border); font-size: 14px; }
+  .watchlist li:first-child { border-top: 0; }
+  .watchlist form { margin: 0; }
+  .watchlist .add { display: flex; gap: 6px; margin-top: 10px; }
+  .watchlist .add input { flex: 1; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+  .watchlist .add button { padding: 6px 12px; border: 1px solid var(--accent); background: var(--accent); color: white; border-radius: 6px; font-size: 13px; cursor: pointer; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Signal Tracker</h1>
+  <p>{{ rows|length }} signaux affichés. Filtres et watchlist ci-dessous.</p>
+</header>
+<main>
+  <div class="panel filters">
+    <form method="get" action="/">
+      <label>Feedback :
+        <select name="feedback">
+          <option value="" {% if filter_feedback == "" %}selected{% endif %}>tous</option>
+          <option value="pending" {% if filter_feedback == "pending" %}selected{% endif %}>sans feedback</option>
+          {% for f in valid_feedback %}
+          <option value="{{ f }}" {% if filter_feedback == f %}selected{% endif %}>{{ f }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Score min : <input type="number" name="min_score" value="{{ min_score }}" min="0" max="100" step="1"></label>
+      <button type="submit">Filtrer</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    {% if not rows %}
+    <p style="color: var(--muted); margin: 0;">Aucun signal pour ces filtres.</p>
+    {% endif %}
+    {% for signal, raw in rows %}
+    {% set badge = "hot" if signal.total_score >= 80 else ("investigate" if signal.total_score >= 60 else "watch") %}
+    <div class="signal">
+      <div class="signal-head">
+        <span class="company">{{ signal.company_name or "(sans nom)" }}</span>
+        <span class="badge {{ badge }}">{{ "%.1f"|format(signal.total_score) }} · {{ signal.signal_type }}</span>
+      </div>
+      <div class="signal-meta">{{ raw.source }} · {{ signal.recommended_action }}{% if signal.user_feedback %} · <span class="feedback-tag {{ signal.user_feedback }}">{{ signal.user_feedback }}</span>{% endif %}</div>
+      <div class="signal-summary">{{ signal.summary_fr }}</div>
+      {% if signal.suggested_angle %}<div class="signal-summary"><strong>Angle :</strong> {{ signal.suggested_angle }}</div>{% endif %}
+      <div class="actions">
+        {% if raw.url %}<a href="{{ raw.url }}" target="_blank">Source ↗</a>{% endif %}
+        <form method="post" action="/signals/{{ signal.id }}/feedback"><input type="hidden" name="action" value="contacted"><button class="contacted" type="submit">contacté</button></form>
+        <form method="post" action="/signals/{{ signal.id }}/feedback"><input type="hidden" name="action" value="relevant"><button class="relevant" type="submit">relevant</button></form>
+        <form method="post" action="/signals/{{ signal.id }}/feedback"><input type="hidden" name="action" value="not_relevant"><button class="not_relevant" type="submit">not relevant</button></form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="panel watchlist">
+    <h2 style="margin: 0 0 10px; font-size: 15px;">Watchlist ({{ watchlist|length }})</h2>
+    {% if not watchlist %}
+    <p style="color: var(--muted); margin: 0 0 8px;">Aucune entreprise prioritaire.</p>
+    {% endif %}
+    <ul>
+      {% for entry in watchlist %}
+      <li>
+        <span><strong>{{ entry.company_name }}</strong>{% if entry.notes %} <span style="color: var(--muted); font-size: 12px;">— {{ entry.notes }}</span>{% endif %}</span>
+        <form method="post" action="/watchlist/{{ entry.id }}/delete"><button type="submit" style="border: none; background: none; color: var(--muted); cursor: pointer;">supprimer</button></form>
+      </li>
+      {% endfor %}
+    </ul>
+    <form method="post" action="/watchlist" class="add">
+      <input type="text" name="company_name" placeholder="Nom de l'entreprise" required>
+      <input type="text" name="notes" placeholder="Notes (optionnel)">
+      <button type="submit">Ajouter</button>
+    </form>
+  </div>
+</main>
+</body>
+</html>
