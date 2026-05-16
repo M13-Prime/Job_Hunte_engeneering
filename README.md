@@ -1,9 +1,36 @@
 # Signal Tracker
 
+[![CI](https://github.com/M13-Prime/Score_Simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/M13-Prime/Score_Simulator/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Tests](https://img.shields.io/badge/tests-79%20passing-brightgreen)
+![mypy strict](https://img.shields.io/badge/mypy-strict-blue)
+
 Détecte des **signaux faibles** indiquant qu'une entreprise va probablement
 recruter dans les domaines **Sustainability / AI / Data / ESG / CSR**, avant
 que les offres ne soient publiées. Envoie chaque matin un digest classé par
 priorité, avec entreprise, signal, personne à contacter et angle d'attaque.
+
+## Why this exists
+
+Le **sales intelligence** (Apollo.io, ZoomInfo, Cognism, LeadIQ, Bombora,
+Sightline Climate…) facture €500 à €2000 par mois pour ce genre de détection
+de *trigger events*. Aucun de ces outils ne cible spécifiquement les profils
+**Sustainability / AI for climate / ESG / Data sustainability**, et aucun
+n'est open source.
+
+| | Signal Tracker | Apollo / ZoomInfo | Sightline Climate | Bombora |
+|---|---|---|---|---|
+| Open source | ✅ MIT | ❌ | ❌ | ❌ |
+| Focus ESG / climate / AI for sustainability | ✅ | ❌ générique | ✅ | ❌ |
+| Multi-LLM (Anthropic / OpenAI / Gemini / local) | ✅ via LiteLLM | ❌ | ❌ | ❌ |
+| Détection signaux faibles (nominations, levées, CSRD, pics) | ✅ | ✅ | partiel | partiel |
+| Self-hosted / RGPD-friendly | ✅ | ❌ | ❌ | ❌ |
+| Coût | clé LLM ~$1-2/jour | €500-2000/mois | sur devis | sur devis |
+
+Construit pour un usage personnel : repérer les fenêtres d'opportunité avant
+qu'une offre n'apparaisse sur LinkedIn, puis viser une candidature spontanée
+ciblée.
 
 > Statut : **Phases 0 → 5 livrées**. Pipeline complet :
 > RSS / GDELT / NewsAPI / Pappers / France Travail → dedup → classifier

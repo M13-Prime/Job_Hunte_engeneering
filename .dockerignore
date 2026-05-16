@@ -1,0 +1,22 @@
+# Image and worktree clutter we don't want in the build context.
+.git
+.venv
+.mypy_cache
+.ruff_cache
+.pytest_cache
+data/signals.db
+data/cache
+data/pappers_snapshots
+data/france_travail_history.json
+data/preview.html
+dist
+build
+*.egg-info
+__pycache__
+.env
+.env.local
+tests
+.github
+docker-compose.yml
+Dockerfile
+.dockerignore

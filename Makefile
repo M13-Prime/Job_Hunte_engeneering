@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 UV ?= uv
 
-.PHONY: help install demo collect classify pipeline digest daily schedule feedback dashboard test lint typecheck format clean
+.PHONY: help install demo doctor collect classify pipeline digest daily schedule feedback dashboard test lint typecheck format clean docker-build docker-up docker-down
 
 help:  ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*##/ { printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -11,6 +11,9 @@ install:  ## Sync dependencies (creates .venv via uv)
 
 demo:  ## Boot the Phase 0 skeleton end-to-end (init DB, load profile, insert sample row)
 	$(UV) run python -m signal_tracker.main
+
+doctor:  ## Sanity-check the local setup (.env, DB, templates, LLM ping)
+	$(UV) run python scripts/doctor.py
 
 collect:  ## Run one collection pass over configured RSS feeds
 	$(UV) run python scripts/collect.py
@@ -51,3 +54,12 @@ typecheck:  ## Run mypy --strict
 clean:  ## Remove caches and the local SQLite DB
 	rm -rf .mypy_cache .ruff_cache .pytest_cache
 	rm -f data/signals.db
+
+docker-build:  ## Build the signal-tracker:local image
+	docker compose build
+
+docker-up:  ## Start dashboard + scheduler in the background
+	docker compose up -d
+
+docker-down:  ## Stop docker services
+	docker compose down
