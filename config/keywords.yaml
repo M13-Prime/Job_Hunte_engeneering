@@ -1,17 +1,24 @@
-# Mots-clés utilisés par les collecteurs pour filtrer / cibler les recherches.
-# Phase 0 : valeurs initiales, à enrichir au fil de l'eau.
+# Mots-clés utilisés par les collecteurs et la veille manuelle.
 
 executive_change:
-  - "nomme"
-  - "nouveau directeur"
-  - "nouvelle directrice"
+  # ESG / Sustainability
   - "Chief Sustainability Officer"
   - "CSO"
-  - "Chief AI Officer"
-  - "Chief Data Officer"
   - "Head of ESG"
   - "VP Sustainability"
   - "Director CSR"
+  - "Directeur RSE"
+  - "Directrice RSE"
+  # AI
+  - "Chief AI Officer"
+  - "Head of AI"
+  - "Chief Data Officer"
+  - "VP AI"
+  - "Director of AI"
+  # Génériques
+  - "nomme"
+  - "nouveau directeur"
+  - "nouvelle directrice"
   - "appoints"
   - "names"
 
@@ -27,12 +34,16 @@ funding:
   - "EIC Accelerator"
   - "Horizon Europe"
   - "French Tech 2030"
+  - "climate tech"
+  - "AI startup"
+  - "GenAI"
 
 csrd_publication:
   - "premier rapport CSRD"
   - "premier DPEF"
   - "rapport de durabilité"
   - "sustainability report"
+  - "double materiality"
 
 sustainability_signals:
   - "SBTi"
@@ -40,6 +51,18 @@ sustainability_signals:
   - "Net Zero"
   - "CDP"
   - "trajectoire carbone"
+  - "bilan carbone"
+
+ai_signals:
+  - "Chief AI Officer"
+  - "AI strategy"
+  - "AI transformation"
+  - "AI roadmap"
+  - "AI Act"
+  - "EU AI Act"
+  - "responsible AI"
+  - "AI governance"
+  - "MLOps"
 
 strategic_announcement:
   - "double l'équipe"
@@ -48,9 +71,19 @@ strategic_announcement:
   - "launches a practice"
   - "ouverture bureau"
   - "opens office"
+  - "AI lab"
+  - "innovation hub"
 
 acquisition:
   - "acquiert"
   - "rachète"
   - "acquires"
   - "acquisition"
+
+regulatory:
+  - "CSRD"
+  - "AI Act"
+  - "EU Taxonomy"
+  - "Taxonomie EU"
+  - "SFDR"
+  - "DPEF"

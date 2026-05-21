@@ -5,20 +5,42 @@ name: null  # ex: "Prénom Nom"
 
 domains:
   - Sustainability
-  - AI
-  - Data Analysis
   - ESG
   - CSR
+  - AI
+  - Machine Learning
+  - Data Analysis
+  - Climate Tech
 
 target_roles:
+  # --- ESG / Sustainability ---
   - Data Analyst ESG
-  - AI for Sustainability
   - Consultant CSRD
   - ESG Strategist
-  - Climate Data Scientist
-  - Head of Data Sustainability
   - Sustainability Analyst
   - Carbon Data Lead
+  - Climate Data Scientist
+  - Head of Data Sustainability
+
+  # --- AI / Machine Learning généraliste ---
+  - AI Engineer
+  - ML Engineer
+  - LLM Engineer
+  - MLOps Engineer
+  - AI Product Manager
+  - Data Engineer
+  - Head of AI
+  - Chief AI Officer
+
+  # --- Intersection AI × Sustainability ---
+  - AI for Sustainability
+  - AI for Climate
+  - AI for ESG
+
+  # --- Conseil / Gouvernance ---
+  - AI Compliance Officer
+  - AI Governance Lead
+  - AI Act Specialist
 
 geographies:
   - France
@@ -26,13 +48,25 @@ geographies:
   - Remote international  # secondaire
 
 target_company_types:
+  # --- Climate / ESG ---
   - Climate tech
   - ESG SaaS
-  - Cabinets de conseil avec practice ESG/AI
-  - Grands groupes en transformation durable
+  - Carbon accounting platforms
+  - Cabinets de conseil avec practice ESG/CSRD
+
+  # --- AI ---
+  - AI scale-ups (foundation models, agents, RAG)
+  - GenAI product startups
+  - MLOps / AI infrastructure
+  - AI consulting practices
+
+  # --- Mix ---
+  - Grands groupes en transformation durable + IA
   - Scale-ups AI avec angle sustainability
 
 notes: |
   Priorité : signaux français et européens. Le remote international est
-  secondaire. Préférence pour structures < 1000 personnes ou practices
-  internes claires.
+  secondaire. Couverture équilibrée AI généraliste + AI-for-Sustainability +
+  ESG / climat. Préférence pour structures < 1000 personnes ou practices
+  internes claires. L'intersection AI × ESG (CSRD data, carbon AI, climate
+  ML) est le pic de pertinence.

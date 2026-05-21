@@ -195,7 +195,36 @@ CLASSIFIER_PROMPT_V1 = dedent(
       }}
     }}
 
-    ## Example 4 - NOT relevant
+    ## Example 4 - executive_change AI (Priority 1, AI side)
+
+    Input title: "BNP Paribas nomme Sophie Bernard au poste de Chief AI Officer"
+    Input content: "La banque francaise BNP Paribas annonce la nomination de
+    Sophie Bernard au poste nouvellement cree de Chief AI Officer. Elle aura
+    pour mission de structurer la strategie IA du groupe et de constituer une
+    equipe d'environ 40 ingenieurs IA d'ici fin 2026."
+    Expected output:
+    {{
+      "is_relevant": true,
+      "signal_type": "executive_change",
+      "company_name": "BNP Paribas",
+      "company_normalized": "bnp paribas",
+      "key_persons": [
+        {{"name": "Sophie Bernard", "role": "Chief AI Officer", "is_new_hire": true}}
+      ],
+      "relevance_score": 92,
+      "urgency_score": 88,
+      "fit_with_profile_score": 90,
+      "summary_fr": "BNP Paribas cree un poste de Chief AI Officer et nomme Sophie Bernard. Constitution annoncee d'une equipe IA d'environ 40 personnes d'ici fin 2026.",
+      "suggested_angle": "Feliciter la nomination et se positionner comme premier AI/ML Engineer pour aider a structurer l'equipe naissante.",
+      "recommended_action": "contact_immediate",
+      "target_contact": {{
+        "name": "Sophie Bernard",
+        "role": "Chief AI Officer",
+        "rationale": "Recrute 40 ingenieurs IA - moment ideal pour une candidature spontanee."
+      }}
+    }}
+
+    ## Example 5 - NOT relevant
 
     Input title: "Apple sort un nouvel iPhone"
     Input content: "Apple a presente hier le nouvel iPhone 17."

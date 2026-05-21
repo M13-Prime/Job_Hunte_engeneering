@@ -1,10 +1,25 @@
 # Définition des sources collectées. Une source = entrée dans une des sections.
 
 rss:
+  # === FR — tech / startup / business ===
   - id: maddyness
     name: Maddyness
     url: https://www.maddyness.com/feed/
     language: fr
+  - id: frenchweb
+    name: Frenchweb
+    url: https://www.frenchweb.fr/feed
+    language: fr
+  - id: usine_digitale
+    name: L'Usine Digitale
+    url: https://www.usine-digitale.fr/rss
+    language: fr
+  - id: zdnet_fr
+    name: ZDNet France
+    url: https://www.zdnet.fr/feeds/rss/
+    language: fr
+
+  # === FR — ESG / RSE / durabilité ===
   - id: novethic
     name: Novethic
     url: https://www.novethic.fr/rss.html
@@ -13,40 +28,82 @@ rss:
     name: Carenews
     url: https://www.carenews.com/rss.xml
     language: fr
+
+  # === EN — tech / AI generalist ===
   - id: techcrunch
     name: TechCrunch
     url: https://techcrunch.com/feed/
     language: en
-  - id: greenbiz
-    name: GreenBiz / Trellis
-    url: https://trellis.net/feed/
+  - id: venturebeat
+    name: VenturesBeat
+    url: https://venturebeat.com/feed/
     language: en
+  - id: theverge
+    name: The Verge
+    url: https://www.theverge.com/rss/index.xml
+    language: en
+  - id: mit_tech_review
+    name: MIT Technology Review
+    url: https://www.technologyreview.com/feed/
+    language: en
+
+  # === EU funding / scale-ups ===
   - id: sifted
     name: Sifted
     url: https://sifted.eu/feed
     language: en
-  - id: frenchweb
-    name: Frenchweb
-    url: https://www.frenchweb.fr/feed
-    language: fr
+  - id: eu_startups
+    name: EU-Startups
+    url: https://www.eu-startups.com/feed/
+    language: en
 
+  # === EN — sustainability / climate tech ===
+  - id: greenbiz
+    name: GreenBiz / Trellis
+    url: https://trellis.net/feed/
+    language: en
+  - id: esg_today
+    name: ESG Today
+    url: https://www.esgtoday.com/feed/
+    language: en
+  - id: edie
+    name: edie.net
+    url: https://www.edie.net/rss/
+    language: en
+  - id: climate_insider
+    name: Climate Insider
+    url: https://climateinsider.com/feed/
+    language: en
+
+# GDELT 2.0 — multilingual veille, pas de clé requise. Activé pour
+# multiplier la couverture sur les signaux executive_change / funding /
+# CSRD / regulatory à l'échelle mondiale (3-4 queries par run).
 gdelt:
-  enabled: false
+  enabled: true
   queries:
-    - id: csrd_fr
-      query: '"CSRD" sourcelang:fre'
+    - id: ai_exec_appointment
+      query: '"Chief AI Officer" OR "Chief Data Officer" OR "Head of AI"'
       timespan: 24h
       max_records: 100
-    - id: chief_sustainability_officer
-      query: '"Chief Sustainability Officer"'
+    - id: sustainability_exec_appointment
+      query: '"Chief Sustainability Officer" OR "VP Sustainability" OR "Head of ESG"'
       timespan: 24h
       max_records: 100
     - id: climate_tech_funding
-      query: '"climate tech" (raises OR funding OR Series)'
+      query: '"climate tech" (raises OR funding OR "Series A" OR "Series B")'
+      timespan: 24h
+      max_records: 100
+    - id: csrd_publication
+      query: '"CSRD" OR "rapport durabilité" sourcelang:fre'
+      timespan: 24h
+      max_records: 100
+    - id: ai_act_compliance
+      query: '"AI Act" (compliance OR hiring OR "Chief AI") sourcelang:eng'
       timespan: 24h
       max_records: 100
 
 newsapi:
+  # Active en mettant NEWSAPI_KEY dans .env (free tier 100 req/jour).
   enabled: false
   queries:
     - id: csrd_fr
@@ -57,20 +114,27 @@ newsapi:
       query: "(AI OR \"machine learning\") AND (sustainability OR climate OR ESG)"
       language: en
       page_size: 50
+    - id: chief_ai_officer
+      query: "\"Chief AI Officer\" OR \"Head of AI\""
+      language: en
+      page_size: 50
 
 pappers:
+  # Surveillance de changements de dirigeants par SIREN.
   enabled: false
   watchlist: []
-  # Examples (uncomment + set the real SIREN to track a company):
+  # Exemples (uncomment + set le bon SIREN pour suivre la boîte) :
   # - { siren: "552120222", label: "Carbone 4" }
-  # - "552120222"
+  # - { siren: "421203555", label: "Sweep" }
 
 france_travail:
+  # Détection de pics de recrutement par moyenne mobile 30j.
   enabled: false
   rome_codes:
     - M1403  # Études et prospectives socio-économiques
     - M1805  # Études et développement informatique
     - M1402  # Conseil en organisation et management d'entreprise
+    - M1810  # Production et exploitation de systèmes d'information
   surge_min_count: 3
   surge_z_threshold: 1.5
   history_window_days: 30
