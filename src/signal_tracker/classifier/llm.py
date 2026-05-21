@@ -8,6 +8,7 @@ SDK here.
 from __future__ import annotations
 
 import json
+import re
 import time
 from typing import Any
 
@@ -39,6 +40,28 @@ logger = get_logger(__name__)
 
 class ClassifierError(RuntimeError):
     """Raised when the LLM cannot produce a valid ClassificationResult."""
+
+
+_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
+_JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
+
+
+def _extract_json(raw: str) -> str:
+    """Pull a JSON object out of a possibly-fenced or preamble-laden response.
+
+    Claude (and a few other models) sometimes ignore ``response_format`` and
+    wrap the JSON in markdown fences or prepend a short preamble. We accept
+    those forms and fish out the actual object.
+    """
+    text = raw.strip()
+    fence_match = _FENCE_RE.search(text)
+    if fence_match:
+        text = fence_match.group(1).strip()
+    elif not text.startswith("{"):
+        obj_match = _JSON_OBJECT_RE.search(text)
+        if obj_match:
+            text = obj_match.group(0)
+    return text
 
 
 _RETRYABLE: tuple[type[BaseException], ...] = (
@@ -106,7 +129,15 @@ async def classify(
         if not text:
             raise ClassifierError("Empty response from LLM")
 
-        data = json.loads(text)
+        cleaned = _extract_json(text)
+        try:
+            data = json.loads(cleaned)
+        except json.JSONDecodeError:
+            logger.warning(
+                "llm.classify json_decode_error raw_preview=%s",
+                text[:300].replace("\n", "\\n"),
+            )
+            raise
         result = ClassificationResult.model_validate(data)
 
         try:
