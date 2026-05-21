@@ -40,7 +40,7 @@ async def _ping_llm() -> tuple[bool, str]:
         await classify(item, load_user_profile())
         return True, "LLM round-trip succeeded"
     except Exception as exc:
-        return False, f"{type(exc).__name__}: {str(exc)[:160]}"
+        return False, f"{type(exc).__name__}: {str(exc)[:500]}"
 
 
 def main() -> None:

@@ -75,6 +75,8 @@ _RETRYABLE: tuple[type[BaseException], ...] = (
 )
 
 
+
+
 async def classify(
     item: ClassifierInput,
     profile: UserProfile,
@@ -126,18 +128,35 @@ async def classify(
 
         choices = response.choices
         text = choices[0].message.content
-        if not text:
-            raise ClassifierError("Empty response from LLM")
+        if not isinstance(text, str):
+            raise ClassifierError(
+                f"LLM returned non-string content (type={type(text).__name__}, "
+                f"repr={text!r:.200})"
+            )
+        if not text.strip():
+            raise ClassifierError(
+                f"LLM returned empty/whitespace content (len={len(text)})"
+            )
 
         cleaned = _extract_json(text)
+        if not cleaned.strip():
+            preview = text[:300].replace("\n", "\\n")
+            raise ClassifierError(
+                f"LLM returned no JSON-like block. Raw preview: {preview!r}"
+            )
         try:
             data = json.loads(cleaned)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as exc:
+            preview = text[:300].replace("\n", "\\n")
             logger.warning(
-                "llm.classify json_decode_error raw_preview=%s",
-                text[:300].replace("\n", "\\n"),
+                "llm.classify json_decode_error raw_preview=%s", preview
             )
-            raise
+            # Re-raise as JSONDecodeError (keeps retry behaviour) with the
+            # preview embedded so downstream callers can see what the model
+            # returned without the warning log being suppressed.
+            raise json.JSONDecodeError(
+                f"{exc.msg} | Raw preview: {preview!r}", exc.doc, exc.pos
+            ) from exc
         result = ClassificationResult.model_validate(data)
 
         try:
