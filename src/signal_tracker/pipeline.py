@@ -260,10 +260,22 @@ async def run_classification(
             result = await classify(item, profile, extra_examples=feedback_examples)
         except Exception as exc:
             report.errors += 1
+            message = str(exc)[:200]
             logger.error(
                 "pipeline.classify_error",
-                extra={"raw_item_id": raw.id, "error": str(exc)[:200]},
+                extra={"raw_item_id": raw.id, "error": message},
             )
+            # Fail-fast on credential errors: no point in burning through the
+            # whole backlog with the same broken key.
+            lowered = message.lower()
+            if "authenticationerror" in lowered or (
+                "missing" in lowered and "api key" in lowered
+            ):
+                logger.error(
+                    "pipeline.aborted_credentials_missing",
+                    extra={"processed_before_abort": report.processed},
+                )
+                break
             continue
 
         report.processed += 1

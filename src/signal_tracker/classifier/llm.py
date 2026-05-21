@@ -30,6 +30,10 @@ from signal_tracker.classifier.schemas import ClassificationResult, ClassifierIn
 from signal_tracker.config import UserProfile, get_settings
 from signal_tracker.utils.logging import get_logger
 
+# LiteLLM is chatty by default; one INFO line per call buries our own
+# structured log. Keep it to warnings / errors.
+litellm.suppress_debug_info = True
+
 logger = get_logger(__name__)
 
 
