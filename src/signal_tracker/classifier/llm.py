@@ -8,6 +8,7 @@ SDK here.
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from typing import Any
@@ -75,6 +76,41 @@ _RETRYABLE: tuple[type[BaseException], ...] = (
 )
 
 
+_PROVIDER_KEY_ENV: dict[str, str] = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "gemini": "GEMINI_API_KEY",
+    "mistral": "MISTRAL_API_KEY",
+}
+
+
+def _provider_has_credentials(model: str) -> bool:
+    """True if the env var required by the provider behind ``model`` is set."""
+    if "/" not in model:
+        return True
+    provider = model.split("/", 1)[0].lower()
+    required = _PROVIDER_KEY_ENV.get(provider)
+    if required is None:
+        return True  # unknown provider (e.g. ollama) — let LiteLLM decide.
+    return bool(os.environ.get(required))
+
+
+def _resolve_fallbacks(model_name: str | None) -> list[str] | None:
+    """Build the fallbacks=... arg, dropping any that lack credentials.
+
+    Otherwise LiteLLM happily tries the fallback when the primary fails, hits
+    'Missing credentials' on the fallback, and that masking error is what we
+    surface — drowning the real reason the primary call failed.
+    """
+    if not model_name:
+        return None
+    if _provider_has_credentials(model_name):
+        return [model_name]
+    logger.warning(
+        "llm.fallback_disabled missing_key model=%s",
+        model_name,
+    )
+    return None
 
 
 async def classify(
@@ -94,9 +130,7 @@ async def classify(
     """
     settings = get_settings()
     model = settings.llm_model
-    fallbacks = (
-        [settings.llm_fallback_model] if settings.llm_fallback_model else None
-    )
+    fallbacks = _resolve_fallbacks(settings.llm_fallback_model)
 
     messages = [
         {

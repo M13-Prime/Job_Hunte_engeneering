@@ -349,6 +349,9 @@ async def test_fallback_model_passed_to_litellm(
 ) -> None:
     monkeypatch.setenv("LLM_MODEL", "anthropic/claude-sonnet-4-5")
     monkeypatch.setenv("LLM_FALLBACK_MODEL", "openai/gpt-4o-mini")
+    # The fallback resolver drops fallbacks whose provider key isn't set,
+    # so the test needs to pretend OpenAI is configured.
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     from signal_tracker.config import get_settings
 
     get_settings.cache_clear()
