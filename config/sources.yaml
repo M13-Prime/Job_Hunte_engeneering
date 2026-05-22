@@ -35,7 +35,7 @@ rss:
     url: https://techcrunch.com/feed/
     language: en
   - id: venturebeat
-    name: VenturesBeat
+    name: VentureBeat
     url: https://venturebeat.com/feed/
     language: en
   - id: theverge
@@ -56,6 +56,10 @@ rss:
     name: EU-Startups
     url: https://www.eu-startups.com/feed/
     language: en
+  - id: crunchbase_news
+    name: Crunchbase News
+    url: https://news.crunchbase.com/feed/
+    language: en
 
   # === EN — sustainability / climate tech ===
   - id: greenbiz
@@ -75,30 +79,94 @@ rss:
     url: https://climateinsider.com/feed/
     language: en
 
-# GDELT 2.0 — multilingual veille, pas de clé requise. Activé pour
-# multiplier la couverture sur les signaux executive_change / funding /
-# CSRD / regulatory à l'échelle mondiale (3-4 queries par run).
+  # === Hacker News — queries ciblées (RSS gratuit via hnrss.org) ===
+  - id: hn_climate_tech
+    name: Hacker News - climate tech
+    url: https://hnrss.org/newest?q=climate+tech&count=50
+    language: en
+  - id: hn_ai_sustainability
+    name: Hacker News - AI x sustainability
+    url: https://hnrss.org/newest?q=AI+sustainability+OR+%22AI+for+climate%22&count=50
+    language: en
+  - id: hn_esg_csrd
+    name: Hacker News - ESG / CSRD
+    url: https://hnrss.org/newest?q=ESG+OR+CSRD&count=50
+    language: en
+
+  # === Reddit — communautés AI / sustainability (RSS public) ===
+  - id: reddit_ml
+    name: Reddit r/MachineLearning
+    url: https://www.reddit.com/r/MachineLearning/.rss
+    language: en
+  - id: reddit_sustainability
+    name: Reddit r/sustainability
+    url: https://www.reddit.com/r/sustainability/.rss
+    language: en
+  - id: reddit_climate
+    name: Reddit r/climate
+    url: https://www.reddit.com/r/climate/.rss
+    language: en
+
+  # === Google News — queries ciblées (RSS gratuit, sans clé) ===
+  # Format : https://news.google.com/rss/search?q=<query>&hl=<lang>&gl=<country>
+  # 3 catégories x 2 langues = 6 queries équilibrées AI / ESG / Intersection.
+  - id: gnews_cao_fr
+    name: Google News FR - Chief AI Officer
+    url: https://news.google.com/rss/search?q=%22Chief+AI+Officer%22+OR+%22Head+of+AI%22+France&hl=fr&gl=FR&ceid=FR:fr
+    language: fr
+  - id: gnews_cso_fr
+    name: Google News FR - Chief Sustainability Officer
+    url: https://news.google.com/rss/search?q=%22Chief+Sustainability+Officer%22+OR+%22directeur+RSE%22+France&hl=fr&gl=FR&ceid=FR:fr
+    language: fr
+  - id: gnews_climate_funding_fr
+    name: Google News FR - climate tech levée
+    url: https://news.google.com/rss/search?q=%22climate+tech%22+OR+%22greentech%22+lev%C3%A9e+France&hl=fr&gl=FR&ceid=FR:fr
+    language: fr
+  - id: gnews_csrd_fr
+    name: Google News FR - CSRD
+    url: https://news.google.com/rss/search?q=%22CSRD%22+OR+%22rapport+de+durabilit%C3%A9%22&hl=fr&gl=FR&ceid=FR:fr
+    language: fr
+  - id: gnews_ai_sustainability_en
+    name: Google News EN - AI for Sustainability
+    url: https://news.google.com/rss/search?q=%22AI+for+sustainability%22+OR+%22AI+for+climate%22+hiring&hl=en&gl=US&ceid=US:en
+    language: en
+  - id: gnews_ai_act_en
+    name: Google News EN - AI Act compliance hiring
+    url: https://news.google.com/rss/search?q=%22AI+Act%22+compliance+hiring&hl=en&gl=US&ceid=US:en
+    language: en
+
+# GDELT 2.0 — multilingual veille, pas de clé requise.
+# Équilibre : 2 queries AI / 2 queries ESG / 2 queries intersection.
 gdelt:
   enabled: true
   queries:
+    # --- AI side ---
     - id: ai_exec_appointment
       query: '"Chief AI Officer" OR "Chief Data Officer" OR "Head of AI"'
       timespan: 24h
       max_records: 100
-    - id: sustainability_exec_appointment
-      query: '"Chief Sustainability Officer" OR "VP Sustainability" OR "Head of ESG"'
+    - id: ai_act_compliance
+      query: '"AI Act" (compliance OR hiring OR "Chief AI") sourcelang:eng'
       timespan: 24h
       max_records: 100
-    - id: climate_tech_funding
-      query: '"climate tech" (raises OR funding OR "Series A" OR "Series B")'
+
+    # --- ESG / Sustainability side ---
+    - id: sustainability_exec_appointment
+      query: '"Chief Sustainability Officer" OR "VP Sustainability" OR "Head of ESG"'
       timespan: 24h
       max_records: 100
     - id: csrd_publication
       query: '"CSRD" OR "rapport durabilité" sourcelang:fre'
       timespan: 24h
       max_records: 100
-    - id: ai_act_compliance
-      query: '"AI Act" (compliance OR hiring OR "Chief AI") sourcelang:eng'
+
+    # --- Intersection AI x Sustainability ---
+    - id: ai_for_climate_funding
+      query: '("AI for climate" OR "AI for sustainability" OR "climate AI") (raises OR funding OR Series)'
+      timespan: 24h
+      max_records: 100
+    - id: climate_tech_funding
+      query: '"climate tech" (raises OR funding OR "Series A" OR "Series B")'
       timespan: 24h
       max_records: 100
 
@@ -120,21 +188,16 @@ newsapi:
       page_size: 50
 
 pappers:
-  # Surveillance de changements de dirigeants par SIREN.
   enabled: false
   watchlist: []
-  # Exemples (uncomment + set le bon SIREN pour suivre la boîte) :
-  # - { siren: "552120222", label: "Carbone 4" }
-  # - { siren: "421203555", label: "Sweep" }
 
 france_travail:
-  # Détection de pics de recrutement par moyenne mobile 30j.
   enabled: false
   rome_codes:
-    - M1403  # Études et prospectives socio-économiques
-    - M1805  # Études et développement informatique
-    - M1402  # Conseil en organisation et management d'entreprise
-    - M1810  # Production et exploitation de systèmes d'information
+    - M1403
+    - M1805
+    - M1402
+    - M1810
   surge_min_count: 3
   surge_z_threshold: 1.5
   history_window_days: 30
