@@ -1,24 +1,57 @@
+# Production docker-compose: dashboard + scheduler + Postgres
+# behind a Cloudflare Tunnel (or nginx) on the host.
+
 services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-signaltracker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme-please}
+      POSTGRES_DB: ${POSTGRES_DB:-signaltracker}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-signaltracker}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [signaltracker]
+
   dashboard:
     build: .
     image: signal-tracker:local
     command: ["python", "scripts/dashboard.py", "--host", "0.0.0.0", "--port", "8000"]
+    # Bind only on 127.0.0.1: Cloudflare Tunnel (or nginx) talks to it from
+    # the host. No need to expose to 0.0.0.0.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     env_file: .env
-    volumes:
-      - signal-data:/data
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-signaltracker}:${POSTGRES_PASSWORD:-changeme-please}@db:5432/${POSTGRES_DB:-signaltracker}
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
+    networks: [signaltracker]
 
   scheduler:
     image: signal-tracker:local
-    depends_on:
-      - dashboard
     command: ["python", "scripts/schedule.py"]
     env_file: .env
-    volumes:
-      - signal-data:/data
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-signaltracker}:${POSTGRES_PASSWORD:-changeme-please}@db:5432/${POSTGRES_DB:-signaltracker}
+    depends_on:
+      db:
+        condition: service_healthy
+      dashboard:
+        condition: service_started
     restart: unless-stopped
+    networks: [signaltracker]
 
 volumes:
-  signal-data:
+  postgres-data:
+
+networks:
+  signaltracker:
+    driver: bridge

@@ -6,7 +6,7 @@ from rich.console import Console
 from rich.table import Table
 
 from signal_tracker import __version__
-from signal_tracker.config import get_settings, load_user_profile
+from signal_tracker.config import get_settings, load_user_profile, resolve_db_url
 from signal_tracker.storage import init_db
 from signal_tracker.storage.models import Company, Person, RawItem, Signal
 from signal_tracker.utils.dedup import raw_item_hash
@@ -50,7 +50,7 @@ def demo() -> None:
     runtime_table.add_row("log_level", settings.log_level)
     console.print(runtime_table)
 
-    db = init_db(settings.db_path)
+    db = init_db(resolve_db_url(settings))
     console.print(f"[green]OK[/green] DB initialised at [bold]{settings.db_path}[/bold]")
 
     with db.session() as session:

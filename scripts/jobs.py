@@ -21,6 +21,7 @@ from signal_tracker.config import (
     get_settings,
     load_jobs_config,
     load_user_profile,
+    resolve_db_url,
 )
 from signal_tracker.jobs.scraper import (
     JobsScraper,
@@ -75,7 +76,7 @@ async def _main(args: argparse.Namespace) -> None:
     jobs_cfg = load_jobs_config()
     overrides = parse_overrides(jobs_cfg.get("overrides"))
 
-    db = init_db(settings.db_path)
+    db = init_db(resolve_db_url(settings))
 
     sources_cfg = jobs_cfg.get("sources") or {}
     use_watchlist = bool(args.from_watchlist) or bool(sources_cfg.get("use_watchlist"))

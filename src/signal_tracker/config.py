@@ -65,6 +65,15 @@ class Settings(BaseSettings):
     dashboard_base_url: str | None = None
     log_level: str = "INFO"
     db_path: str = "data/signals.db"
+    # When set, takes precedence over ``db_path``. Supports
+    # ``sqlite:///...`` or ``postgresql+psycopg://user:pwd@host:5432/db``.
+    database_url: str | None = None
+
+    # Dashboard Basic Auth (production deployments)
+    # When ``dashboard_auth_user`` is unset, the middleware is disabled
+    # (useful for local dev / Codespaces). Set both vars in prod.
+    dashboard_auth_user: str | None = None
+    dashboard_auth_password: str | None = None
 
 
 class UserProfile(BaseModel):
@@ -118,6 +127,16 @@ def load_jobs_config(path: str | Path | None = None) -> dict[str, Any]:
     return _read_yaml(jobs_path)
 
 
+def resolve_db_url(settings: Settings | None = None) -> str:
+    """Return the URL/path to hand to ``init_db``.
+
+    Priority: explicit ``DATABASE_URL`` env var > the local SQLite ``db_path``.
+    Centralised so every script and the dashboard agree.
+    """
+    settings = settings or get_settings()
+    return settings.database_url or settings.db_path
+
+
 __all__ = [
     "CONFIG_DIR",
     "REPO_ROOT",
@@ -128,6 +147,7 @@ __all__ = [
     "load_keywords",
     "load_sources",
     "load_user_profile",
+    "resolve_db_url",
 ]
 
 

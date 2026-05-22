@@ -12,29 +12,46 @@ Endpoints:
 
 from __future__ import annotations
 
+import base64
+import secrets
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from signal_tracker.classifier.feedback import VALID_FEEDBACK
-from signal_tracker.config import get_settings
+from signal_tracker.config import get_settings, resolve_db_url
 from signal_tracker.storage import Database, init_db
 from signal_tracker.storage.models import RawItem, Signal, WatchlistEntry
 from signal_tracker.utils.normalize import normalize_company_name
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
+UNAUTH_PATHS = {"/healthz"}
+
+
+def _check_basic_auth(header_value: str | None, expected_user: str, expected_pwd: str) -> bool:
+    if not header_value or not header_value.startswith("Basic "):
+        return False
+    try:
+        decoded = base64.b64decode(header_value.split(" ", 1)[1]).decode("utf-8")
+        user, _, pwd = decoded.partition(":")
+    except (ValueError, UnicodeDecodeError):
+        return False
+    return secrets.compare_digest(user, expected_user) and secrets.compare_digest(
+        pwd, expected_pwd
+    )
 
 
 def build_app(db: Database | None = None) -> FastAPI:
     """Build the FastAPI app, optionally injecting a custom Database (tests)."""
-    app_db = db or init_db(get_settings().db_path)
+    settings = get_settings()
+    app_db = db or init_db(resolve_db_url(settings))
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
     def get_session_dep() -> Iterable[Session]:
@@ -42,6 +59,24 @@ def build_app(db: Database | None = None) -> FastAPI:
             yield session
 
     app = FastAPI(title="Signal Tracker Dashboard", version="0.1.0")
+
+    auth_user = settings.dashboard_auth_user
+    auth_pwd = settings.dashboard_auth_password or ""
+
+    @app.middleware("http")
+    async def basic_auth_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
+        if not auth_user:
+            # Auth disabled (dev / Codespaces). Skip.
+            return await call_next(request)
+        if request.url.path in UNAUTH_PATHS:
+            return await call_next(request)
+        if _check_basic_auth(request.headers.get("authorization"), auth_user, auth_pwd):
+            return await call_next(request)
+        return Response(
+            status_code=401,
+            content="Authentication required.",
+            headers={"WWW-Authenticate": 'Basic realm="Signal Tracker"'},
+        )
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

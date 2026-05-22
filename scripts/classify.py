@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 from sqlalchemy import desc, select
 
-from signal_tracker.config import get_settings
+from signal_tracker.config import get_settings, resolve_db_url
 from signal_tracker.pipeline import run_classification
 from signal_tracker.storage import init_db
 from signal_tracker.storage.models import RawItem, Signal
@@ -33,7 +33,7 @@ async def _main(limit: int | None) -> None:
     console.print(metrics)
 
     settings = get_settings()
-    db = init_db(settings.db_path)
+    db = init_db(resolve_db_url(settings))
     with db.session() as session:
         rows = list(
             session.execute(

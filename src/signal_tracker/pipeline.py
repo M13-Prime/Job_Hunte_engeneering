@@ -17,7 +17,13 @@ from signal_tracker.collectors.gdelt import GdeltCollector
 from signal_tracker.collectors.newsapi import NewsApiCollector
 from signal_tracker.collectors.pappers import PappersCollector
 from signal_tracker.collectors.rss import FeedConfig, RSSCollector
-from signal_tracker.config import UserProfile, get_settings, load_sources, load_user_profile
+from signal_tracker.config import (
+    UserProfile,
+    get_settings,
+    load_sources,
+    load_user_profile,
+    resolve_db_url,
+)
 from signal_tracker.storage import Database, init_db
 from signal_tracker.storage.models import RawItem, Signal
 from signal_tracker.utils.dedup import raw_item_hash, signal_dedup_key
@@ -145,7 +151,7 @@ async def run_collection(
     """Run all configured collectors and persist new raw items."""
     settings = get_settings()
     if db is None:
-        db = init_db(settings.db_path)
+        db = init_db(resolve_db_url(settings))
     if collectors is None:
         collectors = build_default_collectors()
 
@@ -228,7 +234,7 @@ async def run_classification(
     """Classify all unclassified raw_items in the DB."""
     settings = get_settings()
     if db is None:
-        db = init_db(settings.db_path)
+        db = init_db(resolve_db_url(settings))
     if profile is None:
         profile = load_user_profile()
 

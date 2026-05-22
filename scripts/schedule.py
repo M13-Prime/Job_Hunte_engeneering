@@ -6,7 +6,7 @@ import asyncio
 
 from rich.console import Console
 
-from signal_tracker.config import get_settings, load_user_profile
+from signal_tracker.config import get_settings, load_user_profile, resolve_db_url
 from signal_tracker.notifier.digest import DigestBuilder, record_digest_sent
 from signal_tracker.notifier.email import (
     DryRunSender,
@@ -22,7 +22,7 @@ from signal_tracker.utils.logging import setup_logging
 
 async def _job() -> None:
     settings = get_settings()
-    db = init_db(settings.db_path)
+    db = init_db(resolve_db_url(settings))
     profile = load_user_profile()
     await run_collection(db=db)
     await run_classification(profile=profile, db=db)
