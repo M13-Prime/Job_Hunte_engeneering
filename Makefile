@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 UV ?= uv
 
-.PHONY: help install demo doctor collect classify pipeline digest daily schedule feedback dashboard test lint typecheck format clean docker-build docker-up docker-down
+.PHONY: help install demo doctor collect classify pipeline digest daily schedule feedback dashboard jobs test lint typecheck format clean docker-build docker-up docker-down
 
 help:  ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*##/ { printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -37,6 +37,9 @@ feedback:  ## Mark a signal: ARGS="42 --action contacted" or ARGS="--list"
 
 dashboard:  ## Start the FastAPI dashboard at http://127.0.0.1:8000
 	$(UV) run python scripts/dashboard.py --reload
+
+jobs:  ## Scrape job offers (ARGS="--from-signals --top 20" or "--company X")
+	$(UV) run python scripts/jobs.py $(ARGS)
 
 test:  ## Run pytest
 	$(UV) run pytest

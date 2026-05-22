@@ -146,3 +146,35 @@ class WatchlistEntry(Base):
     added_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
+
+
+class JobOffer(Base):
+    """A single open position scraped from an ATS public API (Module 2)."""
+
+    __tablename__ = "job_offers"
+    __table_args__ = (
+        UniqueConstraint("dedup_key", name="uq_job_offers_dedup_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company_normalized: Mapped[str] = mapped_column(String(512), index=True)
+    company_name: Mapped[str] = mapped_column(String(512))
+    ats: Mapped[str] = mapped_column(String(32))
+    ats_company_slug: Mapped[str] = mapped_column(String(256))
+    external_id: Mapped[str] = mapped_column(String(128))
+
+    title: Mapped[str] = mapped_column(String(512))
+    url: Mapped[str] = mapped_column(String(2048))
+    location: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    department: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    relevance_score: Mapped[float] = mapped_column(Float, default=0.0, index=True)
+    matched_roles: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    is_open: Mapped[bool] = mapped_column(default=True, nullable=False, index=True)
+
+    collected_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+    dedup_key: Mapped[str] = mapped_column(String(256), index=True)

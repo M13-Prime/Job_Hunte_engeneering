@@ -1,0 +1,31 @@
+# Jobs module — config for scraping ATS APIs (Greenhouse / Lever / Workable / Ashby).
+
+# Companies for which the slug heuristic doesn't find the right ATS — override
+# explicitly with the known (ats, slug) pair so the scraper goes straight to it.
+overrides: []
+  # Examples:
+  # - company: Sweep
+  #   ats: greenhouse
+  #   slug: sweep
+  # - company: Carbone 4
+  #   ats: greenhouse
+  #   slug: carbone4
+  # - company: Mirakl
+  #   ats: lever
+  #   slug: mirakl
+
+# Where to pull the list of companies to scrape from.
+sources:
+  # Pull companies sitting in the WatchlistEntry table.
+  use_watchlist: true
+  # Pull companies that have at least one Signal in the last N days, with
+  # total_score >= recent_signals_min_score.
+  use_recent_signals: true
+  recent_signals_days: 14
+  recent_signals_min_score: 50
+
+# Rate limit between requests (per ATS-call), in seconds.
+rate_limit_seconds: 1.0
+
+# Backend HTTP timeout in seconds.
+timeout_seconds: 20.0

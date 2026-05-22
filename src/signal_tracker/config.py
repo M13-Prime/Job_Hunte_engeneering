@@ -112,12 +112,19 @@ def load_sources(path: str | Path | None = None) -> dict[str, Any]:
     return _read_yaml(sources_path)
 
 
+@cache
+def load_jobs_config(path: str | Path | None = None) -> dict[str, Any]:
+    jobs_path = Path(path) if path else CONFIG_DIR / "jobs.yaml"
+    return _read_yaml(jobs_path)
+
+
 __all__ = [
     "CONFIG_DIR",
     "REPO_ROOT",
     "Settings",
     "UserProfile",
     "get_settings",
+    "load_jobs_config",
     "load_keywords",
     "load_sources",
     "load_user_profile",
