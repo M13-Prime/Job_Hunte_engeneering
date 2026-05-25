@@ -1,0 +1,46 @@
+# Lite compose for small / single-user deployments (GCP e2-micro, Pi, etc.)
+# Uses SQLite on a shared volume instead of running Postgres. Both services
+# share the same /data mount, which holds the SQLite file plus the HTTP
+# caches and ATS snapshots.
+#
+# Usage:
+#     docker compose -f docker-compose.lite.yml up -d --build
+#
+# Set DATABASE_URL in .env if you want to point at an external Postgres
+# (e.g. Neon) instead of SQLite; everything else still works.
+
+services:
+  dashboard:
+    build: .
+    image: signal-tracker:local
+    command: ["python", "scripts/dashboard.py", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file: .env
+    environment:
+      DB_PATH: /data/signals.db
+    volumes:
+      - signal-tracker-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status == 200 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  scheduler:
+    image: signal-tracker:local
+    command: ["python", "scripts/schedule.py"]
+    env_file: .env
+    environment:
+      DB_PATH: /data/signals.db
+    volumes:
+      - signal-tracker-data:/data
+    depends_on:
+      dashboard:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  signal-tracker-data:
