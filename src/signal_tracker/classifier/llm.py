@@ -118,6 +118,7 @@ async def classify(
     profile: UserProfile,
     *,
     extra_examples: list[FeedbackExample] | None = None,
+    user_keywords: dict[str, list[str]] | None = None,
 ) -> ClassificationResult:
     """Classify a collected item via the LLM configured in LLM_MODEL.
 
@@ -135,7 +136,11 @@ async def classify(
     messages = [
         {
             "role": "system",
-            "content": render_system_prompt(profile, extra_examples=extra_examples),
+            "content": render_system_prompt(
+                profile,
+                extra_examples=extra_examples,
+                user_keywords=user_keywords,
+            ),
         },
         {"role": "user", "content": render_user_prompt(item)},
     ]
