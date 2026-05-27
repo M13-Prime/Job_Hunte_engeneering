@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # LLM
     llm_model: str = "anthropic/claude-sonnet-4-5"
     llm_fallback_model: str | None = None
+    # Seconds to sleep between consecutive classify() calls in the pipeline.
+    # Set to ~7 on Anthropic Tier 1 (30k TPM) to avoid rate-limit retries.
+    llm_rate_limit_seconds: float = 0.0
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     gemini_api_key: str | None = None
