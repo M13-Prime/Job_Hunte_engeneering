@@ -7,6 +7,7 @@ from signal_tracker.storage.models import (
     Person,
     RawItem,
     Signal,
+    UserKeyword,
     WatchlistEntry,
 )
 
@@ -19,6 +20,7 @@ __all__ = [
     "Person",
     "RawItem",
     "Signal",
+    "UserKeyword",
     "WatchlistEntry",
     "get_session",
     "init_db",
