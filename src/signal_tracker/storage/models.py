@@ -178,3 +178,25 @@ class JobOffer(Base):
         DateTime, server_default=func.now(), nullable=False
     )
     dedup_key: Mapped[str] = mapped_column(String(256), index=True)
+
+
+class UserKeyword(Base):
+    """User-curated keywords injected into the classifier prompt at runtime.
+
+    Categories:
+    - field        : sectors / domains the user hunts (e.g. "AI for legal")
+    - job_title    : roles to surface (e.g. "Sales Engineer")
+    - other        : misc terms (e.g. "AI Act", "RAG", "vector DB")
+    """
+
+    __tablename__ = "user_keywords"
+    __table_args__ = (
+        UniqueConstraint("category", "value", name="uq_user_keywords_cat_value"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    category: Mapped[str] = mapped_column(String(32), index=True)
+    value: Mapped[str] = mapped_column(String(256))
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )

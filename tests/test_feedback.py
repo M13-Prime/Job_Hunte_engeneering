@@ -127,7 +127,7 @@ def test_pipeline_passes_feedback_to_classify(
 
     captured: dict[str, object] = {}
 
-    async def fake_classify(item, profile, *, extra_examples=None):  # type: ignore[no-untyped-def]
+    async def fake_classify(item, profile, *, extra_examples=None, **_kw):  # type: ignore[no-untyped-def]
         captured["extra_examples"] = extra_examples
         return ClassificationResult(
             is_relevant=False, signal_type="other",
