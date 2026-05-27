@@ -251,11 +251,15 @@ def render_system_prompt(
     profile: UserProfile,
     *,
     extra_examples: list[FeedbackExample] | None = None,
+    user_keywords: dict[str, list[str]] | None = None,
 ) -> str:
     """Inject the user profile into the versioned prompt template.
 
-    Optionally appends feedback-derived few-shot examples ("dynamic shots")
-    so the classifier can learn from prior user judgments.
+    Optionally appends:
+    - User-curated keywords (fields / job titles / other) — appended as a
+      runtime supplement to the static profile.
+    - Feedback-derived few-shot examples ("dynamic shots") so the classifier
+      can learn from prior user judgments.
     """
     base = CLASSIFIER_PROMPT_V1.format(
         domains=", ".join(profile.domains) or "(none)",
@@ -264,6 +268,22 @@ def render_system_prompt(
         target_company_types=", ".join(profile.target_company_types) or "(none)",
         notes=(profile.notes or "(none)").strip(),
     )
+
+    if user_keywords:
+        lines: list[str] = ["\n\n-----------------",
+                            "USER-CURATED KEYWORDS (runtime, dashboard-managed)",
+                            "-----------------"]
+        for category, label in (
+            ("field", "Fields / sectors"),
+            ("job_title", "Job titles"),
+            ("other", "Other terms"),
+        ):
+            values = user_keywords.get(category) or []
+            if values:
+                lines.append(f"- {label}: {', '.join(values)}")
+        if len(lines) > 3:
+            base = base + "\n".join(lines)
+
     if not extra_examples:
         return base
     return (
