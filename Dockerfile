@@ -49,7 +49,9 @@ COPY --chown=app:app config/  ./config/
 COPY --chown=app:app Makefile pyproject.toml README.md ./
 
 # /data is a mounted volume (SQLite file, scraping caches, snapshots, etc.).
-RUN mkdir -p /data && chown app:app /data
+# /app/data is also created and chown'd so legacy relative cache paths like
+# "data/cache/rss" written from WORKDIR=/app still resolve to a writable dir.
+RUN mkdir -p /data /app/data && chown -R app:app /data /app/data
 VOLUME ["/data"]
 
 USER app

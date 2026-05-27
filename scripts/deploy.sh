@@ -41,17 +41,19 @@ fi
 # ---------------------------------------------------------------------------
 # 2. Firewall — open 80/443 for HTTP/S even though Cloudflare Tunnel doesn't
 #    need them; nice to have if you ever switch to direct nginx + Let's Encrypt.
+#    Some hosts ship empty iptables rulesets where -I INPUT 6 fails ("Index
+#    of insertion too big"). Appending with -A is safe on any host.
 # ---------------------------------------------------------------------------
 log "Opening firewall ports 80 / 443 (idempotent)..."
 add_rule() {
     local port=$1
     if ! sudo iptables -C INPUT -m state --state NEW -p tcp --dport "$port" -j ACCEPT 2>/dev/null; then
-        sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport "$port" -j ACCEPT
+        sudo iptables -A INPUT -m state --state NEW -p tcp --dport "$port" -j ACCEPT
     fi
 }
 add_rule 80
 add_rule 443
-sudo netfilter-persistent save >/dev/null
+sudo netfilter-persistent save >/dev/null 2>&1 || true
 
 # ---------------------------------------------------------------------------
 # 3. Code
