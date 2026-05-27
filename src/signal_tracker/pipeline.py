@@ -240,6 +240,18 @@ async def run_classification(
 
     report = ClassificationReport()
 
+    # Load runtime user keywords from the dashboard-managed table.
+    user_keywords: dict[str, list[str]] = {}
+    with db.session() as _kw_session:
+        from signal_tracker.storage.models import UserKeyword as _UK
+        for kw in _kw_session.execute(select(_UK)).scalars():
+            user_keywords.setdefault(kw.category, []).append(kw.value)
+    if user_keywords:
+        logger.info(
+            "pipeline.user_keywords_loaded",
+            extra={"counts": {k: len(v) for k, v in user_keywords.items()}},
+        )
+
     # Load dynamic few-shot examples from past user feedback (Phase 4).
     feedback_examples = load_feedback_examples(db)
     if feedback_examples:
@@ -248,13 +260,19 @@ async def run_classification(
             extra={"count": len(feedback_examples)},
         )
 
+    rate_limit = max(0.0, float(settings.llm_rate_limit_seconds))
+
     with db.session() as session:
         stmt = select(RawItem).where(RawItem.classified.is_(False)).order_by(RawItem.id)
         if limit is not None:
             stmt = stmt.limit(limit)
         backlog: list[RawItem] = list(session.execute(stmt).scalars())
 
-    for raw in backlog:
+    import asyncio as _asyncio  # local import to keep top-level imports tight
+
+    for index, raw in enumerate(backlog):
+        if index > 0 and rate_limit > 0:
+            await _asyncio.sleep(rate_limit)
         item = ClassifierInput(
             source=raw.source,
             url=raw.url,
@@ -263,7 +281,12 @@ async def run_classification(
             published_at=raw.published_at,
         )
         try:
-            result = await classify(item, profile, extra_examples=feedback_examples)
+            result = await classify(
+                item,
+                profile,
+                extra_examples=feedback_examples,
+                user_keywords=user_keywords or None,
+            )
         except Exception as exc:
             report.errors += 1
             message = str(exc)[:200]
