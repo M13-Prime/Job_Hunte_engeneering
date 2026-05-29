@@ -113,6 +113,10 @@ class Signal(Base):
 
     user_feedback: Mapped[str | None] = mapped_column(String(32), nullable=True)
     dedup_key: Mapped[str] = mapped_column(String(128), index=True)
+    # The search run that first surfaced this signal (Phase 6 dashboard).
+    search_run_id: Mapped[int | None] = mapped_column(
+        ForeignKey("search_runs.id"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
@@ -178,6 +182,28 @@ class JobOffer(Base):
         DateTime, server_default=func.now(), nullable=False
     )
     dedup_key: Mapped[str] = mapped_column(String(256), index=True)
+
+
+class SearchRun(Base):
+    """One launch of the collect+classify pipeline from the dashboard.
+
+    Lets the UI keep a history of past searches, each with the keywords used
+    and the metrics it produced, and tag the signals it surfaced so new ones
+    are distinguishable from older runs.
+    """
+
+    __tablename__ = "search_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    label: Mapped[str] = mapped_column(String(256))
+    status: Mapped[str] = mapped_column(String(32), default="running", index=True)
+    keywords: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    metrics: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False, index=True
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class UserKeyword(Base):
