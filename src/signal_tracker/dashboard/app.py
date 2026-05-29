@@ -1,38 +1,50 @@
 """Single-page FastAPI dashboard.
 
 Endpoints:
-- GET  /                              — list signals (filterable)
-- POST /signals/{id}/feedback         — set Signal.user_feedback
-- GET  /signals/{id}/contacted        — convenience GET for digest email link
-- GET  /watchlist                     — list watchlist entries (HTML fragment)
-- POST /watchlist                     — add a company
-- POST /watchlist/{id}/delete         — remove a company
-- GET  /healthz                       — liveness probe
+- GET  /healthz                       liveness probe
+- GET  /                              main dashboard (signals + filters + keywords + watchlist)
+- POST /signals/{id}/feedback         set Signal.user_feedback
+- GET  /signals/{id}/contacted        convenience link for the digest email
+- POST /watchlist                     add a company (silent on duplicate)
+- POST /watchlist/{id}/delete         remove a company
+- POST /keywords                      add a user-curated keyword
+- POST /keywords/{id}/delete          remove a user keyword
+- POST /run/pipeline                  launch a full collect+classify run in background
+- GET  /run/status                    current background task state (polled by the UI)
 """
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import secrets
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from signal_tracker.classifier.feedback import VALID_FEEDBACK
-from signal_tracker.config import get_settings, resolve_db_url
+from signal_tracker.config import get_settings, load_user_profile, resolve_db_url
 from signal_tracker.storage import Database, init_db
-from signal_tracker.storage.models import RawItem, Signal, WatchlistEntry
+from signal_tracker.storage.models import (
+    RawItem,
+    Signal,
+    UserKeyword,
+    WatchlistEntry,
+)
 from signal_tracker.utils.normalize import normalize_company_name
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 UNAUTH_PATHS = {"/healthz"}
+
+KEYWORD_CATEGORIES = ("field", "job_title", "other")
 
 
 def _check_basic_auth(header_value: str | None, expected_user: str, expected_pwd: str) -> bool:
@@ -58,15 +70,69 @@ def build_app(db: Database | None = None) -> FastAPI:
         with app_db.session() as session:
             yield session
 
-    app = FastAPI(title="Signal Tracker Dashboard", version="0.1.0")
+    app = FastAPI(title="Signal Tracker Dashboard", version="0.2.0")
 
     auth_user = settings.dashboard_auth_user
     auth_pwd = settings.dashboard_auth_password or ""
 
+    # In-memory state for the background pipeline task. Keyed on a single
+    # slot (one task at a time per dashboard process).
+    task_state: dict[str, Any] = {
+        "status": "idle",        # idle / running / done / failed
+        "step": None,            # collect / classify / digest / None
+        "started_at": None,
+        "finished_at": None,
+        "metrics": {},
+        "error": None,
+    }
+    # Reference holder so the running asyncio task isn't garbage-collected
+    # mid-flight (RUF006).
+    bg_tasks: set[asyncio.Task[None]] = set()
+
+    async def _run_pipeline_task() -> None:
+        from signal_tracker.pipeline import run_classification, run_collection
+
+        task_state.update(
+            status="running",
+            step="collect",
+            started_at=datetime.now(tz=UTC).isoformat(),
+            finished_at=None,
+            metrics={},
+            error=None,
+        )
+        try:
+            coll = await run_collection(db=app_db)
+            task_state["metrics"]["collect"] = {
+                "fetched": coll.fetched,
+                "new": coll.new,
+                "duplicates": coll.duplicates,
+            }
+            task_state["step"] = "classify"
+            profile = load_user_profile()
+            clf = await run_classification(profile=profile, db=app_db)
+            task_state["metrics"]["classify"] = {
+                "processed": clf.processed,
+                "relevant": clf.relevant,
+                "signals_created": clf.signals_created,
+                "signals_deduped": clf.signals_deduped,
+                "errors": clf.errors,
+            }
+            task_state.update(
+                status="done",
+                step=None,
+                finished_at=datetime.now(tz=UTC).isoformat(),
+            )
+        except Exception as exc:
+            task_state.update(
+                status="failed",
+                step=None,
+                finished_at=datetime.now(tz=UTC).isoformat(),
+                error=str(exc)[:500],
+            )
+
     @app.middleware("http")
     async def basic_auth_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
         if not auth_user:
-            # Auth disabled (dev / Codespaces). Skip.
             return await call_next(request)
         if request.url.path in UNAUTH_PATHS:
             return await call_next(request)
@@ -107,6 +173,21 @@ def build_app(db: Database | None = None) -> FastAPI:
             session.execute(select(WatchlistEntry).order_by(WatchlistEntry.company_name)).scalars()
         )
 
+        kw_stmt = select(UserKeyword).order_by(
+            UserKeyword.category, UserKeyword.value
+        )
+        kw_rows = list(session.execute(kw_stmt).scalars())
+        keywords_by_cat: dict[str, list[UserKeyword]] = {c: [] for c in KEYWORD_CATEGORIES}
+        for kw in kw_rows:
+            keywords_by_cat.setdefault(kw.category, []).append(kw)
+
+        # Top-line counts for the header.
+        total_signals = session.query(Signal).count()
+        pending_signals = session.query(Signal).filter(
+            Signal.user_feedback.is_(None)
+        ).count()
+        total_companies = session.query(Signal.company_normalized).distinct().count()
+
         return templates.TemplateResponse(
             request,
             "index.html.j2",
@@ -116,6 +197,14 @@ def build_app(db: Database | None = None) -> FastAPI:
                 "filter_feedback": feedback or "",
                 "min_score": min_score,
                 "valid_feedback": VALID_FEEDBACK,
+                "keyword_categories": KEYWORD_CATEGORIES,
+                "keywords_by_cat": keywords_by_cat,
+                "totals": {
+                    "signals": total_signals,
+                    "pending": pending_signals,
+                    "companies": total_companies,
+                },
+                "task_status": task_state["status"],
             },
         )
 
@@ -163,7 +252,6 @@ def build_app(db: Database | None = None) -> FastAPI:
             session.flush()
         except IntegrityError:
             session.rollback()
-            # Already exists; fall through silently.
         return RedirectResponse(url="/", status_code=303)
 
     @app.post("/watchlist/{entry_id}/delete")
@@ -176,6 +264,49 @@ def build_app(db: Database | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="Watchlist entry not found")
         session.delete(entry)
         return RedirectResponse(url="/", status_code=303)
+
+    @app.post("/keywords")
+    def add_keyword(
+        category: Annotated[str, Form()],
+        value: Annotated[str, Form()],
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        if category not in KEYWORD_CATEGORIES:
+            raise HTTPException(status_code=400, detail=f"Invalid category: {category}")
+        value = value.strip()
+        if not value:
+            raise HTTPException(status_code=400, detail="Empty value")
+        entry = UserKeyword(category=category, value=value)
+        session.add(entry)
+        try:
+            session.flush()
+        except IntegrityError:
+            session.rollback()
+        return RedirectResponse(url="/", status_code=303)
+
+    @app.post("/keywords/{keyword_id}/delete")
+    def delete_keyword(
+        keyword_id: int,
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        kw = session.get(UserKeyword, keyword_id)
+        if kw is None:
+            raise HTTPException(status_code=404, detail="Keyword not found")
+        session.delete(kw)
+        return RedirectResponse(url="/", status_code=303)
+
+    @app.post("/run/pipeline")
+    async def launch_pipeline() -> RedirectResponse:
+        if task_state["status"] == "running":
+            return RedirectResponse(url="/", status_code=303)
+        task = asyncio.create_task(_run_pipeline_task())
+        bg_tasks.add(task)
+        task.add_done_callback(bg_tasks.discard)
+        return RedirectResponse(url="/", status_code=303)
+
+    @app.get("/run/status")
+    def run_status() -> JSONResponse:
+        return JSONResponse(task_state)
 
     return app
 
