@@ -11,15 +11,25 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from signal_tracker.storage.models import Base
 
 
 def _is_database_url(value: str | Path) -> bool:
-    text = str(value)
-    return "://" in text and not text.startswith("/")
+    text_value = str(value)
+    return "://" in text_value and not text_value.startswith("/")
+
+
+# Additive, idempotent column migrations. SQLAlchemy's create_all() only
+# creates *missing tables*, never new columns on existing ones. For a
+# single-maintainer app we keep a tiny hand-rolled list of "ensure column X
+# exists on table Y" instead of pulling in Alembic.
+_ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
+    # (table, column, SQL type)
+    ("signals", "search_run_id", "INTEGER"),
+)
 
 
 class Database:
@@ -47,6 +57,20 @@ class Database:
 
     def create_all(self) -> None:
         Base.metadata.create_all(self.engine)
+        self._apply_additive_migrations()
+
+    def _apply_additive_migrations(self) -> None:
+        inspector = inspect(self.engine)
+        existing_tables = set(inspector.get_table_names())
+        for table, column, sql_type in _ADDITIVE_COLUMNS:
+            if table not in existing_tables:
+                continue  # create_all already made it with the column
+            cols = {c["name"] for c in inspector.get_columns(table)}
+            if column not in cols:
+                with self.engine.begin() as conn:
+                    conn.execute(
+                        text(f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}")
+                    )
 
     @contextmanager
     def session(self) -> Iterator[Session]:
