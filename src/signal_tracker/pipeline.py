@@ -180,6 +180,7 @@ def _store_signal(
     session: object,
     raw: RawItem,
     result: ClassificationResult,
+    search_run_id: int | None = None,
 ) -> bool:
     """
     Persist a Signal row when ``is_relevant`` is True.
@@ -221,6 +222,7 @@ def _store_signal(
                 result.target_contact.model_dump() if result.target_contact else None
             ),
             dedup_key=dedup,
+            search_run_id=search_run_id,
         )
     )
     return True
@@ -230,8 +232,13 @@ async def run_classification(
     profile: UserProfile | None = None,
     db: Database | None = None,
     limit: int | None = None,
+    search_run_id: int | None = None,
 ) -> ClassificationReport:
-    """Classify all unclassified raw_items in the DB."""
+    """Classify all unclassified raw_items in the DB.
+
+    When ``search_run_id`` is set, signals created during this run are tagged
+    with it so the dashboard can flag them as new for that search.
+    """
     settings = get_settings()
     if db is None:
         db = init_db(resolve_db_url(settings))
@@ -316,7 +323,7 @@ async def run_classification(
             row.classified = True
             if result.is_relevant:
                 report.relevant += 1
-                if _store_signal(session, row, result):
+                if _store_signal(session, row, result, search_run_id=search_run_id):
                     report.signals_created += 1
                 else:
                     report.signals_deduped += 1
