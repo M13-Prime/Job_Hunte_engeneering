@@ -1,0 +1,152 @@
+{% extends "base.html.j2" %}
+{% block title %}Signal Tracker — Résultats{% endblock %}
+{% block nav_results %}active{% endblock %}
+
+{% block extra_css %}
+  .results-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+  .results-head h1 { font-size: 24px; font-weight: 800; color: var(--green-darker); margin: 0; }
+  .results-head .spacer { flex: 1; }
+  .filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .filters label { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+  .filters select, .filters input {
+    padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 8px;
+    font-size: 13px; background: white; font-family: inherit;
+  }
+  .filters select:focus, .filters input:focus { outline: none; border-color: var(--green); }
+  .run-banner {
+    background: var(--green-soft); border: 1px solid var(--green-soft-2); color: var(--green-darker);
+    border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 13.5px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  table.signals { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.signals thead th {
+    text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--muted); padding: 0 12px 10px; border-bottom: 1px solid var(--border);
+  }
+  table.signals tbody td { padding: 14px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.signals tbody tr:hover { background: #fafcfb; }
+  table.signals tbody tr.is-new td { background: #f3fbf6; }
+  .col-score { width: 64px; }
+  .col-actions { width: 1%; white-space: nowrap; }
+  .score-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 42px; padding: 5px 8px; border-radius: 8px; font-weight: 800; font-size: 13px;
+  }
+  .score-badge.hot { background: var(--red-soft); color: var(--red); }
+  .score-badge.investigate { background: var(--blue-soft); color: var(--blue); }
+  .score-badge.watch { background: var(--amber-soft); color: var(--amber); }
+  .company-cell .name { font-weight: 700; font-size: 14.5px; color: var(--ink); display: inline-flex; align-items: center; gap: 8px; }
+  .company-cell .type { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .summary { color: var(--ink); margin: 4px 0; max-width: 520px; }
+  .angle { background: var(--green-soft); border-radius: 8px; padding: 7px 11px; margin: 6px 0; font-size: 12.5px; max-width: 520px; }
+  .angle strong { color: var(--green-dark); }
+  .contact { font-size: 12.5px; color: var(--muted); }
+  .row-actions { display: flex; flex-direction: column; gap: 5px; align-items: stretch; }
+  .row-actions form { margin: 0; }
+  .mini {
+    width: 100%; padding: 5px 10px; border: 1px solid var(--border-strong); border-radius: 7px;
+    background: white; font-size: 12px; cursor: pointer; font-weight: 600; color: var(--muted); font-family: inherit;
+  }
+  .mini:hover { border-color: var(--ink); color: var(--ink); }
+  .mini.contacted:hover { border-color: var(--red); color: var(--red); background: var(--red-soft); }
+  .mini.relevant:hover { border-color: var(--green); color: var(--green-dark); background: var(--green-soft); }
+  .mini.src { color: var(--green-dark); border-color: transparent; text-align: center; }
+{% endblock %}
+
+{% block content %}
+<div class="results-head">
+  <h1>Signaux</h1>
+  <span class="badge">{{ rows|length }}</span>
+  <div class="spacer"></div>
+  <form class="filters" method="get" action="/results">
+    {% if run_id %}<input type="hidden" name="run" value="{{ run_id }}">{% endif %}
+    <label>Feedback
+      <select name="feedback">
+        <option value="" {% if filter_feedback == "" %}selected{% endif %}>tous</option>
+        <option value="pending" {% if filter_feedback == "pending" %}selected{% endif %}>sans feedback</option>
+        {% for f in valid_feedback %}
+        <option value="{{ f }}" {% if filter_feedback == f %}selected{% endif %}>{{ f }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Score min
+      <input type="number" name="min_score" value="{{ min_score }}" min="0" max="100" step="1" style="width:64px;">
+    </label>
+    <button type="submit" class="btn btn-ghost" style="padding:8px 14px;">Filtrer</button>
+  </form>
+</div>
+
+{% if run_id and focus_run %}
+<div class="run-banner">
+  <strong>Recherche : {{ focus_run.label }}</strong>
+  <span>· {{ focus_run.created_at.strftime("%d/%m %H:%M") if focus_run.created_at else "" }}</span>
+  {% if focus_run.metrics and focus_run.metrics.classify %}
+  <span>· {{ focus_run.metrics.classify.signals_created }} signaux trouvés</span>
+  {% endif %}
+  <a href="/results" style="margin-left:auto;">Voir tous les signaux →</a>
+</div>
+{% endif %}
+
+<div class="card" style="padding: 16px 18px;">
+  {% if not rows %}
+  <div class="empty">
+    Aucun signal pour ces filtres.
+    <a href="/">Lance une recherche</a> pour collecter et analyser.
+  </div>
+  {% else %}
+  <table class="signals">
+    <thead>
+      <tr>
+        <th class="col-score">Score</th>
+        <th>Entreprise &amp; signal</th>
+        <th>Source</th>
+        <th class="col-actions">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for signal, raw in rows %}
+      {% set tier = "hot" if signal.total_score >= 80 else ("investigate" if signal.total_score >= 60 else "watch") %}
+      {% set is_new = focus_run_id and signal.search_run_id == focus_run_id %}
+      <tr class="{{ 'is-new' if is_new else '' }}">
+        <td class="col-score"><span class="score-badge {{ tier }}">{{ "%.0f"|format(signal.total_score) }}</span></td>
+        <td class="company-cell">
+          <div class="name">
+            {{ signal.company_name or "(sans nom)" }}
+            {% if is_new %}<span class="badge new">Nouveau</span>{% endif %}
+            {% if signal.user_feedback %}<span class="feedback-tag {{ signal.user_feedback }}">{{ signal.user_feedback }}</span>{% endif %}
+          </div>
+          <div class="type">{{ signal.signal_type }} · {{ signal.recommended_action }}</div>
+          <div class="summary">{{ signal.summary_fr }}</div>
+          {% if signal.suggested_angle %}<div class="angle"><strong>Angle :</strong> {{ signal.suggested_angle }}</div>{% endif %}
+          {% if signal.target_contact %}{% set c = signal.target_contact %}{% if c.name or c.role %}
+          <div class="contact"><strong>Contact :</strong> {% if c.name %}{{ c.name }}{% endif %}{% if c.role %} — {{ c.role }}{% endif %}{% if c.rationale %} ({{ c.rationale }}){% endif %}</div>
+          {% endif %}{% endif %}
+        </td>
+        <td style="color:var(--muted); font-size:12.5px;">{{ raw.source }}</td>
+        <td class="col-actions">
+          <div class="row-actions">
+            {% if raw.url %}<a href="{{ raw.url }}" target="_blank" rel="noopener" class="mini src">Source ↗</a>{% endif %}
+            <form method="post" action="/signals/{{ signal.id }}/feedback">
+              <input type="hidden" name="action" value="contacted">
+              <input type="hidden" name="redirect_to" value="/results{% if run_id %}?run={{ run_id }}{% endif %}">
+              <button type="submit" class="mini contacted">Contacté</button>
+            </form>
+            <form method="post" action="/signals/{{ signal.id }}/feedback">
+              <input type="hidden" name="action" value="relevant">
+              <input type="hidden" name="redirect_to" value="/results{% if run_id %}?run={{ run_id }}{% endif %}">
+              <button type="submit" class="mini relevant">Pertinent</button>
+            </form>
+            <form method="post" action="/signals/{{ signal.id }}/feedback">
+              <input type="hidden" name="action" value="not_relevant">
+              <input type="hidden" name="redirect_to" value="/results{% if run_id %}?run={{ run_id }}{% endif %}">
+              <button type="submit" class="mini">Écarter</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}
