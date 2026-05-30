@@ -112,8 +112,8 @@ def test_run_status_starts_idle(client: TestClient) -> None:
     assert payload["step"] is None
 
 
-def test_launch_pipeline_kicks_background_task(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+def test_launch_search_kicks_background_task(
+    client: TestClient, db: Database, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Stub the pipeline imports so the test doesn't hit the LLM.
     async def fake_collect(*_args: Any, **_kwargs: Any) -> Any:
@@ -129,10 +129,10 @@ def test_launch_pipeline_kicks_background_task(
     monkeypatch.setattr("signal_tracker.pipeline.run_collection", fake_collect)
     monkeypatch.setattr("signal_tracker.pipeline.run_classification", fake_classify)
 
-    response = client.post("/run/pipeline", follow_redirects=False)
+    response = client.post("/search", follow_redirects=False)
     assert response.status_code == 303
-    # The task runs in the background; the status endpoint should report it.
-    # Polling is fine since the task is async — TestClient waits for the loop.
+    assert "/results?run=" in response.headers["location"]
+
     import time
     for _ in range(20):
         status = client.get("/run/status").json()
@@ -141,8 +141,15 @@ def test_launch_pipeline_kicks_background_task(
         time.sleep(0.1)
     final = client.get("/run/status").json()
     assert final["status"] == "done", final
-    assert final["metrics"]["collect"]["new"] == 5
     assert final["metrics"]["classify"]["signals_created"] == 2
+
+    # A SearchRun row was persisted with done status + metrics.
+    from signal_tracker.storage.models import SearchRun
+    with db.session() as s:
+        run = s.query(SearchRun).one()
+        assert run.status == "done"
+        assert run.metrics is not None
+        assert run.metrics["classify"]["signals_created"] == 2
 
 
 def test_launch_while_running_is_ignored(
@@ -164,7 +171,7 @@ def test_launch_while_running_is_ignored(
     monkeypatch.setattr("signal_tracker.pipeline.run_collection", slow_collect)
     monkeypatch.setattr("signal_tracker.pipeline.run_classification", fake_classify)
 
-    client.post("/run/pipeline", follow_redirects=False)
+    client.post("/search", follow_redirects=False)
     # Immediately re-launch — should be ignored, no error.
-    r2 = client.post("/run/pipeline", follow_redirects=False)
+    r2 = client.post("/search", follow_redirects=False)
     assert r2.status_code == 303

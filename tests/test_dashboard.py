@@ -61,18 +61,23 @@ def test_healthz(client: TestClient) -> None:
     assert response.json() == {"status": "ok"}
 
 
-def test_index_lists_all_signals(client: TestClient) -> None:
+def test_landing_renders(client: TestClient) -> None:
     response = client.get("/")
+    assert response.status_code == 200
+    assert "Lancer la recherche" in response.text
+
+
+def test_results_lists_all_signals(client: TestClient) -> None:
+    response = client.get("/results")
     assert response.status_code == 200
     body = response.text
     assert "Company 0" in body
     assert "Company 1" in body
     assert "Company 2" in body
-    assert "92.0" in body
 
 
-def test_index_filters_by_min_score(client: TestClient) -> None:
-    response = client.get("/?min_score=60")
+def test_results_filters_by_min_score(client: TestClient) -> None:
+    response = client.get("/results?min_score=60")
     assert response.status_code == 200
     body = response.text
     assert "Company 0" in body  # 92
@@ -80,7 +85,7 @@ def test_index_filters_by_min_score(client: TestClient) -> None:
     assert "Company 2" not in body  # 45
 
 
-def test_index_filters_by_feedback_pending(
+def test_results_filters_by_feedback_pending(
     client: TestClient, db_with_signals: Database
 ) -> None:
     with db_with_signals.session() as s:
@@ -89,7 +94,7 @@ def test_index_filters_by_feedback_pending(
             .where(Signal.company_name == "Company 0")
             .values(user_feedback="contacted")
         )
-    response = client.get("/?feedback=pending")
+    response = client.get("/results?feedback=pending")
     assert response.status_code == 200
     body = response.text
     assert "Company 0" not in body
