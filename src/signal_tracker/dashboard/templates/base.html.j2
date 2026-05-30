@@ -4,244 +4,414 @@
 <meta charset="utf-8">
 <title>{% block title %}Signal Tracker{% endblock %}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f5f5f7">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   :root {
-    --green: #15a05a;
-    --green-dark: #0c6b3c;
-    --green-darker: #0b3d2e;
-    --green-soft: #e8f6ed;
-    --green-soft-2: #d6efdf;
-    --ink: #0b1f17;
-    --muted: #5b6b63;
-    --muted-2: #93a39a;
-    --cream: #f5f7f3;
-    --card: #ffffff;
-    --border: #e4e9e5;
-    --border-strong: #cdd6d0;
-    --amber: #b45309;
-    --amber-soft: #fef3e2;
-    --blue: #1d6fb8;
-    --blue-soft: #e8f1f9;
-    --red: #b91c1c;
-    --red-soft: #fdecec;
-    --shadow: 0 1px 2px rgba(11,61,46,0.04), 0 8px 24px rgba(11,61,46,0.06);
+    /* Surfaces — Apple off-white system */
+    --bg: #f5f5f7;
+    --surface: #ffffff;
+    --surface-2: #fbfbfd;
+    --hairline: rgba(0,0,0,0.08);
+    --hairline-2: rgba(0,0,0,0.04);
+
+    /* Text — Apple's grayscale ladder */
+    --text: #1d1d1f;
+    --text-2: #424245;
+    --text-3: #6e6e73;
+    --text-4: #86868b;
+
+    /* Accents */
+    --green: #34c759;          /* Apple system green — brand */
+    --green-strong: #2bb24b;
+    --green-soft: #e9f9ee;
+    --green-deep: #145c2e;
+    --blue: #0066cc;           /* Apple.com action blue */
+    --blue-strong: #0050a3;
+    --blue-soft: #e6f0fb;
+    --blue-focus: #0071e3;     /* Focus ring */
+    --amber: #ff9500;
+    --amber-soft: #fff3e0;
+    --red: #ff3b30;
+    --red-soft: #ffece9;
+    --purple: #af52de;
+    --purple-soft: #f6ecfb;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 2px 10px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-lg: 0 10px 32px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+    --shadow-xl: 0 24px 64px rgba(0,0,0,0.12);
+
+    /* Radii */
+    --r-sm: 8px;
+    --r-md: 12px;
+    --r-lg: 18px;
+    --r-xl: 24px;
+    --r-full: 980px;
+
+    /* Typography scale (Apple-aligned) */
+    --display: clamp(40px, 5.6vw, 64px);
+    --h1: 40px;
+    --h2: 34px;
+    --h3: 21px;
+    --body: 17px;
+    --small: 14px;
+    --caption: 12px;
+
+    --container: 1180px;
+    --container-px: 28px;
+    --nav-h: 56px;
   }
+
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
     margin: 0;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--cream);
-    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+    font-feature-settings: 'cv11','ss03';
+    background: var(--bg);
+    color: var(--text);
+    font-size: var(--body);
+    line-height: 1.47;
     -webkit-font-smoothing: antialiased;
-    line-height: 1.5;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.011em;
   }
-  a { color: var(--green-dark); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  h1, h2, h3 { letter-spacing: -0.02em; }
+  ::selection { background: rgba(0,113,227,0.18); }
+
+  a { color: var(--blue); text-decoration: none; transition: color 160ms ease; }
+  a:hover { color: var(--blue-strong); text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+
+  h1, h2, h3, h4 { letter-spacing: -0.025em; line-height: 1.1; margin: 0; color: var(--text); }
+  h1 { font-size: var(--h1); font-weight: 700; }
+  h2 { font-size: var(--h2); font-weight: 700; }
+  h3 { font-size: var(--h3); font-weight: 600; }
+
+  /* Focus ring — accessibility-first */
+  :focus { outline: none; }
+  :focus-visible {
+    outline: 3px solid rgba(0,113,227,0.55);
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
 
   /* ---------------- App bar ---------------- */
   header.appbar {
-    background: rgba(255,255,255,0.85);
-    backdrop-filter: saturate(150%) blur(8px);
-    border-bottom: 1px solid var(--border);
-    padding: 14px 28px;
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    position: sticky;
-    top: 0;
-    z-index: 20;
+    position: sticky; top: 0; z-index: 30;
+    height: var(--nav-h);
+    background: rgba(245,245,247,0.72);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--hairline-2);
+  }
+  .appbar-inner {
+    max-width: var(--container);
+    margin: 0 auto;
+    height: 100%;
+    padding: 0 var(--container-px);
+    display: flex; align-items: center; gap: 24px;
   }
   .brand {
     display: inline-flex; align-items: center; gap: 9px;
-    font-weight: 800; font-size: 18px; color: var(--green-darker);
+    font-weight: 700; font-size: 16px; color: var(--text);
+    letter-spacing: -0.015em;
   }
+  .brand:hover { text-decoration: none; color: var(--text); }
   .brand .logo {
-    width: 26px; height: 26px; border-radius: 8px;
-    background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);
+    width: 24px; height: 24px; border-radius: 7px;
+    background: linear-gradient(135deg, var(--green) 0%, var(--green-strong) 100%);
     display: inline-flex; align-items: center; justify-content: center;
-    color: white; font-size: 15px; font-weight: 800;
+    color: white; font-size: 13px; font-weight: 800;
+    box-shadow: 0 1px 2px rgba(52,199,89,0.4), inset 0 1px 0 rgba(255,255,255,0.25);
   }
-  .nav { display: flex; gap: 4px; margin-left: 10px; }
+  .nav { display: flex; gap: 2px; }
   .nav a {
-    padding: 7px 14px; border-radius: 8px; font-size: 14px; font-weight: 500;
-    color: var(--muted);
+    padding: 6px 12px; border-radius: var(--r-full);
+    font-size: 13.5px; font-weight: 500; color: var(--text-3);
+    transition: color 160ms ease, background 160ms ease;
   }
-  .nav a:hover { background: var(--green-soft); color: var(--green-dark); text-decoration: none; }
-  .nav a.active { background: var(--green-soft); color: var(--green-dark); }
+  .nav a:hover { color: var(--text); background: rgba(0,0,0,0.05); text-decoration: none; }
+  .nav a.active { color: var(--text); background: rgba(0,0,0,0.07); }
   .spacer { flex: 1; }
+
   .status-pill {
     display: inline-flex; align-items: center; gap: 7px;
-    padding: 5px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 500;
-    background: var(--cream); color: var(--muted); border: 1px solid var(--border);
+    padding: 5px 12px 5px 10px; border-radius: var(--r-full);
+    font-size: 12.5px; font-weight: 500; color: var(--text-3);
+    background: rgba(0,0,0,0.04); transition: all 200ms ease;
+    white-space: nowrap;
   }
-  .status-pill.running { background: var(--green-soft); color: var(--green-dark); border-color: var(--green-soft-2); }
-  .status-pill.done { background: var(--green-soft); color: var(--green-dark); border-color: var(--green-soft-2); }
-  .status-pill.failed { background: var(--red-soft); color: var(--red); border-color: #f6cccc; }
-  .spinner {
-    width: 12px; height: 12px; border: 2px solid currentColor;
-    border-right-color: transparent; border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+  .status-pill .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--text-4); flex-shrink: 0;
   }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-pill.running { background: var(--green-soft); color: var(--green-deep); }
+  .status-pill.running .dot { background: var(--green); animation: pulse 1.4s ease-in-out infinite; }
+  .status-pill.done { background: var(--green-soft); color: var(--green-deep); }
+  .status-pill.done .dot { background: var(--green); }
+  .status-pill.failed { background: var(--red-soft); color: var(--red); }
+  .status-pill.failed .dot { background: var(--red); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.4); }
+  }
 
   /* ---------------- Buttons ---------------- */
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    border: none; border-radius: 10px; font-size: 14px; font-weight: 600;
-    cursor: pointer; padding: 10px 18px; transition: all 120ms ease;
-    font-family: inherit;
+    border: none; border-radius: var(--r-full);
+    font-size: 14px; font-weight: 500; font-family: inherit;
+    cursor: pointer; padding: 10px 22px; transition: all 160ms ease;
+    white-space: nowrap;
   }
-  .btn-primary { background: var(--green); color: white; }
-  .btn-primary:hover { background: var(--green-dark); }
-  .btn-primary:disabled { background: var(--muted-2); cursor: not-allowed; }
-  .btn-ghost { background: white; color: var(--ink); border: 1px solid var(--border-strong); }
-  .btn-ghost:hover { border-color: var(--green); color: var(--green-dark); }
-  .btn-lg { padding: 14px 28px; font-size: 16px; border-radius: 12px; }
+  .btn:hover { text-decoration: none; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    background: var(--green); color: white;
+    box-shadow: 0 1px 2px rgba(52,199,89,0.3), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .btn-primary:hover { background: var(--green-strong); color: white; }
+  .btn-primary:disabled {
+    background: rgba(0,0,0,0.08); color: var(--text-4); cursor: not-allowed;
+    box-shadow: none;
+  }
+  .btn-primary:disabled:hover { background: rgba(0,0,0,0.08); }
+  .btn-ghost {
+    background: rgba(0,0,0,0.04); color: var(--text);
+  }
+  .btn-ghost:hover { background: rgba(0,0,0,0.08); color: var(--text); }
+  .btn-link {
+    background: transparent; color: var(--blue); padding: 6px 8px;
+  }
+  .btn-link:hover { color: var(--blue-strong); background: rgba(0,113,227,0.06); }
+  .btn-lg { padding: 14px 32px; font-size: 16px; }
+  .btn-xl { padding: 16px 40px; font-size: 17px; font-weight: 500; }
+  .btn-sm { padding: 6px 14px; font-size: 13px; }
 
   /* ---------------- Layout ---------------- */
-  main { max-width: 1240px; margin: 0 auto; padding: 28px; }
+  main {
+    max-width: var(--container);
+    margin: 0 auto;
+    padding: 48px var(--container-px) 80px;
+  }
+  @media (max-width: 720px) {
+    main { padding: 28px 18px 48px; }
+    :root { --container-px: 18px; }
+  }
 
   .card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 16px; padding: 22px 24px; box-shadow: var(--shadow);
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-lg);
+    padding: 28px 30px;
   }
-  .card h2 {
-    margin: 0 0 16px; font-size: 13px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.06em; color: var(--muted);
+  .card-sm { padding: 20px 22px; border-radius: var(--r-lg); }
+  .card h2.section-label,
+  .section-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-3); margin: 0 0 18px;
+    display: flex; align-items: center; gap: 9px;
   }
-  .card h2 .count {
-    background: var(--green-soft); color: var(--green-dark); border-radius: 999px;
-    padding: 2px 9px; font-size: 11px; margin-left: 6px; text-transform: none; letter-spacing: 0;
+  .section-label .count {
+    background: rgba(0,0,0,0.06); color: var(--text-3); border-radius: var(--r-full);
+    padding: 2px 8px; font-size: 11px; letter-spacing: 0;
+    text-transform: none; font-weight: 600;
   }
 
   /* ---------------- Chips ---------------- */
-  .chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
   .chip {
-    display: inline-flex; align-items: center; gap: 7px;
-    background: var(--green-soft); color: var(--green-darker);
-    padding: 5px 10px; border-radius: 999px; font-size: 13px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    color: var(--text);
+    padding: 6px 12px 6px 14px; border-radius: var(--r-full);
+    font-size: 13px; font-weight: 500;
+    transition: all 160ms ease;
   }
+  .chip:hover { border-color: rgba(0,0,0,0.18); }
   .chip form { display: inline-flex; margin: 0; }
-  .chip button {
-    background: none; border: none; color: var(--green-dark); cursor: pointer;
-    padding: 0 0 0 2px; font-size: 15px; line-height: 1; opacity: 0.6;
+  .chip .chip-x {
+    background: none; border: none; color: var(--text-4); cursor: pointer;
+    padding: 0; font-size: 14px; line-height: 1;
+    width: 16px; height: 16px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all 140ms ease;
   }
-  .chip button:hover { opacity: 1; color: var(--red); }
-  .inline-add { display: flex; gap: 7px; margin-top: 8px; }
+  .chip .chip-x:hover { background: var(--red); color: white; }
+
+  .inline-add {
+    display: flex; gap: 8px; margin-top: 10px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-md);
+    padding: 4px;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+  .inline-add:focus-within {
+    border-color: rgba(0,113,227,0.5);
+    box-shadow: 0 0 0 4px rgba(0,113,227,0.12);
+  }
   .inline-add input {
-    flex: 1; padding: 9px 12px; border: 1px solid var(--border-strong);
-    border-radius: 9px; font-size: 13px; font-family: inherit;
+    flex: 1; padding: 9px 12px; border: none; background: transparent;
+    font-size: 14px; font-family: inherit; color: var(--text); outline: none;
   }
-  .inline-add input:focus { outline: none; border-color: var(--green); }
+  .inline-add input::placeholder { color: var(--text-4); }
   .inline-add button {
-    padding: 9px 13px; background: var(--green); color: white; border: none;
-    border-radius: 9px; font-size: 15px; cursor: pointer; line-height: 1;
+    padding: 8px 14px; background: var(--text); color: white; border: none;
+    border-radius: var(--r-sm); font-size: 14px; font-weight: 500;
+    cursor: pointer; line-height: 1; transition: all 160ms ease;
   }
-  .inline-add button:hover { background: var(--green-dark); }
+  .inline-add button:hover { background: #000; }
 
   /* ---------------- Badges ---------------- */
   .badge {
-    font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
-    background: var(--cream); color: var(--muted); white-space: nowrap;
+    font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: var(--r-full);
+    background: rgba(0,0,0,0.06); color: var(--text-3); white-space: nowrap;
+    letter-spacing: 0.01em;
   }
   .badge.hot { background: var(--red-soft); color: var(--red); }
   .badge.investigate { background: var(--blue-soft); color: var(--blue); }
   .badge.watch { background: var(--amber-soft); color: var(--amber); }
-  .badge.new { background: var(--green); color: white; }
-  .feedback-tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; }
+  .badge.new {
+    background: var(--green); color: white;
+    box-shadow: 0 1px 2px rgba(52,199,89,0.3);
+  }
+  .feedback-tag {
+    font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: var(--r-sm);
+  }
   .feedback-tag.contacted { background: var(--red-soft); color: var(--red); }
-  .feedback-tag.relevant { background: var(--green-soft); color: var(--green-dark); }
-  .feedback-tag.not_relevant { background: var(--cream); color: var(--muted); }
+  .feedback-tag.relevant { background: var(--green-soft); color: var(--green-deep); }
+  .feedback-tag.not_relevant { background: rgba(0,0,0,0.06); color: var(--text-3); }
 
-  .empty { text-align: center; color: var(--muted); padding: 40px 16px; font-size: 14px; }
+  .empty {
+    text-align: center; padding: 56px 24px; color: var(--text-3); font-size: 15px;
+  }
+  .empty .empty-icon {
+    width: 48px; height: 48px; margin: 0 auto 14px;
+    border-radius: 50%; background: rgba(0,0,0,0.04);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-4);
+  }
 
   /* ---------------- Toast ---------------- */
   .toast {
-    position: fixed; bottom: 24px; right: 24px; background: white;
-    border: 1px solid var(--border); border-radius: 14px; padding: 14px 18px;
-    box-shadow: var(--shadow); max-width: 400px; z-index: 100; font-size: 13px;
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--hairline-2);
+    border-radius: var(--r-lg);
+    padding: 14px 18px;
+    box-shadow: var(--shadow-xl);
+    max-width: 380px; z-index: 100; font-size: 13px;
+    transform: translateY(120%); opacity: 0;
+    transition: transform 320ms cubic-bezier(0.22,1,0.36,1), opacity 220ms ease;
   }
-  .toast.running { border-left: 4px solid var(--green); }
-  .toast.done { border-left: 4px solid var(--green-dark); }
-  .toast.failed { border-left: 4px solid var(--red); }
-  .toast .title { font-weight: 700; margin-bottom: 4px; }
-  .toast .body { color: var(--muted); font-size: 12.5px; }
+  .toast.visible { transform: translateY(0); opacity: 1; }
+  .toast .toast-row { display: flex; gap: 12px; align-items: flex-start; }
+  .toast .toast-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+    margin-top: 7px; flex-shrink: 0;
+  }
+  .toast.running .toast-dot { background: var(--green); animation: pulse 1.4s ease-in-out infinite; }
+  .toast.failed .toast-dot { background: var(--red); }
+  .toast .title { font-weight: 600; margin-bottom: 2px; color: var(--text); }
+  .toast .body { color: var(--text-3); font-size: 13px; line-height: 1.45; }
+  .toast a { color: var(--blue); }
   .hidden { display: none !important; }
+
+  /* ---------------- Tiny helpers ---------------- */
+  .muted { color: var(--text-3); }
+  .mono { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+
   {% block extra_css %}{% endblock %}
 </style>
 </head>
 <body>
 
 <header class="appbar">
-  <a href="/" class="brand"><span class="logo">S</span> Signal Tracker</a>
-  <nav class="nav">
-    <a href="/" class="{% block nav_search %}{% endblock %}">Recherche</a>
-    <a href="/results" class="{% block nav_results %}{% endblock %}">Résultats</a>
-  </nav>
-  <div class="spacer"></div>
-  <span id="status-pill" class="status-pill {{ task_status }}">
-    {% if task_status == "running" %}<span class="spinner"></span> Analyse en cours…
-    {% elif task_status == "done" %}Dernière analyse terminée
-    {% elif task_status == "failed" %}Échec
-    {% else %}Prêt{% endif %}
-  </span>
+  <div class="appbar-inner">
+    <a href="/" class="brand"><span class="logo">S</span> Signal Tracker</a>
+    <nav class="nav">
+      <a href="/" class="{% block nav_search %}{% endblock %}">Recherche</a>
+      <a href="/results" class="{% block nav_results %}{% endblock %}">Résultats</a>
+    </nav>
+    <div class="spacer"></div>
+    <span id="status-pill" class="status-pill {{ task_status }}">
+      <span class="dot"></span>
+      <span id="status-text">
+        {% if task_status == "running" %}Analyse en cours
+        {% elif task_status == "done" %}Analyse terminée
+        {% elif task_status == "failed" %}Échec
+        {% else %}Prêt{% endif %}
+      </span>
+    </span>
+  </div>
 </header>
 
 <main>
   {% block content %}{% endblock %}
 </main>
 
-<div id="toast" class="toast hidden">
-  <div class="title" id="toast-title">Analyse en cours…</div>
-  <div class="body" id="toast-body"></div>
+<div id="toast" class="toast">
+  <div class="toast-row">
+    <span class="toast-dot"></span>
+    <div>
+      <div class="title" id="toast-title">Analyse en cours</div>
+      <div class="body" id="toast-body"></div>
+    </div>
+  </div>
 </div>
 
 <script>
 (function () {
   const pill = document.getElementById('status-pill');
+  const pillText = document.getElementById('status-text');
   const toast = document.getElementById('toast');
   const toastTitle = document.getElementById('toast-title');
   const toastBody = document.getElementById('toast-body');
   if (!pill) return;
   let polling = null;
-  let lastStatus = pill.className.replace('status-pill', '').trim() || 'idle';
-  const stepLabels = { collect: 'Collecte des sources…', classify: 'Analyse IA des signaux…' };
+  let lastStatus = (pill.className.match(/status-pill\s+(\w+)/) || [])[1] || 'idle';
+  const stepLabels = { collect: 'Collecte des sources', classify: 'Analyse IA des signaux' };
 
+  function showToast(cls) {
+    toast.className = 'toast ' + cls + ' visible';
+  }
+  function hideToast() {
+    toast.className = (toast.className || '').replace(/\bvisible\b/, '').trim();
+  }
   function fmtMetrics(m) {
     if (!m) return '';
     const parts = [];
-    if (m.collect) parts.push(`Collecte : ${m.collect.fetched} articles · ${m.collect.new} nouveaux`);
-    if (m.classify) parts.push(`Analyse : ${m.classify.processed} traités · ${m.classify.signals_created} signaux · ${m.classify.errors} erreurs`);
-    return parts.join('<br>');
+    if (m.collect) parts.push(`${m.collect.fetched} articles · ${m.collect.new} nouveaux`);
+    if (m.classify) parts.push(`${m.classify.processed} traités · ${m.classify.signals_created} signaux`);
+    return parts.join(' · ');
   }
   function apply(state) {
     const status = state.status || 'idle';
     pill.className = 'status-pill ' + status;
     if (status === 'running') {
-      pill.innerHTML = '<span class="spinner"></span> ' + (stepLabels[state.step] || 'Analyse en cours…');
-      toast.classList.remove('hidden'); toast.className = 'toast running';
-      toastTitle.textContent = stepLabels[state.step] || 'Analyse en cours…';
+      pillText.textContent = stepLabels[state.step] || 'Analyse en cours';
+      showToast('running');
+      toastTitle.textContent = stepLabels[state.step] || 'Analyse en cours';
       toastBody.innerHTML = fmtMetrics(state.metrics) || 'Démarrage…';
     } else if (status === 'done') {
-      pill.textContent = 'Dernière analyse terminée';
-      toast.classList.remove('hidden'); toast.className = 'toast done';
-      toastTitle.textContent = 'Analyse terminée ✓';
+      pillText.textContent = 'Analyse terminée';
+      showToast('done');
+      toastTitle.textContent = 'Analyse terminée';
       const rid = state.current_run_id;
       const link = rid ? `/results?run=${rid}` : '/results';
-      toastBody.innerHTML = fmtMetrics(state.metrics) + `<br><a href="${link}">Voir les résultats →</a>`;
+      toastBody.innerHTML = (fmtMetrics(state.metrics) || '') + ` · <a href="${link}">Voir →</a>`;
       stop();
-      if (lastStatus === 'running') setTimeout(() => {
-        const rid2 = state.current_run_id;
-        window.location.href = rid2 ? `/results?run=${rid2}` : '/results';
-      }, 1500);
+      if (lastStatus === 'running') {
+        setTimeout(() => { window.location.href = link; }, 1400);
+      }
     } else if (status === 'failed') {
-      pill.textContent = 'Échec';
-      toast.classList.remove('hidden'); toast.className = 'toast failed';
+      pillText.textContent = 'Échec';
+      showToast('failed');
       toastTitle.textContent = 'Analyse échouée';
       toastBody.textContent = state.error || 'Erreur inconnue';
       stop();

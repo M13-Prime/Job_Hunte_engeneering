@@ -3,91 +3,170 @@
 {% block nav_search %}active{% endblock %}
 
 {% block extra_css %}
-  .hero { text-align: center; padding: 28px 0 8px; }
-  .hero h1 { font-size: 34px; font-weight: 800; color: var(--green-darker); margin: 0 0 8px; }
-  .hero p { color: var(--muted); font-size: 16px; max-width: 620px; margin: 0 auto; }
-  .grid { display: grid; grid-template-columns: minmax(0,1fr) 360px; gap: 24px; margin-top: 24px; align-items: start; }
-  @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
-  .kw-group { margin-bottom: 18px; }
+  .hero { text-align: center; padding: 32px 0 14px; max-width: 760px; margin: 0 auto; }
+  .hero .eyebrow {
+    font-size: 13px; font-weight: 600; color: var(--green-strong);
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px;
+  }
+  .hero h1 {
+    font-size: var(--display); font-weight: 700; color: var(--text);
+    letter-spacing: -0.04em; line-height: 1.05; margin: 0 0 18px;
+  }
+  .hero p {
+    color: var(--text-3); font-size: 19px; max-width: 580px; margin: 0 auto;
+    line-height: 1.5; letter-spacing: -0.012em;
+  }
+  .hero .stats {
+    margin-top: 26px; display: inline-flex; gap: 22px;
+    padding: 10px 22px; background: var(--surface); border: 1px solid var(--hairline);
+    border-radius: var(--r-full); font-size: 13px; color: var(--text-3);
+  }
+  .hero .stats strong { color: var(--text); font-weight: 600; }
+  .hero .stats .sep { color: var(--text-4); }
+
+  .grid {
+    display: grid; grid-template-columns: minmax(0,1.5fr) 380px;
+    gap: 28px; margin-top: 48px; align-items: start;
+  }
+  @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+
+  .kw-group { margin-bottom: 24px; }
   .kw-group:last-of-type { margin-bottom: 0; }
-  .kw-label { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
-  .kw-label .pill { font-weight: 500; font-size: 11px; color: var(--muted); background: var(--cream); border-radius: 999px; padding: 2px 8px; }
-  .launch-row { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-  .launch-row .hint { color: var(--muted); font-size: 13px; }
-  .runs li { list-style: none; }
-  .runs ul { padding: 0; margin: 0; }
+  .kw-label {
+    font-size: 13px; font-weight: 600; color: var(--text);
+    margin-bottom: 4px; display: flex; align-items: baseline; gap: 10px;
+  }
+  .kw-label .hint { color: var(--text-4); font-size: 12px; font-weight: 400; }
+  .kw-sublabel { color: var(--text-3); font-size: 12.5px; margin-bottom: 10px; }
+
+  .launch-block {
+    margin-top: 32px; padding-top: 28px;
+    border-top: 1px solid var(--hairline);
+    display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap;
+  }
+  .launch-block .hint { color: var(--text-3); font-size: 13px; max-width: 360px; }
+
+  /* Side: history list */
+  .runs ul { padding: 0; margin: 0; list-style: none; }
   .run-item {
-    display: flex; align-items: center; gap: 12px; padding: 12px 0;
-    border-top: 1px solid var(--border); font-size: 13.5px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 4px;
+    border-top: 1px solid var(--hairline-2);
+    font-size: 13.5px;
+    transition: background 140ms ease;
+    border-radius: 8px;
   }
   .run-item:first-child { border-top: 0; }
-  .run-item .dot { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; }
+  .run-item:hover { background: rgba(0,0,0,0.025); padding-left: 8px; padding-right: 8px; }
+  .run-item .dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    background: var(--text-4);
+  }
   .run-item .dot.done { background: var(--green); }
-  .run-item .dot.running { background: var(--amber); }
+  .run-item .dot.running { background: var(--amber); animation: pulse 1.4s ease-in-out infinite; }
   .run-item .dot.failed { background: var(--red); }
   .run-item .meta { flex: 1; min-width: 0; }
-  .run-item .meta .label { font-weight: 600; color: var(--ink); }
-  .run-item .meta .sub { color: var(--muted); font-size: 12px; }
-  .run-item .del { background: none; border: none; color: var(--muted-2); cursor: pointer; font-size: 14px; }
-  .run-item .del:hover { color: var(--red); }
+  .run-item .meta a {
+    color: var(--text); font-weight: 500; display: block;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .run-item .meta a:hover { color: var(--blue); text-decoration: none; }
+  .run-item .meta .sub { color: var(--text-3); font-size: 12px; margin-top: 1px; }
+  .run-item .del {
+    background: none; border: none; color: var(--text-4); cursor: pointer;
+    width: 24px; height: 24px; border-radius: 50%; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 16px; line-height: 1;
+    opacity: 0; transition: opacity 160ms ease, background 140ms ease;
+  }
+  .run-item:hover .del { opacity: 1; }
+  .run-item .del:hover { background: var(--red-soft); color: var(--red); }
+
+  .see-all {
+    display: block; text-align: center; margin-top: 14px;
+    padding: 10px; border-top: 1px solid var(--hairline-2);
+    color: var(--blue); font-size: 13px; font-weight: 500;
+  }
+  .see-all:hover { background: rgba(0,113,227,0.04); border-radius: 0 0 var(--r-lg) var(--r-lg); text-decoration: none; }
+
+  /* Empty state icon */
+  .icon-search-empty {
+    width: 22px; height: 22px; stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
 {% endblock %}
 
 {% block content %}
 <div class="hero">
-  <h1>Détecte qui va recruter, avant tout le monde.</h1>
-  <p>Définis tes mots-clés de chasse, lance l'analyse, et reçois une liste classée
-     d'entreprises à contacter — nominations de dirigeants, levées de fonds, signaux ESG &amp; IA.</p>
+  <div class="eyebrow">Phase 6 · v0.3</div>
+  <h1>Détecte qui va recruter,<br>avant tout le monde.</h1>
+  <p>Définis tes mots-clés, lance l'analyse, et reçois une liste classée d'entreprises à contacter — nominations de dirigeants, levées de fonds, signaux ESG &amp; IA.</p>
+  <div class="stats">
+    <span><strong class="mono">{{ total_signals }}</strong> signaux</span>
+    <span class="sep">·</span>
+    <span><strong class="mono">{{ runs|length }}</strong> recherches</span>
+    <span class="sep">·</span>
+    <span><strong class="mono">{{ watchlist|length }}</strong> en watchlist</span>
+  </div>
 </div>
 
 <div class="grid">
 
   <!-- Left: keyword editor + launch -->
   <div class="card">
-    <h2>Mots-clés de la recherche</h2>
+    <h2 class="section-label">Mots-clés de la recherche</h2>
 
-    {% set cat_labels = {"field": "Domaines / secteurs", "job_title": "Postes ciblés", "other": "Autres mots-clés"} %}
-    {% set cat_hints = {"field": "ex : climate tech, AI for sustainability", "job_title": "ex : Sales Engineer, Climate Data Scientist", "other": "ex : CSRD, AI Act, RAG"} %}
+    {% set cat_labels = {"field": "Domaines &amp; secteurs", "job_title": "Postes ciblés", "other": "Autres mots-clés"} %}
+    {% set cat_hints = {"field": "climate tech, AI for sustainability…", "job_title": "Sales Engineer, Climate Data Scientist…", "other": "CSRD, AI Act, RAG…"} %}
 
     {% for cat in keyword_categories %}
     <div class="kw-group">
-      <div class="kw-label">{{ cat_labels[cat] }} <span class="pill">{{ keywords_by_cat[cat]|length }}</span></div>
+      <div class="kw-label">
+        {{ cat_labels[cat]|safe }}
+        <span class="hint">{{ keywords_by_cat[cat]|length }} mot{{ "s" if keywords_by_cat[cat]|length != 1 else "" }}</span>
+      </div>
       {% if keywords_by_cat[cat] %}
       <div class="chips">
         {% for kw in keywords_by_cat[cat] %}
         <span class="chip">{{ kw.value }}
-          <form method="post" action="/keywords/{{ kw.id }}/delete"><button type="submit" title="Supprimer">×</button></form>
+          <form method="post" action="/keywords/{{ kw.id }}/delete"><button type="submit" class="chip-x" aria-label="Supprimer {{ kw.value }}">×</button></form>
         </span>
         {% endfor %}
       </div>
       {% endif %}
       <form class="inline-add" method="post" action="/keywords">
         <input type="hidden" name="category" value="{{ cat }}">
-        <input type="text" name="value" placeholder="{{ cat_hints[cat] }}" required maxlength="255">
-        <button type="submit" title="Ajouter">+</button>
+        <input type="text" name="value" placeholder="{{ cat_hints[cat] }}" required maxlength="255" aria-label="Ajouter un mot-clé">
+        <button type="submit" title="Ajouter">Ajouter</button>
       </form>
     </div>
     {% endfor %}
 
-    <div class="launch-row">
+    <div class="launch-block">
       <form method="post" action="/search" id="launch-form" style="margin:0;">
-        <button type="submit" class="btn btn-primary btn-lg" id="launch-btn"
+        <button type="submit" class="btn btn-primary btn-xl" id="launch-btn"
                 {% if task_status == "running" %}disabled{% endif %}>
-          ▶ Lancer la recherche
+          Lancer la recherche
         </button>
       </form>
       <span class="hint">
         {% if task_status == "running" %}Une analyse est déjà en cours…
-        {% else %}Collecte ~500-900 articles puis les classe par IA (~5-15 min).{% endif %}
+        {% else %}~500-900 articles collectés, puis classés par IA. Compte 5-15 min.{% endif %}
       </span>
     </div>
   </div>
 
   <!-- Right: history + watchlist -->
   <div>
-    <div class="card runs" style="margin-bottom: 20px;">
-      <h2>Recherches précédentes <span class="count">{{ runs|length }}</span></h2>
+    <div class="card runs" style="margin-bottom: 22px;">
+      <h2 class="section-label">Recherches précédentes <span class="count">{{ runs|length }}</span></h2>
       {% if not runs %}
-      <div class="empty" style="padding: 20px 8px;">Aucune recherche encore. Lance la première !</div>
+      <div class="empty" style="padding: 28px 8px;">
+        <div class="empty-icon">
+          <svg class="icon-search-empty" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        </div>
+        Aucune recherche encore.<br>Lance la première !
+      </div>
       {% else %}
       <ul>
         {% for run in runs %}
@@ -95,40 +174,40 @@
           <div class="run-item">
             <span class="dot {{ run.status }}"></span>
             <div class="meta">
-              <div class="label"><a href="/results?run={{ run.id }}">{{ run.label }}</a></div>
+              <a href="/results?run={{ run.id }}">{{ run.label }}</a>
               <div class="sub">
-                {{ run.created_at.strftime("%d/%m %H:%M") if run.created_at else "" }}
-                {% if run.metrics and run.metrics.classify %}· {{ run.metrics.classify.signals_created }} signaux{% endif %}
-                {% if run.status == "running" %}· en cours…{% elif run.status == "failed" %}· échec{% endif %}
+                <span class="mono">{{ run.created_at.strftime("%d/%m %H:%M") if run.created_at else "" }}</span>
+                {% if run.metrics and run.metrics.classify %} · {{ run.metrics.classify.signals_created }} signaux{% endif %}
+                {% if run.status == "running" %} · en cours{% elif run.status == "failed" %} · échec{% endif %}
               </div>
             </div>
-            <form method="post" action="/searches/{{ run.id }}/delete"><button class="del" type="submit" title="Supprimer">×</button></form>
+            <form method="post" action="/searches/{{ run.id }}/delete">
+              <button class="del" type="submit" title="Supprimer" aria-label="Supprimer cette recherche">×</button>
+            </form>
           </div>
         </li>
         {% endfor %}
       </ul>
+      <a href="/results" class="see-all">Voir tous les signaux ({{ total_signals }}) →</a>
       {% endif %}
-      <div style="margin-top:14px;">
-        <a href="/results" class="btn btn-ghost" style="width:100%;">Voir tous les signaux ({{ total_signals }})</a>
-      </div>
     </div>
 
     <div class="card">
-      <h2>Watchlist <span class="count">{{ watchlist|length }}</span></h2>
+      <h2 class="section-label">Watchlist <span class="count">{{ watchlist|length }}</span></h2>
       {% if not watchlist %}
-      <div style="color:var(--muted); font-size:13px; margin-bottom:8px;">Aucune entreprise prioritaire.</div>
+      <div class="muted" style="font-size:13px; margin-bottom:10px;">Aucune entreprise prioritaire pour l'instant.</div>
       {% else %}
       <div class="chips">
         {% for entry in watchlist %}
         <span class="chip">{{ entry.company_name }}
-          <form method="post" action="/watchlist/{{ entry.id }}/delete"><button type="submit" title="Supprimer">×</button></form>
+          <form method="post" action="/watchlist/{{ entry.id }}/delete"><button type="submit" class="chip-x" aria-label="Retirer {{ entry.company_name }}">×</button></form>
         </span>
         {% endfor %}
       </div>
       {% endif %}
       <form class="inline-add" method="post" action="/watchlist">
-        <input type="text" name="company_name" placeholder="Nom d'entreprise" required maxlength="500">
-        <button type="submit" title="Ajouter">+</button>
+        <input type="text" name="company_name" placeholder="Nom d'entreprise" required maxlength="500" aria-label="Ajouter une entreprise à la watchlist">
+        <button type="submit" title="Ajouter">Ajouter</button>
       </form>
     </div>
   </div>

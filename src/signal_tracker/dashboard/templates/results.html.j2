@@ -3,95 +3,229 @@
 {% block nav_results %}active{% endblock %}
 
 {% block extra_css %}
-  .results-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
-  .results-head h1 { font-size: 24px; font-weight: 800; color: var(--green-darker); margin: 0; }
-  .results-head .spacer { flex: 1; }
-  .filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  .filters label { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
-  .filters select, .filters input {
-    padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 8px;
-    font-size: 13px; background: white; font-family: inherit;
+  .results-head {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 22px; flex-wrap: wrap;
   }
-  .filters select:focus, .filters input:focus { outline: none; border-color: var(--green); }
+  .results-head h1 {
+    font-size: 32px; font-weight: 700; color: var(--text);
+    letter-spacing: -0.028em; margin: 0;
+  }
+  .results-head .count-badge {
+    background: rgba(0,0,0,0.06); color: var(--text-3);
+    padding: 4px 12px; border-radius: var(--r-full);
+    font-size: 13px; font-weight: 600;
+  }
+  .results-head .spacer { flex: 1; }
+
+  .filters {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--hairline);
+    padding: 6px; border-radius: var(--r-full);
+  }
+  .filters .filter-label {
+    font-size: 11.5px; font-weight: 600; color: var(--text-3);
+    text-transform: uppercase; letter-spacing: 0.06em; padding: 0 10px 0 12px;
+  }
+  .filters select, .filters input[type="number"] {
+    padding: 7px 12px; border: none; background: transparent;
+    font-size: 13.5px; font-family: inherit; color: var(--text);
+    border-radius: var(--r-full); outline: none;
+    transition: background 140ms ease;
+  }
+  .filters select:hover, .filters input[type="number"]:hover { background: rgba(0,0,0,0.04); }
+  .filters input[type="number"] { width: 72px; text-align: center; font-variant-numeric: tabular-nums; }
+
   .run-banner {
-    background: var(--green-soft); border: 1px solid var(--green-soft-2); color: var(--green-darker);
-    border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 13.5px;
+    background: var(--green-soft); border: 1px solid rgba(52,199,89,0.25);
+    color: var(--green-deep);
+    border-radius: var(--r-md); padding: 12px 18px; margin-bottom: 22px; font-size: 14px;
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   }
-  table.signals { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-  table.signals thead th {
-    text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.05em; color: var(--muted); padding: 0 12px 10px; border-bottom: 1px solid var(--border);
+  .run-banner strong { font-weight: 600; }
+  .run-banner a { color: var(--green-deep); margin-left: auto; font-weight: 500; }
+
+  /* ---------------- Table ---------------- */
+  .signals-card {
+    padding: 0; overflow: hidden;
   }
-  table.signals tbody td { padding: 14px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  table.signals tbody tr:hover { background: #fafcfb; }
-  table.signals tbody tr.is-new td { background: #f3fbf6; }
-  .col-score { width: 64px; }
-  .col-actions { width: 1%; white-space: nowrap; }
+  table.signals {
+    width: 100%; border-collapse: collapse; font-size: 14px;
+  }
+  table.signals thead th {
+    text-align: left; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--text-3);
+    padding: 14px 18px 12px;
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface-2);
+    position: sticky; top: var(--nav-h); z-index: 5;
+  }
+  table.signals tbody td {
+    padding: 18px 18px;
+    border-bottom: 1px solid var(--hairline-2);
+    vertical-align: top;
+    transition: background 140ms ease;
+  }
+  table.signals tbody tr:last-child td { border-bottom: 0; }
+  table.signals tbody tr:hover td { background: rgba(0,0,0,0.018); }
+  table.signals tbody tr.is-new td {
+    background: linear-gradient(to right, rgba(52,199,89,0.05) 0%, rgba(52,199,89,0) 60%);
+  }
+  table.signals tbody tr.is-new:hover td { background: rgba(52,199,89,0.06); }
+
+  .col-score { width: 78px; }
+  .col-source { width: 170px; }
+  .col-actions { width: 1%; white-space: nowrap; padding-right: 18px !important; }
+
+  /* Score badge — Apple-tinted */
   .score-badge {
     display: inline-flex; align-items: center; justify-content: center;
-    min-width: 42px; padding: 5px 8px; border-radius: 8px; font-weight: 800; font-size: 13px;
+    min-width: 50px; padding: 7px 10px; border-radius: var(--r-md);
+    font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
   }
   .score-badge.hot { background: var(--red-soft); color: var(--red); }
   .score-badge.investigate { background: var(--blue-soft); color: var(--blue); }
   .score-badge.watch { background: var(--amber-soft); color: var(--amber); }
-  .company-cell .name { font-weight: 700; font-size: 14.5px; color: var(--ink); display: inline-flex; align-items: center; gap: 8px; }
-  .company-cell .type { color: var(--muted); font-size: 12px; margin-top: 2px; }
-  .summary { color: var(--ink); margin: 4px 0; max-width: 520px; }
-  .angle { background: var(--green-soft); border-radius: 8px; padding: 7px 11px; margin: 6px 0; font-size: 12.5px; max-width: 520px; }
-  .angle strong { color: var(--green-dark); }
-  .contact { font-size: 12.5px; color: var(--muted); }
-  .row-actions { display: flex; flex-direction: column; gap: 5px; align-items: stretch; }
+
+  /* Company cell */
+  .company-cell .name-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+  .company-cell .name {
+    font-weight: 600; font-size: 15.5px; color: var(--text);
+    letter-spacing: -0.012em; display: inline-flex; align-items: center; gap: 6px;
+    transition: color 160ms ease;
+  }
+  .company-cell .name:hover { color: var(--blue); text-decoration: none; }
+  .company-cell .name .external {
+    width: 13px; height: 13px; stroke: currentColor; fill: none;
+    stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+    opacity: 0; transition: opacity 160ms ease;
+  }
+  .company-cell .name:hover .external { opacity: 1; }
+
+  .company-cell .type {
+    color: var(--text-3); font-size: 12.5px; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .company-cell .type .sep { color: var(--text-4); }
+  .company-cell .type .action-tag {
+    background: rgba(0,0,0,0.05); color: var(--text-2);
+    padding: 1px 8px; border-radius: var(--r-sm); font-weight: 500;
+  }
+  .summary { color: var(--text-2); margin: 0 0 8px; max-width: 580px; line-height: 1.5; }
+  .angle {
+    background: var(--green-soft); border-radius: var(--r-sm);
+    padding: 9px 14px; margin: 8px 0; font-size: 13px; max-width: 580px;
+    color: var(--green-deep); border-left: 3px solid var(--green);
+  }
+  .angle strong { color: var(--green-deep); font-weight: 600; }
+  .contact {
+    font-size: 13px; color: var(--text-3); margin-top: 6px;
+  }
+  .contact strong { color: var(--text-2); font-weight: 600; }
+
+  /* Source cell — clickable with favicon */
+  .source-link {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: var(--text-2); font-size: 13px; padding: 4px 0;
+    transition: color 160ms ease;
+  }
+  .source-link:hover { color: var(--blue); text-decoration: none; }
+  .source-link .favicon {
+    width: 16px; height: 16px; border-radius: 4px;
+    background: var(--surface-2);
+    flex-shrink: 0; object-fit: cover;
+  }
+  .source-link .external {
+    width: 12px; height: 12px; stroke: currentColor; fill: none;
+    stroke-width: 2.2; opacity: 0; transition: opacity 160ms ease;
+  }
+  .source-link:hover .external { opacity: 1; }
+
+  /* Row actions — reveal on hover, Apple-quiet */
+  .row-actions {
+    display: flex; flex-direction: column; gap: 4px;
+    opacity: 0.55; transition: opacity 160ms ease;
+  }
+  tr:hover .row-actions { opacity: 1; }
   .row-actions form { margin: 0; }
   .mini {
-    width: 100%; padding: 5px 10px; border: 1px solid var(--border-strong); border-radius: 7px;
-    background: white; font-size: 12px; cursor: pointer; font-weight: 600; color: var(--muted); font-family: inherit;
+    width: 100%; padding: 6px 14px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-sm); background: var(--surface);
+    font-size: 12.5px; font-weight: 500; color: var(--text-2);
+    font-family: inherit; cursor: pointer;
+    transition: all 140ms ease; white-space: nowrap;
+    min-width: 96px;
   }
-  .mini:hover { border-color: var(--ink); color: var(--ink); }
+  .mini:hover { border-color: var(--text-3); color: var(--text); }
   .mini.contacted:hover { border-color: var(--red); color: var(--red); background: var(--red-soft); }
-  .mini.relevant:hover { border-color: var(--green); color: var(--green-dark); background: var(--green-soft); }
-  .mini.src { color: var(--green-dark); border-color: transparent; text-align: center; }
+  .mini.relevant:hover { border-color: var(--green); color: var(--green-deep); background: var(--green-soft); }
+
+  /* Empty state */
+  .empty-results {
+    text-align: center; padding: 72px 24px;
+  }
+  .empty-results .empty-icon {
+    width: 64px; height: 64px; margin: 0 auto 18px;
+    border-radius: 50%; background: rgba(0,0,0,0.04);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-4);
+  }
+  .empty-results h3 {
+    font-size: 18px; font-weight: 600; color: var(--text); margin: 0 0 6px;
+  }
+  .empty-results p { color: var(--text-3); font-size: 14.5px; margin: 0 0 18px; }
+
+  /* Lucide-ish inline icons */
+  .ico { width: 16px; height: 16px; stroke: currentColor; fill: none;
+         stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 {% endblock %}
 
 {% block content %}
 <div class="results-head">
   <h1>Signaux</h1>
-  <span class="badge">{{ rows|length }}</span>
+  <span class="count-badge mono">{{ rows|length }}</span>
   <div class="spacer"></div>
   <form class="filters" method="get" action="/results">
     {% if run_id %}<input type="hidden" name="run" value="{{ run_id }}">{% endif %}
-    <label>Feedback
-      <select name="feedback">
-        <option value="" {% if filter_feedback == "" %}selected{% endif %}>tous</option>
-        <option value="pending" {% if filter_feedback == "pending" %}selected{% endif %}>sans feedback</option>
-        {% for f in valid_feedback %}
-        <option value="{{ f }}" {% if filter_feedback == f %}selected{% endif %}>{{ f }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>Score min
-      <input type="number" name="min_score" value="{{ min_score }}" min="0" max="100" step="1" style="width:64px;">
-    </label>
-    <button type="submit" class="btn btn-ghost" style="padding:8px 14px;">Filtrer</button>
+    <span class="filter-label">Feedback</span>
+    <select name="feedback" onchange="this.form.submit()">
+      <option value="" {% if filter_feedback == "" %}selected{% endif %}>Tous</option>
+      <option value="pending" {% if filter_feedback == "pending" %}selected{% endif %}>Sans feedback</option>
+      {% for f in valid_feedback %}
+      <option value="{{ f }}" {% if filter_feedback == f %}selected{% endif %}>{{ f }}</option>
+      {% endfor %}
+    </select>
+    <span class="filter-label">Score ≥</span>
+    <input type="number" name="min_score" value="{{ min_score }}" min="0" max="100" step="5" onchange="this.form.submit()">
   </form>
 </div>
 
 {% if run_id and focus_run %}
 <div class="run-banner">
   <strong>Recherche : {{ focus_run.label }}</strong>
-  <span>· {{ focus_run.created_at.strftime("%d/%m %H:%M") if focus_run.created_at else "" }}</span>
+  <span class="mono">· {{ focus_run.created_at.strftime("%d/%m %H:%M") if focus_run.created_at else "" }}</span>
   {% if focus_run.metrics and focus_run.metrics.classify %}
   <span>· {{ focus_run.metrics.classify.signals_created }} signaux trouvés</span>
   {% endif %}
-  <a href="/results" style="margin-left:auto;">Voir tous les signaux →</a>
+  <a href="/results">Voir tous les signaux →</a>
 </div>
 {% endif %}
 
-<div class="card" style="padding: 16px 18px;">
+<div class="card signals-card">
   {% if not rows %}
-  <div class="empty">
-    Aucun signal pour ces filtres.
-    <a href="/">Lance une recherche</a> pour collecter et analyser.
+  <div class="empty-results">
+    <div class="empty-icon">
+      <svg class="ico" style="width:28px;height:28px;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    </div>
+    <h3>Aucun signal pour ces filtres</h3>
+    <p>Ajuste tes filtres, ou lance une nouvelle recherche.</p>
+    <a href="/" class="btn btn-primary">Lancer une recherche</a>
   </div>
   {% else %}
   <table class="signals">
@@ -99,33 +233,54 @@
       <tr>
         <th class="col-score">Score</th>
         <th>Entreprise &amp; signal</th>
-        <th>Source</th>
-        <th class="col-actions">Action</th>
+        <th class="col-source">Source</th>
+        <th class="col-actions">Feedback</th>
       </tr>
     </thead>
     <tbody>
       {% for signal, raw in rows %}
       {% set tier = "hot" if signal.total_score >= 80 else ("investigate" if signal.total_score >= 60 else "watch") %}
       {% set is_new = focus_run_id and signal.search_run_id == focus_run_id %}
+      {% set domain = raw.url.split('//')[-1].split('/')[0].replace('www.', '') if raw.url else raw.source %}
       <tr class="{{ 'is-new' if is_new else '' }}">
         <td class="col-score"><span class="score-badge {{ tier }}">{{ "%.0f"|format(signal.total_score) }}</span></td>
         <td class="company-cell">
-          <div class="name">
-            {{ signal.company_name or "(sans nom)" }}
+          <div class="name-row">
+            {% if raw.url %}
+            <a class="name" href="{{ raw.url }}" target="_blank" rel="noopener noreferrer">
+              {{ signal.company_name or "(sans nom)" }}
+              <svg class="external" viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8"/></svg>
+            </a>
+            {% else %}
+            <span class="name">{{ signal.company_name or "(sans nom)" }}</span>
+            {% endif %}
             {% if is_new %}<span class="badge new">Nouveau</span>{% endif %}
             {% if signal.user_feedback %}<span class="feedback-tag {{ signal.user_feedback }}">{{ signal.user_feedback }}</span>{% endif %}
           </div>
-          <div class="type">{{ signal.signal_type }} · {{ signal.recommended_action }}</div>
-          <div class="summary">{{ signal.summary_fr }}</div>
+          <div class="type">
+            {{ signal.signal_type }}
+            <span class="sep">·</span>
+            <span class="action-tag">{{ signal.recommended_action }}</span>
+          </div>
+          <p class="summary">{{ signal.summary_fr }}</p>
           {% if signal.suggested_angle %}<div class="angle"><strong>Angle :</strong> {{ signal.suggested_angle }}</div>{% endif %}
           {% if signal.target_contact %}{% set c = signal.target_contact %}{% if c.name or c.role %}
           <div class="contact"><strong>Contact :</strong> {% if c.name %}{{ c.name }}{% endif %}{% if c.role %} — {{ c.role }}{% endif %}{% if c.rationale %} ({{ c.rationale }}){% endif %}</div>
           {% endif %}{% endif %}
         </td>
-        <td style="color:var(--muted); font-size:12.5px;">{{ raw.source }}</td>
+        <td class="col-source">
+          {% if raw.url %}
+          <a class="source-link" href="{{ raw.url }}" target="_blank" rel="noopener noreferrer" title="{{ raw.url }}">
+            <img class="favicon" src="https://www.google.com/s2/favicons?domain={{ domain }}&amp;sz=32" alt="" loading="lazy" referrerpolicy="no-referrer">
+            <span>{{ domain }}</span>
+            <svg class="external" viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8"/></svg>
+          </a>
+          {% else %}
+          <span class="source-link"><span>{{ raw.source }}</span></span>
+          {% endif %}
+        </td>
         <td class="col-actions">
           <div class="row-actions">
-            {% if raw.url %}<a href="{{ raw.url }}" target="_blank" rel="noopener" class="mini src">Source ↗</a>{% endif %}
             <form method="post" action="/signals/{{ signal.id }}/feedback">
               <input type="hidden" name="action" value="contacted">
               <input type="hidden" name="redirect_to" value="/results{% if run_id %}?run={{ run_id }}{% endif %}">
