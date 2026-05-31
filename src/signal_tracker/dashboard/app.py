@@ -25,7 +25,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, func, select, update
@@ -34,11 +34,15 @@ from sqlalchemy.orm import Session
 
 from signal_tracker.classifier.feedback import VALID_FEEDBACK
 from signal_tracker.config import get_settings, load_user_profile, resolve_db_url
+from signal_tracker.preparation.cv import CVExtractionError, extract_text
+from signal_tracker.preparation.llm import PreparationError, generate_preparation
 from signal_tracker.storage import Database, init_db
 from signal_tracker.storage.models import (
+    Preparation,
     RawItem,
     SearchRun,
     Signal,
+    UserCV,
     UserKeyword,
     WatchlistEntry,
 )
@@ -388,6 +392,160 @@ def build_app(db: Database | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="Keyword not found")
         session.delete(kw)
         return RedirectResponse(url="/", status_code=303)
+
+    # ------------------------------------------------------------ preparation
+    @app.get("/signals/{signal_id}/prepare", response_class=HTMLResponse)
+    def prepare_form(
+        request: Request,
+        signal_id: int,
+        session: Session = Depends(get_session_dep),
+    ) -> HTMLResponse:
+        signal = session.get(Signal, signal_id)
+        if signal is None:
+            raise HTTPException(status_code=404, detail="Signal not found")
+        raw = session.get(RawItem, signal.raw_item_id)
+        cv = session.execute(select(UserCV).limit(1)).scalar_one_or_none()
+        latest_prep = session.execute(
+            select(Preparation)
+            .where(Preparation.signal_id == signal_id)
+            .order_by(desc(Preparation.created_at))
+            .limit(1)
+        ).scalar_one_or_none()
+        return templates.TemplateResponse(
+            request,
+            "prepare.html.j2",
+            {
+                "signal": signal,
+                "raw": raw,
+                "cv": cv,
+                "latest_prep": latest_prep,
+                "task_status": task_state["status"],
+                "current_run_id": task_state["current_run_id"],
+            },
+        )
+
+    @app.post("/signals/{signal_id}/prepare")
+    async def prepare_submit(
+        signal_id: int,
+        cv_file: Annotated[UploadFile | None, File()] = None,
+        cv_text: Annotated[str, Form()] = "",
+        save_cv: Annotated[str, Form()] = "",
+    ) -> RedirectResponse:
+        # 1. Resolve the CV text (file > pasted text > stored CV).
+        text_value = (cv_text or "").strip()
+        filename: str | None = None
+        if cv_file is not None and cv_file.filename:
+            data = await cv_file.read()
+            filename = cv_file.filename
+            try:
+                extracted = extract_text(filename, data)
+            except CVExtractionError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            if extracted.strip():
+                text_value = extracted.strip()
+
+        if not text_value:
+            with app_db.session() as session:
+                stored = session.execute(select(UserCV).limit(1)).scalar_one_or_none()
+                if stored is not None:
+                    text_value = stored.text
+                    filename = filename or stored.filename
+
+        if not text_value:
+            raise HTTPException(
+                status_code=400,
+                detail="No CV provided. Upload a PDF or paste your CV text.",
+            )
+
+        # 2. Optionally persist the CV (singleton: replace existing).
+        if save_cv == "on":
+            with app_db.session() as session:
+                for old in session.execute(select(UserCV)).scalars():
+                    session.delete(old)
+                session.flush()
+                session.add(
+                    UserCV(filename=filename, text=text_value, char_count=len(text_value))
+                )
+
+        # 3. Load context, call the LLM, persist the report.
+        with app_db.session() as session:
+            signal = session.get(Signal, signal_id)
+            if signal is None:
+                raise HTTPException(status_code=404, detail="Signal not found")
+            raw = session.get(RawItem, signal.raw_item_id)
+            company_name = signal.company_name
+            signal_type = signal.signal_type
+            recommended_action = signal.recommended_action
+            total_score = signal.total_score
+            summary_fr = signal.summary_fr
+            suggested_angle = signal.suggested_angle
+            source = raw.source if raw else "—"
+            url = raw.url if raw else None
+            title = raw.title if raw else None
+            content = raw.content if raw else None
+
+        try:
+            report = await generate_preparation(
+                company_name=company_name,
+                signal_type=signal_type,
+                recommended_action=recommended_action,
+                total_score=total_score,
+                summary_fr=summary_fr,
+                suggested_angle=suggested_angle,
+                source=source,
+                url=url,
+                title=title,
+                content=content,
+                profile=load_user_profile(),
+                cv_text=text_value,
+            )
+            status = "done"
+            error_msg = None
+            report_dict: dict[str, Any] | None = report.model_dump()
+        except (PreparationError, Exception) as exc:
+            status = "failed"
+            error_msg = str(exc)[:500]
+            report_dict = None
+
+        with app_db.session() as session:
+            prep = Preparation(
+                signal_id=signal_id,
+                status=status,
+                report=report_dict,
+                cv_excerpt=text_value[:2000],
+                error=error_msg,
+            )
+            session.add(prep)
+            session.flush()
+            prep_id = prep.id
+
+        return RedirectResponse(
+            url=f"/preparations/{prep_id}", status_code=303
+        )
+
+    @app.get("/preparations/{prep_id}", response_class=HTMLResponse)
+    def view_preparation(
+        request: Request,
+        prep_id: int,
+        session: Session = Depends(get_session_dep),
+    ) -> HTMLResponse:
+        prep = session.get(Preparation, prep_id)
+        if prep is None:
+            raise HTTPException(status_code=404, detail="Preparation not found")
+        signal = session.get(Signal, prep.signal_id)
+        raw = session.get(RawItem, signal.raw_item_id) if signal else None
+        return templates.TemplateResponse(
+            request,
+            "preparation.html.j2",
+            {
+                "prep": prep,
+                "report": prep.report,
+                "signal": signal,
+                "raw": raw,
+                "task_status": task_state["status"],
+                "current_run_id": task_state["current_run_id"],
+            },
+        )
 
     return app
 
