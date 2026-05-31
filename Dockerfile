@@ -21,7 +21,9 @@ WORKDIR /app
 # Copy lockfile + project metadata first so layer cache survives source edits.
 COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/
-RUN uv sync --frozen --no-dev
+# Note: not using --frozen so we can deploy a pyproject.toml change without
+# round-tripping uv.lock through the GitHub API (push pipeline limitation).
+RUN uv sync --no-dev
 
 # ---------------------------------------------------------------------------
 # Runtime stage — slim image with only the venv + project source
