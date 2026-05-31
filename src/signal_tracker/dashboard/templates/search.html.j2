@@ -134,6 +134,54 @@
   .how .step h3 { font-size: 17px; margin: 0 0 4px; color: var(--text); font-weight: 600; }
   .how .step p { font-size: 13.5px; color: var(--text-3); margin: 0; line-height: 1.5; }
 
+  /* ---------------- "Why / Description" panel ---------------- */
+  .why {
+    margin-top: 64px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-xl);
+    padding: 48px 48px 40px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.025), 0 8px 24px rgba(11,40,80,0.04);
+    position: relative; overflow: hidden;
+  }
+  .why::before {
+    content: ""; position: absolute; top: -120px; right: -120px;
+    width: 360px; height: 360px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(52,199,89,0.13), rgba(52,199,89,0) 70%);
+    pointer-events: none;
+  }
+  .why .why-head { position: relative; z-index: 1; max-width: 720px; margin-bottom: 32px; }
+  .why .why-eyebrow {
+    font-size: 12.5px; font-weight: 600; color: var(--green-deep);
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;
+  }
+  .why .why-head h2 {
+    font-size: 32px; font-weight: 700; color: var(--text);
+    letter-spacing: -0.028em; line-height: 1.15; margin: 0 0 14px;
+  }
+  .why .why-head p { font-size: 17px; color: var(--text-2); margin: 0; line-height: 1.55; max-width: 640px; }
+  .why-grid {
+    position: relative; z-index: 1;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px 36px;
+  }
+  @media (max-width: 760px) {
+    .why { padding: 32px 24px; }
+    .why .why-head h2 { font-size: 26px; }
+    .why-grid { grid-template-columns: 1fr; gap: 22px; }
+  }
+  .why-item { display: flex; gap: 14px; }
+  .why-item .ico {
+    flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--green-soft); color: var(--green-deep);
+  }
+  .why-item.b .ico { background: var(--blue-soft); color: var(--blue); }
+  .why-item.p .ico { background: var(--purple-soft); color: var(--purple); }
+  .why-item.a .ico { background: var(--amber-soft); color: var(--amber); }
+  .why-item .ico svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .why-item h4 { font-size: 15px; font-weight: 600; color: var(--text); margin: 2px 0 4px; letter-spacing: -0.012em; }
+  .why-item p { font-size: 13.5px; color: var(--text-3); margin: 0; line-height: 1.55; }
+
   /* ---------------- Workspace grid ---------------- */
   .grid {
     display: grid; grid-template-columns: minmax(0,1.5fr) 380px;
@@ -271,6 +319,65 @@
     <div class="num">Étape 03</div>
     <h3>Contacte avant tout le monde</h3>
     <p>Liste classée par score, avec angle d'attaque et contact suggéré.</p>
+  </div>
+</section>
+
+<!-- ============ Why / Description ============ -->
+<section class="why fade-in">
+  <div class="why-head">
+    <div class="why-eyebrow">Pourquoi Signal Tracker ?</div>
+    <h2>Le bon timing, c'est avant que le poste soit publié.</h2>
+    <p>Une nomination, une levée, un changement d'organigramme — chaque semaine, des centaines d'entreprises ESG, climate tech et IA déclenchent un signal qui annonce un futur recrutement. Signal Tracker les détecte automatiquement, les classe par pertinence, et te dit qui contacter, avec quel angle.</p>
+  </div>
+
+  <div class="why-grid">
+    <div class="why-item">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></div>
+      <div>
+        <h4>Détection précoce</h4>
+        <p>Cible les signaux faibles (nominations, levées de fonds, ouvertures de bureau) qui précèdent les recrutements de 2 à 8 semaines.</p>
+      </div>
+    </div>
+
+    <div class="why-item b">
+      <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+      <div>
+        <h4>Tes mots-clés, ton scoring</h4>
+        <p>Tu définis les domaines et les postes qui comptent. L'IA apprend de ton feedback "pertinent / pas pertinent" et affine le classement à chaque recherche.</p>
+      </div>
+    </div>
+
+    <div class="why-item p">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
+      <div>
+        <h4>Sources premium agrégées</h4>
+        <p>500 à 900 articles analysés par recherche : Les Échos, Maddyness, GDELT, NewsAPI, Pappers, France Travail. Tout en français, dédupliqué.</p>
+      </div>
+    </div>
+
+    <div class="why-item a">
+      <div class="ico"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <div>
+        <h4>Angle d'attaque inclus</h4>
+        <p>Chaque signal vient avec un score (urgence, fit, pertinence), un résumé en français, l'angle suggéré et le contact recommandé pour ton premier message.</p>
+      </div>
+    </div>
+
+    <div class="why-item">
+      <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+      <div>
+        <h4>5 à 15 min par recherche</h4>
+        <p>Lance une analyse, va te chercher un café, reviens à une liste classée. Pas de tableau Excel, pas de tabs LinkedIn ouverts à 23h.</p>
+      </div>
+    </div>
+
+    <div class="why-item b">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+      <div>
+        <h4>Historique &amp; watchlist</h4>
+        <p>Chaque recherche est sauvegardée avec ses signaux. Mets une entreprise en watchlist pour la prioriser dans les analyses suivantes.</p>
+      </div>
+    </div>
   </div>
 </section>
 

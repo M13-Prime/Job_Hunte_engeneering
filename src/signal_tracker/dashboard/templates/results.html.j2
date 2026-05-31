@@ -47,10 +47,13 @@
 
   /* ---------------- Table ---------------- */
   .signals-card {
-    padding: 0; overflow: hidden;
+    padding: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
   table.signals {
-    width: 100%; border-collapse: collapse; font-size: 14px;
+    width: 100%; min-width: 720px;
+    border-collapse: collapse; font-size: 14px;
   }
   table.signals thead th {
     text-align: left; font-size: 11px; font-weight: 700;
@@ -65,7 +68,14 @@
     padding: 18px 18px;
     border-bottom: 1px solid var(--hairline-2);
     vertical-align: top;
+    background: var(--surface);
     transition: background 140ms ease;
+  }
+  @media (max-width: 720px) {
+    table.signals { min-width: 560px; font-size: 13px; }
+    table.signals thead th { padding: 12px 12px 10px; }
+    table.signals tbody td { padding: 14px 12px; }
+    .col-source { width: 130px; }
   }
   table.signals tbody tr:last-child td { border-bottom: 0; }
   table.signals tbody tr:hover td { background: rgba(0,0,0,0.018); }
