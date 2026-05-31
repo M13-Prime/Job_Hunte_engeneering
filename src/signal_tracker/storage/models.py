@@ -226,3 +226,40 @@ class UserKeyword(Base):
     added_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
+
+
+class UserCV(Base):
+    """The current user CV — singleton (only one row at a time).
+
+    Stored as plain text so we can paste it into LLM prompts. We keep the
+    original filename for display. To replace the CV the user uploads again
+    and the dashboard deletes the previous row.
+    """
+
+    __tablename__ = "user_cv"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    filename: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    text: Mapped[str] = mapped_column(Text)
+    char_count: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+
+
+class Preparation(Base):
+    """Generated preparation report for a (Signal, CV) pair (Phase 7)."""
+
+    __tablename__ = "preparations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    signal_id: Mapped[int] = mapped_column(
+        ForeignKey("signals.id"), index=True, nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(16), default="done", index=True)
+    report: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    cv_excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False, index=True
+    )
