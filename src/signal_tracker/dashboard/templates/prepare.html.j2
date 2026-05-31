@@ -1,0 +1,185 @@
+{% extends "base.html.j2" %}
+{% block title %}Préparer le contact — {{ signal.company_name }}{% endblock %}
+
+{% block extra_css %}
+  .prep-head { display: flex; align-items: flex-start; gap: 18px; margin-bottom: 26px; flex-wrap: wrap; }
+  .prep-head .score {
+    flex-shrink: 0; min-width: 60px; padding: 10px 14px; border-radius: var(--r-md);
+    font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .prep-head .score.hot { background: var(--red-soft); color: var(--red); }
+  .prep-head .score.investigate { background: var(--blue-soft); color: var(--blue); }
+  .prep-head .score.watch { background: var(--amber-soft); color: var(--amber); }
+  .prep-head .meta h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.025em; margin: 0 0 6px; }
+  .prep-head .meta .sub { color: var(--text-3); font-size: 13.5px; }
+  .prep-head .meta .sub a { color: var(--blue); }
+
+  .prep-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 28px; }
+  @media (max-width: 960px) { .prep-grid { grid-template-columns: 1fr; } }
+
+  .signal-recap { font-size: 14px; color: var(--text-2); }
+  .signal-recap .label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-4); margin: 14px 0 4px; }
+  .signal-recap .label:first-of-type { margin-top: 0; }
+  .signal-recap p { margin: 0; line-height: 1.55; }
+  .signal-recap .summary { color: var(--text); font-size: 15px; line-height: 1.55; margin-top: 4px; }
+  .signal-recap .angle {
+    background: var(--green-soft); border-radius: var(--r-sm); padding: 10px 14px;
+    color: var(--green-deep); border-left: 3px solid var(--green); font-size: 13.5px; margin-top: 4px;
+  }
+
+  .upload-form { display: flex; flex-direction: column; gap: 18px; }
+  .upload-zone {
+    border: 2px dashed var(--hairline);
+    border-radius: var(--r-lg); padding: 28px 22px; text-align: center;
+    background: var(--surface-2); cursor: pointer; transition: all 160ms ease;
+  }
+  .upload-zone:hover { border-color: var(--green); background: var(--green-soft); }
+  .upload-zone .icon {
+    width: 40px; height: 40px; margin: 0 auto 12px; color: var(--text-3);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .upload-zone .icon svg { width: 28px; height: 28px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .upload-zone .label { font-size: 14.5px; font-weight: 600; color: var(--text); }
+  .upload-zone .hint { font-size: 12.5px; color: var(--text-3); margin-top: 4px; }
+  .upload-zone input[type="file"] { display: none; }
+  .upload-zone.has-file { border-style: solid; border-color: var(--green); background: var(--green-soft); }
+  .upload-zone.has-file .icon { color: var(--green-deep); }
+
+  .divider {
+    display: flex; align-items: center; gap: 12px; color: var(--text-4); font-size: 11.5px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--hairline); }
+
+  textarea.cv-paste {
+    width: 100%; min-height: 160px; resize: vertical; padding: 12px 14px;
+    border: 1px solid var(--hairline); border-radius: var(--r-md);
+    font-family: inherit; font-size: 13.5px; color: var(--text);
+    line-height: 1.5; outline: none;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+  textarea.cv-paste:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(0,113,227,0.12); }
+
+  .cv-known {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    background: var(--blue-soft); color: var(--blue); border-radius: var(--r-md);
+    font-size: 13px;
+  }
+  .cv-known strong { font-weight: 600; }
+
+  .save-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-3); cursor: pointer; }
+  .save-toggle input { width: 16px; height: 16px; accent-color: var(--green); }
+
+  .latest-prep {
+    margin-top: 14px; padding: 14px; border: 1px solid var(--hairline);
+    border-radius: var(--r-md); background: var(--surface);
+  }
+  .latest-prep a { font-weight: 500; }
+
+  .submit-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .submit-row .hint { color: var(--text-3); font-size: 12.5px; }
+{% endblock %}
+
+{% block content %}
+{% set tier = "hot" if signal.total_score >= 80 else ("investigate" if signal.total_score >= 60 else "watch") %}
+<div class="prep-head">
+  <span class="score {{ tier }}">{{ "%.0f"|format(signal.total_score) }}</span>
+  <div class="meta">
+    <h1>Préparer le contact — {{ signal.company_name }}</h1>
+    <div class="sub">
+      {{ signal.signal_type }} · {{ signal.recommended_action }}
+      {% if raw and raw.url %} · <a href="{{ raw.url }}" target="_blank" rel="noopener">Voir l'article ↗</a>{% endif %}
+      · <a href="/results">← Retour aux signaux</a>
+    </div>
+  </div>
+</div>
+
+<div class="prep-grid">
+
+  <!-- Left: signal recap -->
+  <div class="card">
+    <h2 class="section-label">Contexte du signal</h2>
+    <div class="signal-recap">
+      <div class="label">Résumé</div>
+      <p class="summary">{{ signal.summary_fr }}</p>
+
+      {% if signal.suggested_angle %}
+      <div class="label">Angle suggéré</div>
+      <div class="angle">{{ signal.suggested_angle }}</div>
+      {% endif %}
+
+      {% if signal.target_contact and (signal.target_contact.name or signal.target_contact.role) %}
+      <div class="label">Contact pré-suggéré</div>
+      <p>{% if signal.target_contact.name %}<strong>{{ signal.target_contact.name }}</strong>{% endif %}{% if signal.target_contact.role %} — {{ signal.target_contact.role }}{% endif %}{% if signal.target_contact.rationale %}<br><span class="muted">{{ signal.target_contact.rationale }}</span>{% endif %}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Right: CV upload -->
+  <div class="card">
+    <h2 class="section-label">Ton CV</h2>
+
+    {% if cv %}
+    <div class="cv-known">
+      <svg style="width:16px;height:16px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+      <span>CV enregistré : <strong>{{ cv.filename or "(texte collé)" }}</strong> · {{ cv.char_count }} caractères</span>
+    </div>
+    <p class="muted" style="font-size:13px; margin: 10px 0 0;">Tu peux le réutiliser tel quel, le remplacer par un nouvel upload, ou coller un texte ad-hoc juste pour cette préparation.</p>
+    {% endif %}
+
+    <form class="upload-form" method="post" action="/signals/{{ signal.id }}/prepare" enctype="multipart/form-data" style="margin-top: 16px;">
+      <label class="upload-zone" id="drop-zone" for="cv-file">
+        <div class="icon">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <div class="label" id="dz-label">Glisse ton CV (PDF) ici</div>
+        <div class="hint" id="dz-hint">ou clique pour choisir un fichier</div>
+        <input id="cv-file" type="file" name="cv_file" accept=".pdf,.txt">
+      </label>
+
+      <div class="divider">ou</div>
+
+      <textarea class="cv-paste" name="cv_text" placeholder="Colle directement le texte de ton CV ici (utile si ton PDF est scanné)…" maxlength="40000"></textarea>
+
+      <label class="save-toggle">
+        <input type="checkbox" name="save_cv" value="on" {% if not cv %}checked{% endif %}>
+        Mémoriser ce CV pour les prochaines préparations
+      </label>
+
+      <div class="submit-row">
+        <button type="submit" class="btn btn-primary btn-lg">Générer la préparation</button>
+        <span class="hint">~15-30 secondes. Tu seras redirigé vers le rapport.</span>
+      </div>
+    </form>
+
+    {% if latest_prep and latest_prep.status == "done" %}
+    <div class="latest-prep">
+      <div class="muted" style="font-size:12px; margin-bottom: 4px;">DERNIÈRE PRÉPARATION POUR CE SIGNAL</div>
+      <a href="/preparations/{{ latest_prep.id }}">
+        Voir le rapport du {{ latest_prep.created_at.strftime("%d/%m %H:%M") }} →
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Drop-zone UI feedback
+  var dz = document.getElementById('drop-zone');
+  var input = document.getElementById('cv-file');
+  var label = document.getElementById('dz-label');
+  var hint = document.getElementById('dz-hint');
+  if (input && dz) {
+    input.addEventListener('change', function () {
+      if (input.files && input.files[0]) {
+        dz.classList.add('has-file');
+        label.textContent = input.files[0].name;
+        hint.textContent = Math.round(input.files[0].size / 1024) + ' Ko · prêt à envoyer';
+      }
+    });
+  }
+</script>
+{% endblock %}

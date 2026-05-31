@@ -1,0 +1,320 @@
+{% extends "base.html.j2" %}
+{% block title %}Préparation — {{ signal.company_name if signal else "" }}{% endblock %}
+
+{% block extra_css %}
+  .prep-header {
+    display: flex; align-items: flex-start; gap: 18px;
+    margin-bottom: 26px; flex-wrap: wrap;
+  }
+  .prep-header .score {
+    flex-shrink: 0; min-width: 60px; padding: 10px 14px; border-radius: var(--r-md);
+    font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .prep-header .score.hot { background: var(--red-soft); color: var(--red); }
+  .prep-header .score.investigate { background: var(--blue-soft); color: var(--blue); }
+  .prep-header .score.watch { background: var(--amber-soft); color: var(--amber); }
+  .prep-header .meta { flex: 1; min-width: 0; }
+  .prep-header h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 6px; }
+  .prep-header .sub { color: var(--text-3); font-size: 13.5px; }
+  .prep-header .sub a { color: var(--blue); }
+
+  .headline-card {
+    background: linear-gradient(135deg, rgba(52,199,89,0.08) 0%, rgba(0,113,227,0.06) 100%);
+    border: 1px solid rgba(52,199,89,0.18);
+    border-radius: var(--r-lg);
+    padding: 22px 26px; margin-bottom: 28px; font-size: 17px; color: var(--text);
+    line-height: 1.5; letter-spacing: -0.012em;
+  }
+  .headline-card strong { color: var(--green-deep); }
+
+  .section { margin-bottom: 28px; }
+  .section .stitle {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-3); margin: 0 0 12px;
+  }
+  .section .stitle .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--text); color: white; font-size: 11px; font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  /* Fit panel */
+  .fit-grid { display: grid; grid-template-columns: 200px 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 720px) { .fit-grid { grid-template-columns: 1fr; } }
+  .fit-score {
+    text-align: center; padding: 22px 16px; border-radius: var(--r-lg);
+    background: var(--surface-2); border: 1px solid var(--hairline);
+  }
+  .fit-score .n {
+    display: block; font-size: 48px; font-weight: 700;
+    color: var(--green-deep); letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .fit-score .l { font-size: 12px; color: var(--text-3); margin-top: 6px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .fit-rationale { font-size: 15px; color: var(--text-2); line-height: 1.55; }
+
+  .duo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 18px; }
+  @media (max-width: 720px) { .duo-grid { grid-template-columns: 1fr; } }
+  .points {
+    padding: 18px; border-radius: var(--r-md); border: 1px solid var(--hairline);
+    background: var(--surface);
+  }
+  .points h4 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 12px; color: var(--text-3); display: flex; align-items: center; gap: 7px; }
+  .points h4 .pip { width: 8px; height: 8px; border-radius: 50%; }
+  .points.strong h4 .pip { background: var(--green); }
+  .points.gaps h4 .pip { background: var(--amber); }
+  .points ul { list-style: none; padding: 0; margin: 0; }
+  .points li {
+    padding: 8px 0 8px 20px; position: relative; font-size: 14px;
+    color: var(--text-2); line-height: 1.5; border-top: 1px solid var(--hairline-2);
+  }
+  .points li:first-child { border-top: 0; }
+  .points li::before {
+    content: ""; position: absolute; left: 4px; top: 16px;
+    width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+  }
+  .points.gaps li::before { background: var(--amber); }
+
+  /* Company intel */
+  .intel-card { padding: 22px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-lg); }
+  .intel-card p { font-size: 14.5px; color: var(--text-2); line-height: 1.55; margin: 0 0 14px; }
+  .intel-card p:last-child { margin-bottom: 0; }
+  .intel-card .micro-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin: 18px 0 8px; }
+  .intel-card .micro-label:first-child { margin-top: 0; }
+  .exec-row { display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid var(--hairline-2); }
+  .exec-row:first-of-type { border-top: 0; padding-top: 0; }
+  .exec-row .avatar {
+    flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--green), var(--blue));
+    color: white; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px;
+  }
+  .exec-row .who .name { font-weight: 600; font-size: 14.5px; color: var(--text); }
+  .exec-row .who .role { font-size: 13px; color: var(--text-3); }
+  .exec-row .who .bg { font-size: 13px; color: var(--text-3); margin-top: 3px; line-height: 1.45; }
+
+  /* Approach */
+  .approach-summary {
+    background: var(--green-soft); border-left: 3px solid var(--green);
+    color: var(--green-deep); padding: 14px 18px; border-radius: var(--r-sm);
+    font-size: 14.5px; line-height: 1.55; margin-bottom: 18px;
+  }
+  .approach-steps { display: flex; flex-direction: column; gap: 12px; }
+  .step {
+    display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px;
+    border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--surface);
+    transition: border-color 160ms ease;
+  }
+  .step:hover { border-color: var(--green); }
+  .step .n {
+    flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--text); color: white;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px; letter-spacing: -0.02em;
+  }
+  .step .t .title { font-weight: 600; font-size: 14.5px; color: var(--text); margin-bottom: 2px; }
+  .step .t .detail { font-size: 13.5px; color: var(--text-3); line-height: 1.5; }
+
+  .talking-points {
+    display: flex; flex-wrap: wrap; gap: 7px; margin-top: 18px;
+  }
+  .talking-points .chip {
+    background: var(--blue-soft); color: var(--blue);
+    border: 1px solid rgba(0,113,227,0.18);
+  }
+
+  .msg-template {
+    margin-top: 18px; background: var(--text); color: #d2d2d7;
+    border-radius: var(--r-md); padding: 18px 22px; font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+    font-size: 13.5px; line-height: 1.65; white-space: pre-wrap; word-wrap: break-word;
+    position: relative;
+  }
+  .msg-template .label {
+    position: absolute; top: 10px; right: 14px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-4);
+  }
+  .msg-template .copy-btn {
+    position: absolute; top: 30px; right: 14px;
+    background: rgba(255,255,255,0.08); color: white; border: none;
+    padding: 5px 10px; border-radius: var(--r-sm); font-size: 11px; cursor: pointer;
+    font-family: inherit;
+  }
+  .msg-template .copy-btn:hover { background: rgba(255,255,255,0.15); }
+
+  /* Contacts */
+  .contact-row {
+    display: flex; gap: 14px; padding: 14px; border: 1px solid var(--hairline);
+    border-radius: var(--r-md); align-items: flex-start; background: var(--surface);
+    margin-bottom: 10px;
+  }
+  .contact-row:last-child { margin-bottom: 0; }
+  .contact-row .conf {
+    flex-shrink: 0; font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: var(--r-full);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .conf.high { background: var(--green-soft); color: var(--green-deep); }
+  .conf.medium { background: var(--blue-soft); color: var(--blue); }
+  .conf.low { background: var(--amber-soft); color: var(--amber); }
+  .conf.unknown { background: rgba(0,0,0,0.06); color: var(--text-3); }
+  .contact-row .who .name { font-weight: 600; font-size: 14.5px; color: var(--text); }
+  .contact-row .who .role { font-size: 13px; color: var(--text-3); }
+  .contact-row .who .why { font-size: 13px; color: var(--text-3); margin-top: 4px; line-height: 1.45; }
+  .no-contact {
+    text-align: center; padding: 28px 18px; color: var(--text-3); font-size: 14px;
+    border: 1px dashed var(--hairline); border-radius: var(--r-md);
+  }
+
+  /* Failed state */
+  .failed-card {
+    padding: 22px; background: var(--red-soft); color: var(--red); border-radius: var(--r-lg);
+    border: 1px solid #f6cccc;
+  }
+{% endblock %}
+
+{% block content %}
+{% set tier = "hot" if signal and signal.total_score >= 80 else ("investigate" if signal and signal.total_score >= 60 else "watch") %}
+<div class="prep-header">
+  {% if signal %}<span class="score {{ tier }}">{{ "%.0f"|format(signal.total_score) }}</span>{% endif %}
+  <div class="meta">
+    <h1>Préparation — {{ signal.company_name if signal else "(signal supprimé)" }}</h1>
+    <div class="sub">
+      Généré le {{ prep.created_at.strftime("%d/%m %H:%M") }}
+      {% if raw and raw.url %} · <a href="{{ raw.url }}" target="_blank" rel="noopener">Article ↗</a>{% endif %}
+      {% if signal %} · <a href="/signals/{{ signal.id }}/prepare">Régénérer</a>{% endif %}
+      · <a href="/results">← Tous les signaux</a>
+    </div>
+  </div>
+</div>
+
+{% if prep.status == "failed" or not report %}
+<div class="failed-card">
+  <strong>Échec de la génération.</strong>
+  <div style="margin-top:6px; font-size:13px;">{{ prep.error or "Erreur inconnue. Réessaie." }}</div>
+</div>
+{% else %}
+
+<div class="headline-card">{{ report.headline }}</div>
+
+<!-- Section 1: Profile fit -->
+<section class="section">
+  <div class="stitle"><span class="num">1</span> Fit du profil</div>
+  <div class="fit-grid">
+    <div class="fit-score">
+      <span class="n">{{ report.profile_fit.overall_fit_score }}</span>
+      <span class="l">/ 100 fit</span>
+    </div>
+    <div class="fit-rationale">{{ report.profile_fit.overall_rationale }}</div>
+  </div>
+  <div class="duo-grid">
+    <div class="points strong">
+      <h4><span class="pip"></span> Points forts</h4>
+      <ul>
+        {% for p in report.profile_fit.strong_points %}<li>{{ p }}</li>{% endfor %}
+      </ul>
+    </div>
+    <div class="points gaps">
+      <h4><span class="pip"></span> Axes d'amélioration</h4>
+      <ul>
+        {% for p in report.profile_fit.improvement_areas %}<li>{{ p }}</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- Section 2: Company intel -->
+<section class="section">
+  <div class="stitle"><span class="num">2</span> L'entreprise</div>
+  <div class="intel-card">
+    {% if report.company_intel.structure %}
+    <div class="micro-label">Structure</div>
+    <p>{{ report.company_intel.structure }}</p>
+    {% endif %}
+
+    {% if report.company_intel.team_structure %}
+    <div class="micro-label">Équipe que tu rejoindrais</div>
+    <p>{{ report.company_intel.team_structure }}</p>
+    {% endif %}
+
+    {% if report.company_intel.top_management %}
+    <div class="micro-label">Top management</div>
+    {% for ex in report.company_intel.top_management %}
+    <div class="exec-row">
+      <div class="avatar">{{ (ex.name or "?")[:1]|upper }}</div>
+      <div class="who">
+        <div class="name">{{ ex.name }}</div>
+        <div class="role">{{ ex.role }}</div>
+        {% if ex.background %}<div class="bg">{{ ex.background }}</div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if report.company_intel.notes %}
+    <div class="micro-label">Notes</div>
+    <p>{{ report.company_intel.notes }}</p>
+    {% endif %}
+
+    {% if not report.company_intel.structure and not report.company_intel.team_structure and not report.company_intel.top_management and not report.company_intel.notes %}
+    <p class="muted" style="text-align:center;">Pas d'informations vérifiées sur la structure interne. Cherche sur LinkedIn et Pappers pour compléter.</p>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Section 3: Approach plan -->
+<section class="section">
+  <div class="stitle"><span class="num">3</span> Plan d'approche</div>
+  <div class="approach-summary">{{ report.approach_plan.optimal_approach }}</div>
+
+  <div class="approach-steps">
+    {% for s in report.approach_plan.steps %}
+    <div class="step">
+      <span class="n">{{ s.order }}</span>
+      <div class="t">
+        <div class="title">{{ s.title }}</div>
+        <div class="detail">{{ s.detail }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if report.approach_plan.talking_points %}
+  <div class="micro-label" style="margin-top:18px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3);">Talking points</div>
+  <div class="talking-points">
+    {% for tp in report.approach_plan.talking_points %}<span class="chip">{{ tp }}</span>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="msg-template">
+    <span class="label">Premier message</span>
+    <button type="button" class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('msg-text').innerText).then(()=>{this.textContent='Copié ✓'})">Copier</button>
+    <div id="msg-text" style="margin-top:18px;">{{ report.approach_plan.first_message_template }}</div>
+  </div>
+</section>
+
+<!-- Section 4: Contacts -->
+<section class="section">
+  <div class="stitle"><span class="num">4</span> Contacts suggérés</div>
+  {% if report.contacts %}
+    {% for c in report.contacts %}
+    <div class="contact-row">
+      <span class="conf {{ c.confidence }}">{{ c.confidence }}</span>
+      <div class="who">
+        <div class="name">{{ c.name or "—" }}</div>
+        <div class="role">{{ c.role or "" }}</div>
+        {% if c.rationale %}<div class="why">{{ c.rationale }}</div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="no-contact">
+      <strong>Aucun contact direct identifié</strong> dans l'article ou les sources publiques.<br>
+      Cherche sur LinkedIn (filtre entreprise + poste) ou Pappers pour les dirigeants.
+    </div>
+  {% endif %}
+</section>
+
+{% endif %}
+{% endblock %}
