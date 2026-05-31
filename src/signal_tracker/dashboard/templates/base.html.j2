@@ -170,10 +170,33 @@
   .btn:hover { text-decoration: none; }
   .btn:active { transform: scale(0.97); }
   .btn-primary {
-    background: var(--green); color: white;
-    box-shadow: 0 1px 2px rgba(52,199,89,0.3), inset 0 1px 0 rgba(255,255,255,0.18);
+    background: linear-gradient(180deg, #3ad466 0%, var(--green) 60%, var(--green-strong) 100%);
+    color: white;
+    box-shadow:
+      0 1px 2px rgba(20,92,46,0.25),
+      inset 0 1px 0 rgba(255,255,255,0.28),
+      0 0 0 0 rgba(52,199,89,0.55);
+    position: relative;
   }
-  .btn-primary:hover { background: var(--green-strong); color: white; }
+  .btn-primary:hover {
+    background: linear-gradient(180deg, #34c759 0%, var(--green-strong) 70%, #279f44 100%);
+    color: white;
+    box-shadow:
+      0 1px 2px rgba(20,92,46,0.3),
+      inset 0 1px 0 rgba(255,255,255,0.3),
+      0 8px 24px rgba(52,199,89,0.35);
+  }
+  .btn-primary.btn-xl:not(:disabled) { animation: cta-glow 3.4s ease-in-out infinite; }
+  @keyframes cta-glow {
+    0%, 100% { box-shadow:
+        0 1px 2px rgba(20,92,46,0.25),
+        inset 0 1px 0 rgba(255,255,255,0.28),
+        0 0 0 0 rgba(52,199,89,0.55); }
+    50%      { box-shadow:
+        0 1px 2px rgba(20,92,46,0.25),
+        inset 0 1px 0 rgba(255,255,255,0.28),
+        0 0 0 12px rgba(52,199,89,0); }
+  }
   .btn-primary:disabled {
     background: rgba(0,0,0,0.08); color: var(--text-4); cursor: not-allowed;
     box-shadow: none;
@@ -207,6 +230,12 @@
     border: 1px solid var(--hairline);
     border-radius: var(--r-lg);
     padding: 28px 30px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.025), 0 8px 24px rgba(11,40,80,0.04);
+    transition: transform 280ms cubic-bezier(0.22,1,0.36,1), box-shadow 280ms ease;
+  }
+  .card-interactive:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03), 0 18px 38px rgba(11,40,80,0.08);
   }
   .card-sm { padding: 20px 22px; border-radius: var(--r-lg); }
   .card h2.section-label,
@@ -326,10 +355,37 @@
   .muted { color: var(--text-3); }
   .mono { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
 
+  /* Fade-in-up entrance — applied by JS once the element is mounted */
+  .fade-in {
+    opacity: 0; transform: translateY(14px);
+    transition: opacity 700ms ease, transform 700ms cubic-bezier(0.22,1,0.36,1);
+  }
+  .fade-in.is-visible { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .fade-in { opacity: 1; transform: none; transition: none; }
+    .btn-primary.btn-xl:not(:disabled) { animation: none; }
+  }
+
+  /* Mesh background — soft brand gradient behind the page top */
+  .mesh-bg {
+    position: absolute; inset: 0 0 auto 0; height: 560px;
+    background:
+      radial-gradient(60% 60% at 18% 12%, rgba(52,199,89,0.16) 0%, rgba(52,199,89,0) 60%),
+      radial-gradient(50% 50% at 82% 8%, rgba(0,113,227,0.10) 0%, rgba(0,113,227,0) 65%),
+      radial-gradient(40% 40% at 50% 80%, rgba(175,82,222,0.06) 0%, rgba(175,82,222,0) 60%);
+    pointer-events: none; z-index: 0;
+    mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  }
+  body { position: relative; }
+  main { position: relative; z-index: 1; }
+
   {% block extra_css %}{% endblock %}
 </style>
 </head>
 <body>
+
+<div class="mesh-bg" aria-hidden="true"></div>
 
 <header class="appbar">
   <div class="appbar-inner">
@@ -424,6 +480,13 @@
   if (lastStatus === 'running') start();
   window.__startStatusPolling = start;
 })();
+
+// Fade-in entrance: stagger any .fade-in elements on load.
+window.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.fade-in').forEach(function (el, i) {
+    setTimeout(function () { el.classList.add('is-visible'); }, 60 + i * 90);
+  });
+});
 </script>
 {% block extra_js %}{% endblock %}
 </body>
