@@ -1,0 +1,96 @@
+{% extends "base.html.j2" %}
+{% block title %}Créer un compte — Signal Tracker{% endblock %}
+
+{% block extra_css %}
+  .auth-shell {
+    max-width: 460px; margin: 80px auto 40px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-xl);
+    padding: 40px 36px 32px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.025), 0 8px 24px rgba(11,40,80,0.06);
+  }
+  @media (max-width: 560px) {
+    .auth-shell { margin: 32px 18px; padding: 28px 22px; }
+  }
+  .auth-shell .logo-row {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 17px; color: var(--text); margin-bottom: 6px;
+  }
+  .auth-shell .logo-row .logo {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--green) 0%, var(--green-strong) 100%);
+    display: inline-flex; align-items: center; justify-content: center;
+    color: white; font-size: 14px; font-weight: 800;
+    box-shadow: 0 1px 2px rgba(52,199,89,0.4), inset 0 1px 0 rgba(255,255,255,0.25);
+  }
+  .auth-shell h1 {
+    font-size: 26px; font-weight: 700; letter-spacing: -0.025em;
+    margin: 18px 0 6px; color: var(--text);
+  }
+  .auth-shell p.lead { color: var(--text-3); font-size: 14px; margin: 0 0 22px; }
+  .auth-form { display: flex; flex-direction: column; gap: 14px; }
+  .auth-form label {
+    display: flex; flex-direction: column; gap: 6px;
+    font-size: 12.5px; font-weight: 600; color: var(--text-2);
+  }
+  .auth-form input {
+    padding: 11px 14px; border: 1px solid var(--hairline);
+    border-radius: var(--r-md); font-size: 14.5px;
+    font-family: inherit; color: var(--text); background: var(--surface);
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+    outline: none;
+  }
+  .auth-form input:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 4px rgba(0,113,227,0.12);
+  }
+  .auth-form .hint { font-size: 12px; color: var(--text-3); margin-top: -4px; }
+  .auth-form .err {
+    background: var(--red-soft); color: var(--red);
+    border: 1px solid #f6cccc; border-radius: var(--r-sm);
+    padding: 10px 14px; font-size: 13.5px; font-weight: 500;
+  }
+  .auth-form button[type="submit"] {
+    margin-top: 6px;
+    padding: 13px 22px;
+    border: none; border-radius: var(--r-full);
+    background: linear-gradient(180deg, #3ad466 0%, var(--green) 60%, var(--green-strong) 100%);
+    color: white; font-size: 15px; font-weight: 600;
+    font-family: inherit; cursor: pointer;
+    box-shadow: 0 1px 2px rgba(20,92,46,0.25), inset 0 1px 0 rgba(255,255,255,0.28);
+    transition: all 160ms ease;
+  }
+  .auth-form button[type="submit"]:hover { background: var(--green-strong); }
+  .auth-form button[type="submit"]:active { transform: scale(0.98); }
+  .auth-foot { margin-top: 22px; text-align: center; font-size: 13.5px; color: var(--text-3); }
+  .auth-foot a { color: var(--blue); font-weight: 500; }
+{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+  <div class="logo-row"><span class="logo">S</span> Signal Tracker</div>
+  <h1>Créer un compte</h1>
+  <p class="lead">Ton propre espace de recherches, watchlist, CV et préparations.</p>
+
+  {% if error %}<div class="err">{{ error }}</div>{% endif %}
+
+  <form class="auth-form" method="post" action="/signup">
+    <label>Email
+      <input type="email" name="email" required autocomplete="email" autofocus>
+    </label>
+    <label>Mot de passe
+      <input type="password" name="password" required autocomplete="new-password" minlength="6">
+      <span class="hint">6 caractères minimum.</span>
+    </label>
+    <label>Confirmer le mot de passe
+      <input type="password" name="password_confirm" required autocomplete="new-password" minlength="6">
+    </label>
+    <button type="submit">Créer mon compte</button>
+  </form>
+
+  <div class="auth-foot">
+    Tu as déjà un compte ? <a href="/login">Se connecter</a>
+  </div>
+</div>
+{% endblock %}
