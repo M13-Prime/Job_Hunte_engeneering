@@ -35,7 +35,13 @@ from sqlalchemy.orm import Session
 from signal_tracker.classifier.feedback import VALID_FEEDBACK
 from signal_tracker.config import get_settings, load_user_profile, resolve_db_url
 from signal_tracker.preparation.cv import CVExtractionError, extract_text
-from signal_tracker.preparation.llm import PreparationError, generate_preparation
+from signal_tracker.preparation.llm import (
+    PreparationError,
+    cv_profile_to_prompt_block,
+    generate_cv_profile,
+    generate_preparation,
+)
+from signal_tracker.preparation.schemas import CVProfile
 from signal_tracker.storage import Database, init_db
 from signal_tracker.storage.models import (
     Preparation,
@@ -46,7 +52,10 @@ from signal_tracker.storage.models import (
     UserKeyword,
     WatchlistEntry,
 )
+from signal_tracker.utils.logging import get_logger
 from signal_tracker.utils.normalize import normalize_company_name
+
+logger = get_logger(__name__)
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 UNAUTH_PATHS = {"/healthz"}
@@ -431,9 +440,12 @@ def build_app(db: Database | None = None) -> FastAPI:
         cv_text: Annotated[str, Form()] = "",
         save_cv: Annotated[str, Form()] = "",
     ) -> RedirectResponse:
-        # 1. Resolve the CV text (file > pasted text > stored CV).
+        # 1. Resolve the CV text (file > pasted text > stored CV). Also
+        #    track whether we already have a cached compact profile.
         text_value = (cv_text or "").strip()
         filename: str | None = None
+        cached_profile: dict[str, Any] | None = None
+        uploaded_new_cv = False
         if cv_file is not None and cv_file.filename:
             data = await cv_file.read()
             filename = cv_file.filename
@@ -443,6 +455,7 @@ def build_app(db: Database | None = None) -> FastAPI:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
             if extracted.strip():
                 text_value = extracted.strip()
+                uploaded_new_cv = True
 
         if not text_value:
             with app_db.session() as session:
@@ -450,6 +463,14 @@ def build_app(db: Database | None = None) -> FastAPI:
                 if stored is not None:
                     text_value = stored.text
                     filename = filename or stored.filename
+                    cached_profile = stored.profile_json
+        elif not uploaded_new_cv:
+            # Pasted text only — still pick up any cached profile from the
+            # stored CV iff the pasted text matches what we have.
+            with app_db.session() as session:
+                stored = session.execute(select(UserCV).limit(1)).scalar_one_or_none()
+                if stored is not None and stored.text == text_value:
+                    cached_profile = stored.profile_json
 
         if not text_value:
             raise HTTPException(
@@ -457,15 +478,32 @@ def build_app(db: Database | None = None) -> FastAPI:
                 detail="No CV provided. Upload a PDF or paste your CV text.",
             )
 
-        # 2. Optionally persist the CV (singleton: replace existing).
+        # 2. If we're persisting the CV (or replacing it), distill it once
+        #    into a compact CVProfile. Failure here is non-fatal — we fall
+        #    back to the raw text for the prep call.
+        new_profile_dict: dict[str, Any] | None = None
         if save_cv == "on":
+            try:
+                cv_profile = await generate_cv_profile(text_value)
+                new_profile_dict = cv_profile.model_dump()
+            except Exception as exc:
+                logger.warning(
+                    "preparation.cv_profile_failed_using_raw error=%s", str(exc)[:200],
+                )
+                new_profile_dict = None
             with app_db.session() as session:
                 for old in session.execute(select(UserCV)).scalars():
                     session.delete(old)
                 session.flush()
                 session.add(
-                    UserCV(filename=filename, text=text_value, char_count=len(text_value))
+                    UserCV(
+                        filename=filename,
+                        text=text_value,
+                        char_count=len(text_value),
+                        profile_json=new_profile_dict,
+                    )
                 )
+            cached_profile = new_profile_dict
 
         # 3. Load context, call the LLM, persist the report.
         with app_db.session() as session:
@@ -484,6 +522,18 @@ def build_app(db: Database | None = None) -> FastAPI:
             title = raw.title if raw else None
             content = raw.content if raw else None
 
+        # Prefer the compact CVProfile if we have one — same outcome at
+        # ~20% of the input-token cost for the CV portion.
+        if cached_profile is not None:
+            try:
+                cv_payload = cv_profile_to_prompt_block(
+                    CVProfile.model_validate(cached_profile)
+                )
+            except Exception:
+                cv_payload = text_value
+        else:
+            cv_payload = text_value
+
         try:
             report = await generate_preparation(
                 company_name=company_name,
@@ -497,7 +547,7 @@ def build_app(db: Database | None = None) -> FastAPI:
                 title=title,
                 content=content,
                 profile=load_user_profile(),
-                cv_text=text_value,
+                cv_text=cv_payload,
             )
             status = "done"
             error_msg = None
