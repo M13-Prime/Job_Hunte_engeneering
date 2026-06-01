@@ -233,11 +233,14 @@ async def run_classification(
     db: Database | None = None,
     limit: int | None = None,
     search_run_id: int | None = None,
+    user_id: int | None = None,
 ) -> ClassificationReport:
     """Classify all unclassified raw_items in the DB.
 
     When ``search_run_id`` is set, signals created during this run are tagged
-    with it so the dashboard can flag them as new for that search.
+    with it so the dashboard can flag them as new for that search. When
+    ``user_id`` is set (Phase 8 multi-tenant), only keywords belonging to
+    that user are injected into the classifier prompt.
     """
     settings = get_settings()
     if db is None:
@@ -247,11 +250,16 @@ async def run_classification(
 
     report = ClassificationReport()
 
-    # Load runtime user keywords from the dashboard-managed table.
+    # Load runtime user keywords from the dashboard-managed table. Scope
+    # to the launching user when we have one — keeps each user's chase
+    # independent.
     user_keywords: dict[str, list[str]] = {}
     with db.session() as _kw_session:
         from signal_tracker.storage.models import UserKeyword as _UK
-        for kw in _kw_session.execute(select(_UK)).scalars():
+        kw_stmt = select(_UK)
+        if user_id is not None:
+            kw_stmt = kw_stmt.where(_UK.user_id == user_id)
+        for kw in _kw_session.execute(kw_stmt).scalars():
             user_keywords.setdefault(kw.category, []).append(kw.value)
     if user_keywords:
         logger.info(

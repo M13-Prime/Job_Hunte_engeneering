@@ -139,13 +139,25 @@ class DigestSent(Base):
 
 
 class WatchlistEntry(Base):
-    """Companies the user wants to prioritize in scoring (Phase 5 dashboard)."""
+    """Companies the user wants to prioritize in scoring (Phase 5 dashboard).
+
+    Scoped per-user (Phase 8 multi-tenant). The legacy unique constraint on
+    normalized_name was global; now it's per (user_id, normalized_name).
+    """
 
     __tablename__ = "watchlist"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "normalized_name", name="uq_watchlist_user_name"
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=True
+    )
     company_name: Mapped[str] = mapped_column(String(512))
-    normalized_name: Mapped[str] = mapped_column(String(512), unique=True, index=True)
+    normalized_name: Mapped[str] = mapped_column(String(512), index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     added_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
@@ -189,12 +201,15 @@ class SearchRun(Base):
 
     Lets the UI keep a history of past searches, each with the keywords used
     and the metrics it produced, and tag the signals it surfaced so new ones
-    are distinguishable from older runs.
+    are distinguishable from older runs. Scoped per-user (Phase 8).
     """
 
     __tablename__ = "search_runs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=True
+    )
     label: Mapped[str] = mapped_column(String(256))
     status: Mapped[str] = mapped_column(String(32), default="running", index=True)
     keywords: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
@@ -209,6 +224,9 @@ class SearchRun(Base):
 class UserKeyword(Base):
     """User-curated keywords injected into the classifier prompt at runtime.
 
+    Scoped per-user (Phase 8). Each user maintains their own keyword set;
+    uniqueness is (user_id, category, value).
+
     Categories:
     - field        : sectors / domains the user hunts (e.g. "AI for legal")
     - job_title    : roles to surface (e.g. "Sales Engineer")
@@ -217,10 +235,16 @@ class UserKeyword(Base):
 
     __tablename__ = "user_keywords"
     __table_args__ = (
-        UniqueConstraint("category", "value", name="uq_user_keywords_cat_value"),
+        UniqueConstraint(
+            "user_id", "category", "value",
+            name="uq_user_keywords_user_cat_value",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=True
+    )
     category: Mapped[str] = mapped_column(String(32), index=True)
     value: Mapped[str] = mapped_column(String(256))
     added_at: Mapped[datetime] = mapped_column(
@@ -229,11 +253,11 @@ class UserKeyword(Base):
 
 
 class UserCV(Base):
-    """The current user CV — singleton (only one row at a time).
+    """The current user CV — one row per user (Phase 8 multi-tenant).
 
     Stored as plain text so we can paste it into LLM prompts. We keep the
     original filename for display. To replace the CV the user uploads again
-    and the dashboard deletes the previous row.
+    and the dashboard deletes their previous row.
 
     `profile_json` is the distilled, structured CVProfile computed once
     when the CV is saved (Phase 7+). Future preparations send the compact
@@ -241,8 +265,14 @@ class UserCV(Base):
     """
 
     __tablename__ = "user_cv"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_user_cv_user"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=True
+    )
     filename: Mapped[str | None] = mapped_column(String(256), nullable=True)
     text: Mapped[str] = mapped_column(Text)
     char_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -253,11 +283,17 @@ class UserCV(Base):
 
 
 class Preparation(Base):
-    """Generated preparation report for a (Signal, CV) pair (Phase 7)."""
+    """Generated preparation report for a (Signal, CV) pair (Phase 7+).
+
+    Scoped per-user (Phase 8).
+    """
 
     __tablename__ = "preparations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=True
+    )
     signal_id: Mapped[int] = mapped_column(
         ForeignKey("signals.id"), index=True, nullable=False
     )
@@ -267,4 +303,50 @@ class Preparation(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False, index=True
+    )
+
+
+# ----------------------------------------------------------------------------
+# Phase 8: multi-tenant auth
+# ----------------------------------------------------------------------------
+
+class User(Base):
+    """Email + bcrypt password account. Owns search runs, keywords, CV, etc."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+    is_owner: Mapped[bool] = mapped_column(default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class SignalFeedback(Base):
+    """Per-user feedback on a (shared) signal.
+
+    Phase 8 replaces the global Signal.user_feedback column. One row per
+    (user, signal). Older single-user feedback is migrated into this table
+    against the owner account.
+    """
+
+    __tablename__ = "signal_feedback"
+    __table_args__ = (
+        UniqueConstraint("user_id", "signal_id", name="uq_signal_feedback_user_signal"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=False
+    )
+    signal_id: Mapped[int] = mapped_column(
+        ForeignKey("signals.id"), index=True, nullable=False
+    )
+    action: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
     )

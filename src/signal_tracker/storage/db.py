@@ -30,6 +30,14 @@ _ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
     # (table, column, SQL type)
     ("signals", "search_run_id", "INTEGER"),
     ("user_cv", "profile_json", "JSON"),
+    # Phase 8 — multi-tenant. user_id columns added retroactively to
+    # tables that originally were single-user. Existing rows get NULL
+    # and the bootstrap script claims them for the owner account.
+    ("search_runs", "user_id", "INTEGER"),
+    ("user_keywords", "user_id", "INTEGER"),
+    ("watchlist", "user_id", "INTEGER"),
+    ("user_cv", "user_id", "INTEGER"),
+    ("preparations", "user_id", "INTEGER"),
 )
 
 
