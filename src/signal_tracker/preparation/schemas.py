@@ -42,6 +42,10 @@ class CompanyIntel(BaseModel):
     team_structure: str | None = None
     top_management: list[Executive] = Field(default_factory=list)
     notes: str | None = None
+    # Career / jobs page URL. The LLM is instructed to leave these null
+    # rather than invent — we render a Google-search fallback regardless.
+    career_page_url: str | None = None
+    career_page_confidence: Literal["high", "medium", "low", "unknown"] = "unknown"
 
 
 class ApproachPlan(BaseModel):

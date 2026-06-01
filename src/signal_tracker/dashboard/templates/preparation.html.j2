@@ -167,6 +167,31 @@
     border: 1px dashed var(--hairline); border-radius: var(--r-md);
   }
 
+  /* Career page block */
+  .career-block {
+    margin-top: 18px; padding: 14px 16px;
+    border: 1px solid var(--hairline); border-radius: var(--r-md);
+    background: var(--surface-2);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .career-block .ico-careers {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--blue-soft); color: var(--blue);
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .career-block .ico-careers svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .career-block .label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); }
+  .career-block a.url {
+    display: block; font-weight: 600; font-size: 14.5px; color: var(--blue);
+    word-break: break-all; line-height: 1.35; margin-top: 2px;
+  }
+  .career-block .fallback { font-size: 12.5px; color: var(--text-3); margin-top: 4px; }
+  .career-block .fallback a { color: var(--blue); }
+  .career-block .conf {
+    font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: var(--r-full);
+    text-transform: uppercase; letter-spacing: 0.04em; margin-left: auto;
+  }
+
   /* Failed state */
   .failed-card {
     padding: 22px; background: var(--red-soft); color: var(--red); border-radius: var(--r-lg);
@@ -260,6 +285,24 @@
     {% if not report.company_intel.structure and not report.company_intel.team_structure and not report.company_intel.top_management and not report.company_intel.notes %}
     <p class="muted" style="text-align:center;">Pas d'informations vérifiées sur la structure interne. Cherche sur LinkedIn et Pappers pour compléter.</p>
     {% endif %}
+
+    <div class="career-block">
+      <span class="ico-careers">
+        <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
+      </span>
+      <div style="min-width:0; flex:1;">
+        <div class="label">Page carrière</div>
+        {% if report.company_intel.career_page_url %}
+          <a class="url" href="{{ report.company_intel.career_page_url }}" target="_blank" rel="noopener noreferrer">{{ report.company_intel.career_page_url }}</a>
+          <div class="fallback">Vérifie le lien — ou <a href="https://www.google.com/search?q={{ (signal.company_name or '')|urlencode }}+careers" target="_blank" rel="noopener noreferrer">cherche sur Google</a> si KO.</div>
+        {% else %}
+          <div class="fallback" style="margin-top:0;"><a href="https://www.google.com/search?q={{ (signal.company_name or '')|urlencode }}+careers" target="_blank" rel="noopener noreferrer">Chercher « {{ signal.company_name }} careers » sur Google</a></div>
+        {% endif %}
+      </div>
+      {% if report.company_intel.career_page_url %}
+      <span class="conf {{ report.company_intel.career_page_confidence }}">{{ report.company_intel.career_page_confidence }}</span>
+      {% endif %}
+    </div>
   </div>
 </section>
 
