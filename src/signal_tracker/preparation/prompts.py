@@ -109,7 +109,9 @@ def render_user_prompt(
     geographies: list[str],
     cv_text: str,
 ) -> str:
-    # Truncate to keep token use sane; CVs are usually <8k chars, articles <20k
+    # Truncate to keep token use sane. When `cv_text` already comes from a
+    # CVProfile JSON dump (the cached compact form), it's ~600 tokens so the
+    # 12k char cap is a no-op; for raw uploads it cuts the worst cases.
     cv_excerpt = (cv_text or "").strip()[:12000]
     article_excerpt = (content or "").strip()[:8000]
     return USER_PROMPT_TEMPLATE.format(
@@ -128,3 +130,61 @@ def render_user_prompt(
         geographies=", ".join(geographies) or "—",
         cv_text=cv_excerpt or "(empty CV provided)",
     )
+
+
+# ----------------------------------------------------------------------------
+# CV → CVProfile distillation prompt (one-shot, cached on UserCV).
+# ----------------------------------------------------------------------------
+
+CV_PROFILE_SYSTEM_PROMPT = dedent(
+    """
+    You compress a raw CV into a strict, compact JSON profile that another
+    LLM will receive on every subsequent preparation request. Every token
+    you save here is saved hundreds of times downstream.
+
+    HARD RULES
+    1. Output JSON ONLY matching the schema below. No prose.
+    2. Be faithful: never invent skills, dates, or companies. If unsure,
+       omit. Better empty than wrong.
+    3. Be concise. Bullet points, no full sentences in `skills`,
+       `languages`, `education`, `achievements`. Each `top_roles[].
+       achievements[]` bullet: 1 short line max.
+    4. Pick at most 5 `top_roles` (most recent OR most senior). 10-15
+       `skills`. 1-3 `achievements` per role.
+    5. Match the CV's language for free-text fields.
+
+    OUTPUT JSON SCHEMA
+    {
+      "name": "string|null",
+      "headline": "string|null  e.g. 'Sales Engineer · 5+ yrs · climate tech & AI'",
+      "years_experience": int|null,
+      "skills": ["string", ...],
+      "languages": ["string", ...],
+      "education": ["string", ...],
+      "top_roles": [
+        {
+          "title": "string",
+          "company": "string",
+          "period": "string|null  e.g. '2020-2023' or 'depuis 2022'",
+          "achievements": ["string", ...]
+        }
+      ],
+      "notable_achievements": ["string", ...]
+    }
+    """
+).strip()
+
+
+CV_PROFILE_USER_PROMPT = dedent(
+    """
+    ============ RAW CV ============
+    {cv_text}
+
+    ============ TASK ============
+    Produce the JSON CVProfile described in the system prompt.
+    """
+).strip()
+
+
+def render_cv_profile_user_prompt(cv_text: str) -> str:
+    return CV_PROFILE_USER_PROMPT.format(cv_text=(cv_text or "").strip()[:24000])

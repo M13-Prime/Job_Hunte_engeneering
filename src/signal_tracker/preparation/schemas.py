@@ -59,3 +59,28 @@ class PreparationReport(BaseModel):
     company_intel: CompanyIntel
     approach_plan: ApproachPlan
     contacts: list[ContactSuggestion] = Field(default_factory=list)
+
+
+class CVRole(BaseModel):
+    title: str
+    company: str
+    period: str | None = None
+    achievements: list[str] = Field(default_factory=list)
+
+
+class CVProfile(BaseModel):
+    """Compact structured CV representation cached on UserCV.
+
+    Generated once when the user saves a CV. Re-used as the `cv_text` payload
+    on every subsequent preparation, so we never re-send the ~3k-token raw
+    CV body to the model.
+    """
+
+    name: str | None = None
+    headline: str | None = None
+    years_experience: int | None = Field(default=None, ge=0, le=80)
+    skills: list[str] = Field(default_factory=list)
+    languages: list[str] = Field(default_factory=list)
+    education: list[str] = Field(default_factory=list)
+    top_roles: list[CVRole] = Field(default_factory=list)
+    notable_achievements: list[str] = Field(default_factory=list)

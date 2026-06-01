@@ -234,6 +234,10 @@ class UserCV(Base):
     Stored as plain text so we can paste it into LLM prompts. We keep the
     original filename for display. To replace the CV the user uploads again
     and the dashboard deletes the previous row.
+
+    `profile_json` is the distilled, structured CVProfile computed once
+    when the CV is saved (Phase 7+). Future preparations send the compact
+    profile to the LLM instead of the full text — ~80% token savings.
     """
 
     __tablename__ = "user_cv"
@@ -242,6 +246,7 @@ class UserCV(Base):
     filename: Mapped[str | None] = mapped_column(String(256), nullable=True)
     text: Mapped[str] = mapped_column(Text)
     char_count: Mapped[int] = mapped_column(Integer, default=0)
+    profile_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )

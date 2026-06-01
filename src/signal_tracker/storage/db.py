@@ -29,6 +29,7 @@ def _is_database_url(value: str | Path) -> bool:
 _ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
     # (table, column, SQL type)
     ("signals", "search_run_id", "INTEGER"),
+    ("user_cv", "profile_json", "JSON"),
 )
 
 
