@@ -42,22 +42,31 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/signal_tracker"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"src/signal_tracker/notifier/templates" = "signal_tracker/notifier/templates"
+"src/signal_tracker/dashboard/templates" = "signal_tracker/dashboard/templates"
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "PL"]
-ignore = ["E501", "PLR0913", "PLR2004"]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["PLR2004", "S101"]
+# Few-shot examples in the classifier prompt contain long French strings on
+# purpose; wrapping them would make the prompt unreadable.
+"src/signal_tracker/classifier/prompts.py" = ["E501"]
+"src/signal_tracker/preparation/prompts.py" = ["E501"]
+# `param: T = Depends(...)` is the canonical FastAPI dependency-injection
+# idiom; B008 (no function call in argument defaults) flags it as a false
+# positive there.
+"src/signal_tracker/dashboard/app.py" = ["B008"]
 
 [tool.mypy]
 python_version = "3.11"
 strict = true
-warn_unused_ignores = true
-warn_return_any = true
+files = ["src", "scripts", "tests"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
