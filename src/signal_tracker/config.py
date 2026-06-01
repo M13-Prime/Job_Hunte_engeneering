@@ -72,11 +72,16 @@ class Settings(BaseSettings):
     # ``sqlite:///...`` or ``postgresql+psycopg://user:pwd@host:5432/db``.
     database_url: str | None = None
 
-    # Dashboard Basic Auth (production deployments)
-    # When ``dashboard_auth_user`` is unset, the middleware is disabled
-    # (useful for local dev / Codespaces). Set both vars in prod.
+    # Dashboard Basic Auth (legacy single-user gate; superseded by the
+    # Phase 8 email+password accounts but kept as an outer firewall when
+    # both env vars are set).
     dashboard_auth_user: str | None = None
     dashboard_auth_password: str | None = None
+
+    # Phase 8 — session signing key for the email+password auth cookies.
+    # When unset we generate a random 32-byte key at boot. Set this in
+    # prod (.env) so user sessions survive container restarts.
+    session_secret_key: str | None = None
 
 
 class UserProfile(BaseModel):
