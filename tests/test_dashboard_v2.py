@@ -9,19 +9,35 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from signal_tracker.auth import hash_password
 from signal_tracker.dashboard.app import build_app
 from signal_tracker.storage import Database, init_db
-from signal_tracker.storage.models import UserKeyword
+from signal_tracker.storage.models import User, UserKeyword
 
 
 @pytest.fixture()
 def db(tmp_path: Path) -> Database:
-    return init_db(tmp_path / "v2.db")
+    db = init_db(tmp_path / "v2.db")
+    with db.session() as s:
+        s.add(User(
+            email="test@example.com",
+            password_hash=hash_password("password"),
+            is_active=True,
+            is_owner=True,
+        ))
+    return db
 
 
 @pytest.fixture()
 def client(db: Database) -> TestClient:
-    return TestClient(build_app(db=db))
+    c = TestClient(build_app(db=db))
+    resp = c.post(
+        "/login",
+        data={"email": "test@example.com", "password": "password"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303, resp.text
+    return c
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +105,7 @@ def test_delete_unknown_keyword_returns_404(client: TestClient) -> None:
     assert response.status_code == 404
 
 
-def test_index_renders_keyword_chips(client: TestClient) -> None:
+def test_index_renders_keyword_chips(client: TestClient, db: Database) -> None:
     client.post("/keywords", data={"category": "field", "value": "AI for legal"})
     client.post("/keywords", data={"category": "job_title", "value": "Sales Engineer"})
     response = client.get("/")
