@@ -21,8 +21,13 @@ from tenacity import (
 
 from signal_tracker.classifier.llm import _extract_json, _resolve_fallbacks
 from signal_tracker.config import UserProfile, get_settings
-from signal_tracker.preparation.prompts import SYSTEM_PROMPT, render_user_prompt
-from signal_tracker.preparation.schemas import PreparationReport
+from signal_tracker.preparation.prompts import (
+    CV_PROFILE_SYSTEM_PROMPT,
+    SYSTEM_PROMPT,
+    render_cv_profile_user_prompt,
+    render_user_prompt,
+)
+from signal_tracker.preparation.schemas import CVProfile, PreparationReport
 from signal_tracker.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -39,6 +44,95 @@ _RETRYABLE: tuple[type[BaseException], ...] = (
     ConnectionError,
     OSError,
 )
+
+
+def cv_profile_to_prompt_block(profile: CVProfile) -> str:
+    """Pack a CVProfile into a compact text block for the prep user prompt.
+
+    Markdown-ish, deterministic, dense. ~600 tokens for a normal profile
+    vs ~3000 tokens for the raw CV text — that's the whole point of the
+    cached profile.
+    """
+    lines: list[str] = []
+    if profile.headline:
+        lines.append(f"# {profile.headline}")
+    if profile.name:
+        lines.append(f"Nom : {profile.name}")
+    if profile.years_experience is not None:
+        lines.append(f"Expérience : {profile.years_experience} ans")
+    if profile.skills:
+        lines.append("Skills : " + ", ".join(profile.skills))
+    if profile.languages:
+        lines.append("Langues : " + ", ".join(profile.languages))
+    if profile.education:
+        lines.append("Formation : " + " / ".join(profile.education))
+    if profile.top_roles:
+        lines.append("\nParcours :")
+        for r in profile.top_roles:
+            head = f"- {r.title} @ {r.company}"
+            if r.period:
+                head += f" ({r.period})"
+            lines.append(head)
+            for ach in r.achievements:
+                lines.append(f"  • {ach}")
+    if profile.notable_achievements:
+        lines.append("\nRéalisations notables :")
+        for ach in profile.notable_achievements:
+            lines.append(f"- {ach}")
+    return "\n".join(lines).strip()
+
+
+async def generate_cv_profile(cv_text: str) -> CVProfile:
+    """One-shot LLM call: raw CV text → compact CVProfile JSON."""
+    settings = get_settings()
+    model = settings.llm_model
+    fallbacks = _resolve_fallbacks(settings.llm_fallback_model)
+
+    messages = [
+        {"role": "system", "content": CV_PROFILE_SYSTEM_PROMPT},
+        {"role": "user", "content": render_cv_profile_user_prompt(cv_text)},
+    ]
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=8),
+        retry=retry_if_exception_type(_RETRYABLE),
+        reraise=True,
+    )
+    async def _attempt() -> CVProfile:
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "response_format": {"type": "json_object"},
+            "temperature": 0.0,
+        }
+        if fallbacks:
+            kwargs["fallbacks"] = fallbacks
+        start = time.perf_counter()
+        response = await litellm.acompletion(**kwargs)
+        latency = time.perf_counter() - start
+
+        text = response.choices[0].message.content
+        if not isinstance(text, str) or not text.strip():
+            raise PreparationError(
+                f"LLM returned empty/non-string content (type={type(text).__name__})"
+            )
+        cleaned = _extract_json(text)
+        try:
+            data = json.loads(cleaned)
+        except json.JSONDecodeError as exc:
+            preview = text[:300].replace("\n", "\\n")
+            raise json.JSONDecodeError(
+                f"{exc.msg} | preview: {preview!r}", exc.doc, exc.pos
+            ) from exc
+        profile = CVProfile.model_validate(data)
+        logger.info(
+            "preparation.cv_profile_generated latency_ms=%.0f skills=%d roles=%d",
+            latency * 1000, len(profile.skills), len(profile.top_roles),
+        )
+        return profile
+
+    return await _attempt()
 
 
 async def generate_preparation(

@@ -123,7 +123,7 @@
     {% if cv %}
     <div class="cv-known">
       <svg style="width:16px;height:16px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
-      <span>CV enregistré : <strong>{{ cv.filename or "(texte collé)" }}</strong> · {{ cv.char_count }} caractères</span>
+      <span>CV enregistré : <strong>{{ cv.filename or "(texte collé)" }}</strong> · {{ cv.char_count }} caractères{% if cv.profile_json %} · <strong>profil compact prêt</strong> (économie de tokens){% endif %}</span>
     </div>
     <p class="muted" style="font-size:13px; margin: 10px 0 0;">Tu peux le réutiliser tel quel, le remplacer par un nouvel upload, ou coller un texte ad-hoc juste pour cette préparation.</p>
     {% endif %}
