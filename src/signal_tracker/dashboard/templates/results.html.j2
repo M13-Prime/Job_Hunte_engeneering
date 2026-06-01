@@ -270,7 +270,8 @@
             <span class="name">{{ signal.company_name or "(sans nom)" }}</span>
             {% endif %}
             {% if is_new %}<span class="badge new">Nouveau</span>{% endif %}
-            {% if signal.user_feedback %}<span class="feedback-tag {{ signal.user_feedback }}">{{ signal.user_feedback }}</span>{% endif %}
+            {% set my_fb = feedback_by_signal.get(signal.id) %}
+            {% if my_fb %}<span class="feedback-tag {{ my_fb }}">{{ my_fb }}</span>{% endif %}
           </div>
           <div class="type">
             {{ signal.signal_type }}
