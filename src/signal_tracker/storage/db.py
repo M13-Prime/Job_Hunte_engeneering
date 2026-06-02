@@ -40,6 +40,16 @@ _ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("preparations", "user_id", "INTEGER"),
 )
 
+# Same story for indexes: create_all() doesn't add new indexes to existing
+# tables, so the (user_id, created_at) covering indexes used by the
+# /preparations and sidebar /searches list pages need an explicit step.
+_ADDITIVE_INDEXES: tuple[tuple[str, str, str], ...] = (
+    # (index_name, table, columns)
+    ("idx_preparations_user_created", "preparations", "user_id, created_at DESC"),
+    ("idx_search_runs_user_created", "search_runs", "user_id, created_at DESC"),
+    ("idx_signal_feedback_user_action", "signal_feedback", "user_id, action"),
+)
+
 
 class Database:
     """Thin wrapper around a SQLAlchemy engine + session factory."""
@@ -67,6 +77,7 @@ class Database:
     def create_all(self) -> None:
         Base.metadata.create_all(self.engine)
         self._apply_additive_migrations()
+        self._apply_additive_indexes()
 
     def _apply_additive_migrations(self) -> None:
         inspector = inspect(self.engine)
@@ -80,6 +91,23 @@ class Database:
                     conn.execute(
                         text(f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}")
                     )
+
+    def _apply_additive_indexes(self) -> None:
+        inspector = inspect(self.engine)
+        existing_tables = set(inspector.get_table_names())
+        for index_name, table, columns in _ADDITIVE_INDEXES:
+            if table not in existing_tables:
+                continue
+            existing = {idx["name"] for idx in inspector.get_indexes(table)}
+            if index_name in existing:
+                continue
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        f"CREATE INDEX IF NOT EXISTS {index_name} "
+                        f"ON {table} ({columns})"
+                    )
+                )
 
     @contextmanager
     def session(self) -> Iterator[Session]:

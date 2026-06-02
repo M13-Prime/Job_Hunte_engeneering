@@ -41,6 +41,17 @@ class Settings(BaseSettings):
     # Seconds to sleep between consecutive classify() calls in the pipeline.
     # Set to ~7 on Anthropic Tier 1 (30k TPM) to avoid rate-limit retries.
     llm_rate_limit_seconds: float = 0.0
+    # Cheap model used for the two-stage classifier prefilter (perf #2) and
+    # the CV → CVProfile distillation (perf #7). Falls back to llm_model
+    # when unset. Recommended: anthropic/claude-haiku-4-5.
+    llm_cheap_model: str | None = None
+    # Opt-in: if true, every article goes through a Haiku yes/no/maybe
+    # prefilter before the full Sonnet classification. Cuts cost and time
+    # ~60-70% when the news corpus is mostly noise. Requires llm_cheap_model.
+    llm_prefilter_enabled: bool = False
+    # Opt-in: send Anthropic prompt caching headers on the classifier
+    # system prompt. No-op for non-Anthropic providers.
+    llm_prompt_cache_enabled: bool = True
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     gemini_api_key: str | None = None

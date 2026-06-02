@@ -39,6 +39,7 @@ from sqlalchemy import desc, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import StreamingResponse
 
 from signal_tracker.auth import (
     SESSION_USER_ID_KEY,
@@ -147,6 +148,7 @@ def build_app(db: Database | None = None) -> FastAPI:
                     "signals_created": clf.signals_created,
                     "signals_deduped": clf.signals_deduped,
                     "errors": clf.errors,
+                    "prefiltered_out": clf.prefiltered_out,
                 },
             }
             state["metrics"] = metrics
@@ -475,6 +477,65 @@ def build_app(db: Database | None = None) -> FastAPI:
     @app.get("/run/status")
     def run_status(user: User = Depends(require_user)) -> JSONResponse:
         return JSONResponse(_state_for(user.id))
+
+    @app.get("/run/events")
+    async def run_events(user: User = Depends(require_user)) -> StreamingResponse:
+        """Server-sent events stream for the current user's pipeline state.
+
+        Replaces the 2-3s ``/run/status`` polling with a single long-lived
+        connection that pushes deltas as they happen. Wakes up roughly
+        every 500ms server-side to check the in-memory state dict; only
+        emits an event when the state changed (or after a 15s heartbeat
+        so proxies / Cloudflare don't drop the idle connection).
+        """
+        import json as _json
+
+        async def gen() -> Any:
+            last_serialized: str | None = None
+            heartbeat_every = 15.0
+            last_heartbeat = 0.0
+            elapsed = 0.0
+            poll_interval = 0.5
+            # Emit an initial snapshot so the client renders something
+            # immediately without waiting for a state change.
+            initial = _state_for(user.id)
+            last_serialized = _json.dumps(initial, sort_keys=True, default=str)
+            yield f"data: {last_serialized}\n\n"
+            # Cap the stream lifetime to 10 minutes — clients reconnect
+            # transparently. Avoids leaking connections if the browser
+            # forgets to close.
+            while elapsed < 600.0:
+                await asyncio.sleep(poll_interval)
+                elapsed += poll_interval
+                last_heartbeat += poll_interval
+                state = _state_for(user.id)
+                serialized = _json.dumps(state, sort_keys=True, default=str)
+                if serialized != last_serialized:
+                    yield f"data: {serialized}\n\n"
+                    last_serialized = serialized
+                    last_heartbeat = 0.0
+                elif last_heartbeat >= heartbeat_every:
+                    yield ": heartbeat\n\n"
+                    last_heartbeat = 0.0
+                # Once the run reaches a terminal state and the client has
+                # seen it, close the stream — no point in holding a
+                # connection while idle.
+                if (
+                    state.get("status") in {"done", "failed", "idle"}
+                    and elapsed > 2.0
+                    and serialized == last_serialized
+                ):
+                    break
+
+        return StreamingResponse(
+            gen(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache, no-transform",
+                "X-Accel-Buffering": "no",
+                "Connection": "keep-alive",
+            },
+        )
 
     @app.post("/searches/{run_id}/delete")
     def delete_search(

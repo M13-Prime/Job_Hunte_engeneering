@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 
 from signal_tracker.classifier.feedback import load_feedback_examples
-from signal_tracker.classifier.llm import classify
+from signal_tracker.classifier.llm import classify, prefilter
 from signal_tracker.classifier.schemas import ClassificationResult, ClassifierInput
 from signal_tracker.collectors.base import BaseCollector, CollectedItem
 from signal_tracker.collectors.france_travail import FranceTravailCollector
@@ -47,6 +47,8 @@ class ClassificationReport:
     signals_created: int = 0
     signals_deduped: int = 0
     errors: int = 0
+    # Two-stage prefilter metrics (zero when the prefilter is disabled).
+    prefiltered_out: int = 0  # cheap "no" → skipped expensive call
 
 
 def build_default_collectors() -> list[BaseCollector]:
@@ -276,6 +278,9 @@ async def run_classification(
         )
 
     rate_limit = max(0.0, float(settings.llm_rate_limit_seconds))
+    prefilter_enabled = bool(
+        settings.llm_prefilter_enabled and settings.llm_cheap_model
+    )
 
     with db.session() as session:
         stmt = select(RawItem).where(RawItem.classified.is_(False)).order_by(RawItem.id)
@@ -295,6 +300,19 @@ async def run_classification(
             content=raw.content,
             published_at=raw.published_at,
         )
+
+        # Stage 1: cheap prefilter. "no" → mark classified, skip the
+        # expensive call entirely. "yes"/"maybe"/failure → fall through.
+        if prefilter_enabled:
+            verdict = await prefilter(item, profile)
+            if verdict == "no":
+                report.prefiltered_out += 1
+                with db.session() as session:
+                    row = session.get(RawItem, raw.id)
+                    if row is not None:
+                        row.classified = True
+                continue
+
         try:
             result = await classify(
                 item,

@@ -577,9 +577,49 @@
     }
     lastStatus = status;
   }
+  // SSE (perf #4) replaces the 2s polling loop. Falls back to polling if
+  // EventSource is unavailable (very old browsers) or if the SSE connection
+  // errors out repeatedly.
+  let evtSource = null;
+  let fallbackInterval = null;
   function poll() { fetch('/run/status').then(r => r.json()).then(apply).catch(() => {}); }
-  function start() { if (!polling) { polling = setInterval(poll, 2000); poll(); } }
-  function stop() { if (polling) { clearInterval(polling); polling = null; } }
+  function startFallbackPolling() {
+    if (fallbackInterval) return;
+    fallbackInterval = setInterval(poll, 2500);
+    poll();
+  }
+  function stopFallbackPolling() {
+    if (fallbackInterval) { clearInterval(fallbackInterval); fallbackInterval = null; }
+  }
+  function startSSE() {
+    if (typeof EventSource === 'undefined') { startFallbackPolling(); return; }
+    if (evtSource) return;
+    try {
+      evtSource = new EventSource('/run/events');
+    } catch (e) {
+      startFallbackPolling();
+      return;
+    }
+    let consecutiveErrors = 0;
+    evtSource.onmessage = function (ev) {
+      consecutiveErrors = 0;
+      try { apply(JSON.parse(ev.data)); } catch (e) { /* ignore malformed */ }
+    };
+    evtSource.onerror = function () {
+      consecutiveErrors += 1;
+      // After 3 errors give up on SSE and fall back to polling — keeps the
+      // banner alive even when Cloudflare / a corporate proxy strips SSE.
+      if (consecutiveErrors >= 3) {
+        if (evtSource) { evtSource.close(); evtSource = null; }
+        startFallbackPolling();
+      }
+    };
+  }
+  function start() { startSSE(); }
+  function stop() {
+    if (evtSource) { evtSource.close(); evtSource = null; }
+    stopFallbackPolling();
+  }
   if (lastStatus === 'running') start();
   window.__startStatusPolling = start;
 })();

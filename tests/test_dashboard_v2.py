@@ -140,6 +140,7 @@ def test_launch_search_kicks_background_task(
     async def fake_classify(*_args: Any, **_kwargs: Any) -> Any:
         class R:
             processed, relevant, signals_created, signals_deduped, errors = 5, 2, 2, 0, 0
+            prefiltered_out = 0
         return R()
 
     monkeypatch.setattr("signal_tracker.pipeline.run_collection", fake_collect)
@@ -182,6 +183,7 @@ def test_launch_while_running_is_ignored(
     async def fake_classify(*_args: Any, **_kwargs: Any) -> Any:
         class R:
             processed, relevant, signals_created, signals_deduped, errors = 0, 0, 0, 0, 0
+            prefiltered_out = 0
         return R()
 
     monkeypatch.setattr("signal_tracker.pipeline.run_collection", slow_collect)

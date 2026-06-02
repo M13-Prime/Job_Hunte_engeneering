@@ -363,3 +363,147 @@ async def test_fallback_model_passed_to_litellm(
     assert await_args.kwargs["fallbacks"] == ["openai/gpt-4o-mini"]
     assert await_args.kwargs["response_format"] == {"type": "json_object"}
     assert await_args.kwargs["model"] == "anthropic/claude-sonnet-4-5"
+
+
+# ---------------------------------------------------------------------------
+# Prompt caching (perf #1) — system prompt becomes a structured content block
+# with cache_control:ephemeral for Anthropic models, stays a string otherwise.
+# ---------------------------------------------------------------------------
+
+
+async def test_anthropic_system_prompt_is_cache_controlled(
+    monkeypatch: pytest.MonkeyPatch,
+    patched_litellm: AsyncMock,
+    sample_profile: UserProfile,
+) -> None:
+    monkeypatch.setenv("LLM_MODEL", "anthropic/claude-sonnet-4-5")
+    monkeypatch.setenv("LLM_PROMPT_CACHE_ENABLED", "true")
+    from signal_tracker.config import get_settings
+
+    get_settings.cache_clear()
+
+    patched_litellm.return_value = _fake_response(POSITIVE_CASES[0][1])
+    await classify(_make_input("x"), sample_profile)
+    sent = patched_litellm.await_args.kwargs["messages"]
+    sys_msg = sent[0]
+    assert sys_msg["role"] == "system"
+    assert isinstance(sys_msg["content"], list)
+    block = sys_msg["content"][0]
+    assert block["type"] == "text"
+    assert block["cache_control"] == {"type": "ephemeral"}
+    assert "signal classifier" in block["text"].lower()
+
+
+async def test_non_anthropic_system_prompt_stays_plain_string(
+    monkeypatch: pytest.MonkeyPatch,
+    patched_litellm: AsyncMock,
+    sample_profile: UserProfile,
+) -> None:
+    monkeypatch.setenv("LLM_MODEL", "openai/gpt-4o-mini")
+    monkeypatch.setenv("LLM_PROMPT_CACHE_ENABLED", "true")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    from signal_tracker.config import get_settings
+
+    get_settings.cache_clear()
+
+    patched_litellm.return_value = _fake_response(POSITIVE_CASES[0][1])
+    await classify(_make_input("x"), sample_profile)
+    sys_msg = patched_litellm.await_args.kwargs["messages"][0]
+    assert isinstance(sys_msg["content"], str)
+
+
+async def test_cache_disabled_keeps_string_content(
+    monkeypatch: pytest.MonkeyPatch,
+    patched_litellm: AsyncMock,
+    sample_profile: UserProfile,
+) -> None:
+    monkeypatch.setenv("LLM_MODEL", "anthropic/claude-sonnet-4-5")
+    monkeypatch.setenv("LLM_PROMPT_CACHE_ENABLED", "false")
+    from signal_tracker.config import get_settings
+
+    get_settings.cache_clear()
+
+    patched_litellm.return_value = _fake_response(POSITIVE_CASES[0][1])
+    await classify(_make_input("x"), sample_profile)
+    sys_msg = patched_litellm.await_args.kwargs["messages"][0]
+    assert isinstance(sys_msg["content"], str)
+
+
+# ---------------------------------------------------------------------------
+# Prefilter (perf #2)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def configure_cheap_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_CHEAP_MODEL", "anthropic/claude-haiku-4-5")
+    from signal_tracker.config import get_settings
+
+    get_settings.cache_clear()
+
+
+def _prefilter_resp(verdict: str) -> Any:
+    return SimpleNamespace(
+        choices=[
+            SimpleNamespace(message=SimpleNamespace(
+                content=json.dumps({"verdict": verdict, "reason": "test"})
+            ))
+        ],
+        usage=SimpleNamespace(prompt_tokens=10, completion_tokens=5),
+        model="anthropic/claude-haiku-4-5",
+    )
+
+
+@pytest.mark.parametrize("verdict", ["yes", "no", "maybe"])
+async def test_prefilter_returns_verdict(
+    configure_cheap_model: None,
+    patched_litellm: AsyncMock,
+    sample_profile: UserProfile,
+    verdict: str,
+) -> None:
+    from signal_tracker.classifier.llm import prefilter
+
+    patched_litellm.return_value = _prefilter_resp(verdict)
+    out = await prefilter(_make_input("Test"), sample_profile)
+    assert out == verdict
+
+
+async def test_prefilter_unknown_verdict_falls_back_to_maybe(
+    configure_cheap_model: None,
+    patched_litellm: AsyncMock,
+    sample_profile: UserProfile,
+) -> None:
+    from signal_tracker.classifier.llm import prefilter
+
+    patched_litellm.return_value = _prefilter_resp("definitely")
+    assert await prefilter(_make_input("x"), sample_profile) == "maybe"
+
+
+async def test_prefilter_without_cheap_model_returns_maybe(
+    monkeypatch: pytest.MonkeyPatch,
+    patched_litellm: AsyncMock,
+    sample_profile: UserProfile,
+) -> None:
+    # Unset the cheap model entirely.
+    monkeypatch.delenv("LLM_CHEAP_MODEL", raising=False)
+    from signal_tracker.classifier.llm import prefilter
+    from signal_tracker.config import get_settings
+
+    get_settings.cache_clear()
+    out = await prefilter(_make_input("x"), sample_profile)
+    assert out == "maybe"
+    # No LLM call should happen.
+    assert patched_litellm.await_count == 0
+
+
+async def test_prefilter_failure_fails_open(
+    configure_cheap_model: None,
+    patched_litellm: AsyncMock,
+    sample_profile: UserProfile,
+) -> None:
+    """If the cheap LLM errors out, we never drop a potential signal."""
+    from signal_tracker.classifier.llm import prefilter
+
+    patched_litellm.side_effect = RuntimeError("simulated provider failure")
+    out = await prefilter(_make_input("x"), sample_profile)
+    assert out == "maybe"

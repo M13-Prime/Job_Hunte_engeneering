@@ -319,9 +319,54 @@ def render_user_prompt(item: ClassifierInput) -> str:
     ).strip()
 
 
+# ---------------------------------------------------------------------------
+# Prefilter prompts (cheap pre-classification pass — perf #2)
+# ---------------------------------------------------------------------------
+
+PREFILTER_SYSTEM_PROMPT = dedent(
+    """
+    You are a fast triage filter. Given an article and a user profile,
+    decide whether the article *might* contain a weak hiring signal for the
+    user's target sectors. You are NOT scoring or extracting — just routing.
+
+    Rules:
+    - Be inclusive. Anything plausibly about: executive appointments, fundraising,
+      sustainability / CSRD reports, hiring announcements, strategic
+      expansion in the user's domains, acquisitions, or sector-relevant
+      regulation → output "yes".
+    - Output "no" ONLY for items that are clearly unrelated to the user's
+      domains and roles (e.g. consumer product launches, sports, lifestyle,
+      celebrity news, articles about other industries entirely).
+    - When unsure, output "maybe". A "no" wrongly applied loses a real
+      signal, so err toward "maybe".
+
+    Output strict JSON: {"verdict": "yes" | "maybe" | "no", "reason": "<<=15 words>"}.
+    """
+).strip()
+
+
+def render_prefilter_user_prompt(item: ClassifierInput, profile: UserProfile) -> str:
+    """Compact user turn for the prefilter — kept short to minimize tokens."""
+    title = (item.title or "")[:280]
+    snippet = (item.content or "")[:600]
+    return dedent(
+        f"""
+        USER DOMAINS: {", ".join(profile.domains) or "(none)"}
+        USER ROLES: {", ".join(profile.target_roles) or "(none)"}
+
+        ARTICLE TITLE: {title or "(no title)"}
+        ARTICLE SNIPPET: {snippet or "(no snippet)"}
+
+        Decide.
+        """
+    ).strip()
+
+
 __all__ = [
     "CLASSIFIER_PROMPT_V1",
     "CLASSIFIER_PROMPT_VERSION",
+    "PREFILTER_SYSTEM_PROMPT",
+    "render_prefilter_user_prompt",
     "render_system_prompt",
     "render_user_prompt",
 ]

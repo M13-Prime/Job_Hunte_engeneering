@@ -364,41 +364,67 @@
 
 {% block extra_js %}
 <script>
-  // If the run is in progress, refresh the page when /run/status flips to
-  // "done" so the table populates without the user needing to reload.
+  // Live state for the running banner. Uses SSE (perf #4) with a polling
+  // fallback. Reloads the page when the run flips to "done".
   (function () {
     var banner = document.getElementById('results-running-banner');
     if (!banner) return;
     var titleEl = document.getElementById('rb-title');
     var bodyEl = document.getElementById('rb-body');
     var stepLabels = { collect: 'Collecte des sources', classify: 'Analyse IA des signaux' };
-    function tick () {
-      fetch('/run/status').then(function (r) { return r.json(); }).then(function (s) {
-        if (s.status === 'done') { window.location.reload(); return; }
-        if (s.status === 'failed') {
-          banner.style.background = 'var(--red-soft)';
-          banner.style.borderColor = 'rgba(255,59,48,0.2)';
-          if (titleEl) { titleEl.textContent = 'Analyse échouée'; titleEl.style.color = 'var(--red)'; }
-          if (bodyEl) bodyEl.textContent = s.error || 'Erreur inconnue. Relance une recherche.';
-          return;
-        }
-        if (s.status === 'running' && s.step) {
-          if (titleEl) titleEl.textContent = stepLabels[s.step] || 'Analyse en cours';
-          if (bodyEl && s.metrics) {
-            var parts = [];
-            if (s.metrics.collect) {
-              parts.push(s.metrics.collect.fetched + ' articles · ' + s.metrics.collect.new + ' nouveaux');
-            }
-            if (s.metrics.classify) {
-              parts.push(s.metrics.classify.processed + ' traités · ' + s.metrics.classify.signals_created + ' signaux');
-            }
-            if (parts.length) bodyEl.innerHTML = parts.join(' · ') + ' · <strong>continue à patienter</strong>';
+
+    function apply (s) {
+      if (!s) return;
+      if (s.status === 'done') { window.location.reload(); return; }
+      if (s.status === 'failed') {
+        banner.style.background = 'var(--red-soft)';
+        banner.style.borderColor = 'rgba(255,59,48,0.2)';
+        if (titleEl) { titleEl.textContent = 'Analyse échouée'; titleEl.style.color = 'var(--red)'; }
+        if (bodyEl) bodyEl.textContent = s.error || 'Erreur inconnue. Relance une recherche.';
+        return;
+      }
+      if (s.status === 'running') {
+        if (titleEl) titleEl.textContent = stepLabels[s.step] || 'Analyse en cours';
+        if (bodyEl && s.metrics) {
+          var parts = [];
+          if (s.metrics.collect) {
+            parts.push(s.metrics.collect.fetched + ' articles · ' + s.metrics.collect.new + ' nouveaux');
           }
+          if (s.metrics.classify) {
+            var c = s.metrics.classify;
+            var seg = c.processed + ' traités · ' + c.signals_created + ' signaux';
+            if (c.prefiltered_out) seg += ' · ' + c.prefiltered_out + ' filtrés';
+            parts.push(seg);
+          }
+          if (parts.length) bodyEl.innerHTML = parts.join(' · ') + ' · <strong>continue à patienter</strong>';
         }
-      }).catch(function () {});
+      }
     }
-    tick();
-    setInterval(tick, 3000);
+
+    var poller = null;
+    function startPolling () {
+      if (poller) return;
+      var tick = function () {
+        fetch('/run/status').then(function (r) { return r.json(); }).then(apply).catch(function () {});
+      };
+      tick();
+      poller = setInterval(tick, 3000);
+    }
+    function tryStream () {
+      if (typeof EventSource === 'undefined') { startPolling(); return; }
+      var es;
+      try { es = new EventSource('/run/events'); } catch (e) { startPolling(); return; }
+      var errors = 0;
+      es.onmessage = function (ev) {
+        errors = 0;
+        try { apply(JSON.parse(ev.data)); } catch (e) {}
+      };
+      es.onerror = function () {
+        errors += 1;
+        if (errors >= 3) { es.close(); startPolling(); }
+      };
+    }
+    tryStream();
   })();
 </script>
 {% endblock %}
