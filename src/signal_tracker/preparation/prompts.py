@@ -41,7 +41,8 @@ SYSTEM_PROMPT = dedent(
         "top_management": [{"name": "string", "role": "string", "background": "string|null"}],
         "notes": "string|null — sector, size, recent moves",
         "career_page_url": "string|null — only set when you're confident; NEVER invent URLs. Examples: 'https://greenly.earth/careers', 'https://www.carbone4.com/careers'.",
-        "career_page_confidence": "high|medium|low|unknown — your confidence in the URL above. 'high' only for well-known companies where you've seen the URL in training data. 'unknown' if you didn't supply a URL."
+        "career_page_confidence": "high|medium|low|unknown — your confidence in the URL above. 'high' only for well-known companies where you've seen the URL in training data. 'unknown' if you didn't supply a URL.",
+        "deep_dive": "string|null — 4-8 sentences. Sector position, recent moves, competitive landscape, hiring patterns, risk factors. Only what you actually know; leave null when you can't go deeper than the article. Will be rendered inside a collapsed details block."
       },
       "approach_plan": {
         "optimal_approach": "string — 2-3 sentences on the WAY to approach (timing, channel, angle)",

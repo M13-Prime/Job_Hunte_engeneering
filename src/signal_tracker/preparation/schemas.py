@@ -46,6 +46,9 @@ class CompanyIntel(BaseModel):
     # rather than invent — we render a Google-search fallback regardless.
     career_page_url: str | None = None
     career_page_confidence: Literal["high", "medium", "low", "unknown"] = "unknown"
+    # Longer-form analysis (sector position, competitive landscape, hiring
+    # patterns, risks). Rendered inside a collapsible <details> block.
+    deep_dive: str | None = None
 
 
 class ApproachPlan(BaseModel):

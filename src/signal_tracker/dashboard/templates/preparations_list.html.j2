@@ -1,0 +1,134 @@
+{% extends "base.html.j2" %}
+{% block title %}Préparations — Signal Tracker{% endblock %}
+{% block nav_preparations %}active{% endblock %}
+
+{% block extra_css %}
+  .preps-head {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 24px; flex-wrap: wrap;
+  }
+  .preps-head h1 {
+    font-size: 32px; font-weight: 700; color: var(--text);
+    letter-spacing: -0.028em; margin: 0;
+  }
+  .preps-head .count-badge {
+    background: rgba(0,0,0,0.06); color: var(--text-3);
+    padding: 4px 12px; border-radius: var(--r-full);
+    font-size: 13px; font-weight: 600;
+  }
+
+  .preps-card { padding: 0; overflow: hidden; }
+  .prep-row {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1.6fr) minmax(0, 1fr) auto;
+    gap: 18px; align-items: center;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--hairline-2);
+    transition: background 140ms ease;
+    text-decoration: none; color: inherit;
+  }
+  .prep-row:last-child { border-bottom: 0; }
+  .prep-row:hover { background: rgba(0,0,0,0.018); text-decoration: none; }
+  @media (max-width: 720px) {
+    .prep-row { grid-template-columns: 52px 1fr auto; gap: 12px; padding: 14px 16px; }
+    .prep-row .meta-right { display: none; }
+  }
+
+  .prep-row .score {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 54px; padding: 7px 0; border-radius: var(--r-md);
+    font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .prep-row .score.hot { background: var(--red-soft); color: var(--red); }
+  .prep-row .score.investigate { background: var(--blue-soft); color: var(--blue); }
+  .prep-row .score.watch { background: var(--amber-soft); color: var(--amber); }
+  .prep-row .score.none { background: rgba(0,0,0,0.06); color: var(--text-3); }
+
+  .prep-row .company { min-width: 0; }
+  .prep-row .company .name {
+    font-weight: 600; font-size: 15.5px; color: var(--text);
+    letter-spacing: -0.012em; line-height: 1.3;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .prep-row .company .sub {
+    color: var(--text-3); font-size: 12.5px; margin-top: 3px;
+    display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  }
+  .prep-row .company .sub .sep { color: var(--text-4); }
+  .prep-row .company .sub .fit {
+    background: var(--green-soft); color: var(--green-deep);
+    padding: 1px 8px; border-radius: var(--r-sm); font-weight: 500;
+  }
+
+  .prep-row .meta-right {
+    color: var(--text-3); font-size: 12.5px;
+    display: flex; flex-direction: column; gap: 3px;
+    justify-self: end; text-align: right; min-width: 0;
+  }
+  .prep-row .meta-right .date { font-variant-numeric: tabular-nums; }
+  .prep-row .meta-right .status-tag {
+    display: inline-block; font-size: 10.5px; font-weight: 700;
+    padding: 1px 8px; border-radius: var(--r-full);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .prep-row .meta-right .status-tag.failed { background: var(--red-soft); color: var(--red); }
+  .prep-row .meta-right .status-tag.done   { background: var(--green-soft); color: var(--green-deep); }
+
+  .prep-row .chev {
+    color: var(--text-4); transition: transform 140ms ease, color 140ms ease;
+  }
+  .prep-row:hover .chev { color: var(--blue); transform: translateX(2px); }
+
+  .empty-preps {
+    text-align: center; padding: 64px 24px; color: var(--text-3); font-size: 14.5px;
+  }
+  .empty-preps .empty-icon {
+    width: 56px; height: 56px; margin: 0 auto 14px;
+    border-radius: 50%; background: rgba(0,0,0,0.04);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-4);
+  }
+{% endblock %}
+
+{% block content %}
+<div class="preps-head">
+  <h1>Préparations</h1>
+  <span class="count-badge mono">{{ rows|length }}</span>
+</div>
+
+<div class="card preps-card fade-in">
+  {% if not rows %}
+  <div class="empty-preps">
+    <div class="empty-icon">
+      <svg style="width:24px;height:24px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/></svg>
+    </div>
+    <strong style="color:var(--text); font-weight:600;">Aucune préparation pour l'instant.</strong><br>
+    Clique sur « Préparer » sur un signal pour générer ton premier rapport.
+  </div>
+  {% else %}
+    {% for prep, signal, raw in rows %}
+    {% set tier = "hot" if signal.total_score >= 80 else ("investigate" if signal.total_score >= 60 else "watch") %}
+    {% set fit = (prep.report.get("profile_fit", {}).get("overall_fit_score") if prep.report else None) %}
+    <a class="prep-row" href="/preparations/{{ prep.id }}">
+      <span class="score {{ tier }}">{{ "%.0f"|format(signal.total_score) }}</span>
+      <div class="company">
+        <div class="name">{{ signal.company_name or "(sans nom)" }}</div>
+        <div class="sub">
+          {{ signal.signal_type }}
+          {% if fit is not none %}<span class="sep">·</span><span class="fit">Fit {{ fit }}/100</span>{% endif %}
+          {% if raw and raw.url %}{% set dom = raw.url.split('//')[-1].split('/')[0].replace('www.', '') %}<span class="sep">·</span><span>{{ dom }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="meta-right">
+        <span class="date">{{ prep.created_at.strftime("%d/%m/%Y · %H:%M") }}</span>
+        {% if prep.status != "done" %}<span class="status-tag failed">{{ prep.status }}</span>{% endif %}
+      </div>
+      <span class="chev">
+        <svg style="width:16px;height:16px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      </span>
+    </a>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}
