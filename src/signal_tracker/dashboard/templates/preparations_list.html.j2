@@ -72,8 +72,10 @@
     padding: 1px 8px; border-radius: var(--r-full);
     text-transform: uppercase; letter-spacing: 0.04em;
   }
-  .prep-row .meta-right .status-tag.failed { background: var(--red-soft); color: var(--red); }
-  .prep-row .meta-right .status-tag.done   { background: var(--green-soft); color: var(--green-deep); }
+  .prep-row .meta-right .status-tag.failed  { background: var(--red-soft); color: var(--red); }
+  .prep-row .meta-right .status-tag.done    { background: var(--green-soft); color: var(--green-deep); }
+  .prep-row .meta-right .status-tag.pending,
+  .prep-row .meta-right .status-tag.running { background: var(--blue-soft); color: var(--blue); }
 
   .prep-row .chev {
     color: var(--text-4); transition: transform 140ms ease, color 140ms ease;
@@ -108,21 +110,22 @@
   </div>
   {% else %}
     {% for prep, signal, raw in rows %}
-    {% set tier = "hot" if signal.total_score >= 80 else ("investigate" if signal.total_score >= 60 else "watch") %}
-    {% set fit = (prep.report.get("profile_fit", {}).get("overall_fit_score") if prep.report else None) %}
+    {% set tier = "hot" if (signal and signal.total_score >= 80) else ("investigate" if (signal and signal.total_score >= 60) else "watch") %}
+    {% set report = prep.report if (prep.report and prep.report is mapping) else None %}
+    {% set fit = (report.get("profile_fit", {}).get("overall_fit_score") if report else None) %}
     <a class="prep-row" href="/preparations/{{ prep.id }}">
-      <span class="score {{ tier }}">{{ "%.0f"|format(signal.total_score) }}</span>
+      <span class="score {{ tier }}">{% if signal %}{{ "%.0f"|format(signal.total_score) }}{% else %}—{% endif %}</span>
       <div class="company">
-        <div class="name">{{ signal.company_name or "(sans nom)" }}</div>
+        <div class="name">{{ (signal.company_name if signal else None) or "(signal supprimé)" }}</div>
         <div class="sub">
-          {{ signal.signal_type }}
+          {% if signal %}{{ signal.signal_type }}{% endif %}
           {% if fit is not none %}<span class="sep">·</span><span class="fit">Fit {{ fit }}/100</span>{% endif %}
           {% if raw and raw.url %}{% set dom = raw.url.split('//')[-1].split('/')[0].replace('www.', '') %}<span class="sep">·</span><span>{{ dom }}</span>{% endif %}
         </div>
       </div>
       <div class="meta-right">
         <span class="date">{{ prep.created_at.strftime("%d/%m/%Y · %H:%M") }}</span>
-        {% if prep.status != "done" %}<span class="status-tag failed">{{ prep.status }}</span>{% endif %}
+        {% if prep.status != "done" %}<span class="status-tag {{ prep.status }}">{{ prep.status }}</span>{% endif %}
       </div>
       <span class="chev">
         <svg style="width:16px;height:16px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>

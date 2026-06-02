@@ -337,7 +337,7 @@
           <div class="fallback" style="margin-top:0;"><a href="https://www.google.com/search?q={{ (signal.company_name or '')|urlencode }}+careers" target="_blank" rel="noopener noreferrer">Chercher « {{ signal.company_name }} careers » sur Google</a></div>
         {% endif %}
       </div>
-      {% if report.company_intel.career_page_url %}
+      {% if report.company_intel.career_page_url and report.company_intel.career_page_confidence %}
       <span class="conf {{ report.company_intel.career_page_confidence }}">{{ report.company_intel.career_page_confidence }}</span>
       {% endif %}
     </div>
@@ -370,7 +370,7 @@
 
   <div class="msg-template">
     <span class="label">Premier message</span>
-    <button type="button" class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('msg-text').innerText).then(()=>{this.textContent='Copié ✓'})">Copier</button>
+    <button type="button" class="copy-btn" data-copy-target="msg-text">Copier</button>
     <div id="msg-text" style="margin-top:18px;">{{ report.approach_plan.first_message_template }}</div>
   </div>
 </section>
@@ -398,4 +398,36 @@
 </section>
 
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Copy-to-clipboard with graceful fallback: navigator.clipboard requires
+  // a secure context (https or localhost). On plain http through a tunnel
+  // it's undefined and the old onclick handler silently threw.
+  document.querySelectorAll('[data-copy-target]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var target = document.getElementById(btn.getAttribute('data-copy-target'));
+      if (!target) return;
+      var text = target.innerText;
+      var done = function () { btn.textContent = 'Copié ✓'; setTimeout(function () { btn.textContent = 'Copier'; }, 2000); };
+      var fail = function () { btn.textContent = 'Échec — sélectionne-le'; };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done).catch(fail);
+        return;
+      }
+      // Fallback: temporary textarea + execCommand.
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed'; ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        ok ? done() : fail();
+      } catch (e) { fail(); }
+    });
+  });
+</script>
 {% endblock %}

@@ -521,7 +521,26 @@
   // Start live polling as soon as the search is launched.
   var f = document.getElementById('launch-form');
   if (f) f.addEventListener('submit', function () {
+    window.showLoader && window.showLoader(
+      'Lancement de l\'analyse…',
+      'Redirection vers les résultats — l\'analyse continue en arrière-plan.'
+    );
     setTimeout(function () { if (window.__startStatusPolling) window.__startStatusPolling(); }, 500);
+  });
+
+  // CV upload triggers an LLM call to distill the profile (~5-10s).
+  document.querySelectorAll('form[action="/cv"]').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      var fileInput = form.querySelector('input[type="file"]');
+      var textArea = form.querySelector('textarea[name="cv_text"]');
+      var hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
+      var hasText = textArea && textArea.value.trim().length > 0;
+      if (!hasFile && !hasText) return; // browser will show its required-field error
+      window.showLoader && window.showLoader(
+        'Analyse de ton CV…',
+        'L\'IA extrait un profil compact réutilisable pour les préparations futures.'
+      );
+    });
   });
 </script>
 {% endblock %}

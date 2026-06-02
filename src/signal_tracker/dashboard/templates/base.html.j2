@@ -371,6 +371,56 @@
   .toast a { color: var(--blue); }
   .hidden { display: none !important; }
 
+  /* ---------------- Full-page loading overlay ---------------- */
+  .page-loader {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(245,245,247,0.78);
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 220ms ease;
+  }
+  .page-loader.visible { opacity: 1; pointer-events: auto; }
+  .loader-card {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-xl);
+    padding: 32px 38px 28px;
+    text-align: center;
+    box-shadow: 0 24px 64px rgba(11,40,80,0.18), 0 4px 12px rgba(11,40,80,0.06);
+    min-width: 300px; max-width: 380px; margin: 0 18px;
+  }
+  .loader-spin {
+    width: 38px; height: 38px;
+    border: 3px solid var(--hairline);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: ldspin 0.9s linear infinite;
+    margin: 0 auto 18px;
+  }
+  @keyframes ldspin { to { transform: rotate(360deg); } }
+  .loader-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 4px; letter-spacing: -0.012em; }
+  .loader-body { font-size: 13.5px; color: var(--text-3); line-height: 1.5; }
+  .loader-steps {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    margin-top: 16px; font-size: 11.5px; color: var(--text-4);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .loader-steps .dot {
+    width: 5px; height: 5px; border-radius: 50%; background: var(--text-4);
+    opacity: 0.5; animation: ldstep 1.4s ease-in-out infinite;
+  }
+  .loader-steps .dot:nth-child(2) { animation-delay: 0.2s; }
+  .loader-steps .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes ldstep {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; background: var(--green); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .loader-spin, .loader-steps .dot { animation: none; }
+  }
+
   /* ---------------- Tiny helpers ---------------- */
   .muted { color: var(--text-3); }
   .mono { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
@@ -454,6 +504,17 @@
   </div>
 </div>
 
+<div id="page-loader" class="page-loader" aria-hidden="true">
+  <div class="loader-card">
+    <div class="loader-spin"></div>
+    <div class="loader-title" id="loader-title">Chargement…</div>
+    <div class="loader-body" id="loader-body">Quelques secondes…</div>
+    <div class="loader-steps" aria-hidden="true">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   const pill = document.getElementById('status-pill');
@@ -493,9 +554,18 @@
       toastTitle.textContent = 'Analyse terminée';
       const rid = state.current_run_id;
       const link = rid ? `/results?run=${rid}` : '/results';
-      toastBody.innerHTML = (fmtMetrics(state.metrics) || '') + ` · <a href="${link}">Voir →</a>`;
+      // Build link safely (rid is numeric) — avoid innerHTML with mixed strings.
+      const metricsText = fmtMetrics(state.metrics) || '';
+      toastBody.textContent = metricsText ? metricsText + ' · ' : '';
+      const a = document.createElement('a');
+      a.href = link; a.textContent = 'Voir →';
+      toastBody.appendChild(a);
       stop();
-      if (lastStatus === 'running') {
+      // Only auto-navigate from the landing page. Anywhere else (a prep
+      // report, preparations list, etc.) we just show the toast — yanking
+      // the user mid-read is annoying.
+      const onLanding = location.pathname === '/' || location.pathname === '';
+      if (lastStatus === 'running' && onLanding) {
         setTimeout(() => { window.location.href = link; }, 1400);
       }
     } else if (status === 'failed') {
@@ -519,6 +589,30 @@ window.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.fade-in').forEach(function (el, i) {
     setTimeout(function () { el.classList.add('is-visible'); }, 60 + i * 90);
   });
+});
+
+// Reusable page loader. Call from form submit handlers when a request
+// takes more than ~1s (LLM calls, CV upload, etc).
+window.showLoader = function (title, body) {
+  var ld = document.getElementById('page-loader');
+  if (!ld) return;
+  if (title) {
+    var t = document.getElementById('loader-title');
+    if (t) t.textContent = title;
+  }
+  if (body) {
+    var b = document.getElementById('loader-body');
+    if (b) b.textContent = body;
+  }
+  ld.classList.add('visible');
+};
+window.hideLoader = function () {
+  var ld = document.getElementById('page-loader');
+  if (ld) ld.classList.remove('visible');
+};
+// Auto-hide on back/forward navigation so a stuck loader doesn't persist.
+window.addEventListener('pageshow', function (e) {
+  if (e.persisted) window.hideLoader();
 });
 </script>
 {% block extra_js %}{% endblock %}

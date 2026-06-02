@@ -45,6 +45,27 @@
   .run-banner strong { font-weight: 600; }
   .run-banner a { color: var(--green-deep); margin-left: auto; font-weight: 500; }
 
+  /* Running banner — shown while the background pipeline is collecting/classifying */
+  .running-banner {
+    background: var(--blue-soft); border: 1px solid rgba(0,113,227,0.22);
+    color: var(--blue); border-radius: var(--r-md);
+    padding: 16px 20px; margin-bottom: 22px; font-size: 14.5px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .running-banner .spin {
+    width: 22px; height: 22px; flex-shrink: 0;
+    border: 2.5px solid rgba(0,113,227,0.2);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: rbspin 0.85s linear infinite;
+  }
+  @keyframes rbspin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .running-banner .spin { animation: none; } }
+  .running-banner .copy { display: flex; flex-direction: column; gap: 2px; }
+  .running-banner .title { font-weight: 600; color: var(--blue); }
+  .running-banner .body { font-size: 13px; color: var(--text-3); }
+  .running-banner .body strong { color: var(--text-2); font-weight: 600; }
+
   /* ---------------- Table ---------------- */
   .signals-card {
     padding: 0;
@@ -125,7 +146,11 @@
     background: rgba(0,0,0,0.05); color: var(--text-2);
     padding: 1px 8px; border-radius: var(--r-sm); font-weight: 500;
   }
-  .summary { color: var(--text-2); margin: 0 0 8px; max-width: 580px; line-height: 1.5; }
+  .summary {
+    color: var(--text-2); margin: 0 0 8px; max-width: 580px; line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden; overflow-wrap: anywhere;
+  }
   .angle {
     background: var(--green-soft); border-radius: var(--r-sm);
     padding: 9px 14px; margin: 8px 0; font-size: 13px; max-width: 580px;
@@ -174,6 +199,7 @@
   .mini:hover { border-color: var(--text-3); color: var(--text); }
   .mini.contacted:hover { border-color: var(--red); color: var(--red); background: var(--red-soft); }
   .mini.relevant:hover { border-color: var(--green); color: var(--green-deep); background: var(--green-soft); }
+  .mini.not_relevant:hover { border-color: var(--text-3); color: var(--text-3); background: rgba(0,0,0,0.04); }
   .mini.prepare {
     background: var(--text); color: white; border-color: var(--text);
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -221,6 +247,16 @@
   </form>
 </div>
 
+{% if task_status == "running" %}
+<div class="running-banner" id="results-running-banner">
+  <div class="spin" aria-hidden="true"></div>
+  <div class="copy">
+    <span class="title" id="rb-title">Analyse en cours</span>
+    <span class="body" id="rb-body">L'IA collecte et trie les actualités. <strong>Compte 5 à 15 minutes.</strong> Cette page se rafraîchira automatiquement.</span>
+  </div>
+</div>
+{% endif %}
+
 {% if run_id and focus_run %}
 <div class="run-banner">
   <strong>Recherche : {{ focus_run.label }}</strong>
@@ -256,7 +292,7 @@
       {% for signal, raw in rows %}
       {% set tier = "hot" if signal.total_score >= 80 else ("investigate" if signal.total_score >= 60 else "watch") %}
       {% set is_new = focus_run_id and signal.search_run_id == focus_run_id %}
-      {% set domain = raw.url.split('//')[-1].split('/')[0].replace('www.', '') if raw.url else raw.source %}
+      {% set domain = (raw.url.split('//')[-1].split('/')[0].replace('www.', '') if (raw and raw.url) else (raw.source if raw else "")) %}
       <tr class="{{ 'is-new' if is_new else '' }}">
         <td class="col-score"><span class="score-badge {{ tier }}">{{ "%.0f"|format(signal.total_score) }}</span></td>
         <td class="company-cell">
@@ -314,7 +350,7 @@
             <form method="post" action="/signals/{{ signal.id }}/feedback">
               <input type="hidden" name="action" value="not_relevant">
               <input type="hidden" name="redirect_to" value="/results{% if run_id %}?run={{ run_id }}{% endif %}">
-              <button type="submit" class="mini">Écarter</button>
+              <button type="submit" class="mini not_relevant">Écarter</button>
             </form>
           </div>
         </td>
@@ -324,4 +360,45 @@
   </table>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // If the run is in progress, refresh the page when /run/status flips to
+  // "done" so the table populates without the user needing to reload.
+  (function () {
+    var banner = document.getElementById('results-running-banner');
+    if (!banner) return;
+    var titleEl = document.getElementById('rb-title');
+    var bodyEl = document.getElementById('rb-body');
+    var stepLabels = { collect: 'Collecte des sources', classify: 'Analyse IA des signaux' };
+    function tick () {
+      fetch('/run/status').then(function (r) { return r.json(); }).then(function (s) {
+        if (s.status === 'done') { window.location.reload(); return; }
+        if (s.status === 'failed') {
+          banner.style.background = 'var(--red-soft)';
+          banner.style.borderColor = 'rgba(255,59,48,0.2)';
+          if (titleEl) { titleEl.textContent = 'Analyse échouée'; titleEl.style.color = 'var(--red)'; }
+          if (bodyEl) bodyEl.textContent = s.error || 'Erreur inconnue. Relance une recherche.';
+          return;
+        }
+        if (s.status === 'running' && s.step) {
+          if (titleEl) titleEl.textContent = stepLabels[s.step] || 'Analyse en cours';
+          if (bodyEl && s.metrics) {
+            var parts = [];
+            if (s.metrics.collect) {
+              parts.push(s.metrics.collect.fetched + ' articles · ' + s.metrics.collect.new + ' nouveaux');
+            }
+            if (s.metrics.classify) {
+              parts.push(s.metrics.classify.processed + ' traités · ' + s.metrics.classify.signals_created + ' signaux');
+            }
+            if (parts.length) bodyEl.innerHTML = parts.join(' · ') + ' · <strong>continue à patienter</strong>';
+          }
+        }
+      }).catch(function () {});
+    }
+    tick();
+    setInterval(tick, 3000);
+  })();
+</script>
 {% endblock %}
