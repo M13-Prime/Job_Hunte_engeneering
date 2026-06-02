@@ -464,6 +464,36 @@
       {% endif %}
     </div>
 
+    <div class="card card-interactive fade-in" style="margin-bottom: 22px;">
+      <h2 class="section-label">Mon CV{% if cv %} <span class="count">{{ cv.char_count }} car.</span>{% endif %}</h2>
+      {% if cv %}
+        <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--green-soft); color:var(--green-deep); border-radius:var(--r-md); font-size:13px;">
+          <svg style="width:16px;height:16px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+          <div style="min-width:0; flex:1;"><strong style="font-weight:600;">{{ cv.filename or "(texte collé)" }}</strong>{% if cv.profile_json %}<br><span style="font-size:11.5px; opacity:0.85;">Profil compact prêt · économie de tokens</span>{% endif %}</div>
+        </div>
+        <form class="inline-add" method="post" action="/cv" enctype="multipart/form-data" style="margin-top:12px;">
+          <input type="file" name="cv_file" accept=".pdf,.txt" required style="flex:1; padding:7px 6px; font-size:12.5px;">
+          <button type="submit" title="Remplacer le CV">Remplacer</button>
+        </form>
+        <form method="post" action="/cv/delete" style="margin-top:8px;">
+          <button type="submit" style="background:none; border:none; color:var(--text-4); font-size:12px; cursor:pointer; font-family:inherit; padding:4px 8px;" onclick="return confirm('Supprimer le CV stocké ?')">Supprimer le CV</button>
+        </form>
+      {% else %}
+        <p class="muted" style="font-size:13px; margin: 0 0 12px;">Stocker ton CV te permet de générer des préparations personnalisées en un clic.</p>
+        <form method="post" action="/cv" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:10px;">
+          <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; color:var(--text-3);">
+            <span>PDF ou TXT</span>
+            <input type="file" name="cv_file" accept=".pdf,.txt" style="font-size:13px;">
+          </label>
+          <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; color:var(--text-3);">
+            <span>ou colle le texte</span>
+            <textarea name="cv_text" rows="3" placeholder="Colle ton CV ici (utile si PDF scanné)…" style="font-family:inherit; font-size:13px; padding:8px 10px; border:1px solid var(--hairline); border-radius:var(--r-sm); resize:vertical; color:var(--text); outline:none;"></textarea>
+          </label>
+          <button type="submit" class="btn btn-primary" style="font-size:13.5px; padding:9px 18px;">Enregistrer mon CV</button>
+        </form>
+      {% endif %}
+    </div>
+
     <div class="card card-interactive fade-in">
       <h2 class="section-label">Watchlist <span class="count">{{ watchlist|length }}</span></h2>
       {% if not watchlist %}
