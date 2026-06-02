@@ -8,7 +8,8 @@ Routes:
 - GET  /signup | POST /signup
 - GET  /login  | POST /login
 - POST /logout
-- GET  /                landing (auth)
+- GET  /                landing (auth) — CV card in sidebar
+- POST /cv | POST /cv/delete
 - GET  /results         signals table (auth, per-user feedback)
 - POST /search
 - GET  /run/status      JSON, per-user
@@ -17,7 +18,8 @@ Routes:
 - POST /watchlist | /watchlist/{id}/delete
 - POST /keywords  | /keywords/{id}/delete
 - GET  /signals/{id}/prepare | POST /signals/{id}/prepare
-- GET  /preparations/{id}
+- GET  /preparations              list (auth)
+- GET  /preparations/{id}         report
 - GET  /healthz
 """
 
@@ -335,6 +337,10 @@ def build_app(db: Database | None = None) -> FastAPI:
         total_signals = session.execute(
             select(func.count(Signal.id)).where(Signal.search_run_id.in_(run_ids))
         ).scalar_one()
+        # Current CV (or None) for the sidebar card.
+        cv = session.execute(
+            select(UserCV).where(UserCV.user_id == user.id).limit(1)
+        ).scalar_one_or_none()
 
         state = _state_for(user.id)
         return templates.TemplateResponse(
@@ -344,6 +350,7 @@ def build_app(db: Database | None = None) -> FastAPI:
                 "keywords_by_cat": keywords_by_cat,
                 "runs": runs,
                 "watchlist": watchlist,
+                "cv": cv,
                 "total_signals": total_signals,
                 "task_status": state["status"],
                 "current_run_id": state["current_run_id"],
@@ -622,9 +629,10 @@ def build_app(db: Database | None = None) -> FastAPI:
     def prepare_form(
         request: Request,
         signal_id: int,
+        force: Annotated[int, Query()] = 0,
         user: User = Depends(require_user),
         session: Session = Depends(get_session_dep),
-    ) -> HTMLResponse:
+    ) -> Response:
         signal = session.get(Signal, signal_id)
         if signal is None or not _user_owns_signal(session, signal_id, user.id):
             raise HTTPException(status_code=404, detail="Signal not found")
@@ -636,8 +644,16 @@ def build_app(db: Database | None = None) -> FastAPI:
             select(Preparation)
             .where(Preparation.signal_id == signal_id)
             .where(Preparation.user_id == user.id)
+            .where(Preparation.status == "done")
             .order_by(desc(Preparation.created_at)).limit(1)
         ).scalar_one_or_none()
+        # Skip the form (and the LLM call) when a done prep already exists
+        # for this (user, signal). User can explicitly re-generate via the
+        # report page's "Régénérer" link (which sends ?force=1).
+        if latest_prep is not None and not force:
+            return RedirectResponse(
+                url=f"/preparations/{latest_prep.id}", status_code=303
+            )
         state = _state_for(user.id)
         return templates.TemplateResponse(
             request, "prepare.html.j2",
@@ -782,6 +798,103 @@ def build_app(db: Database | None = None) -> FastAPI:
             prep_id = prep.id
 
         return RedirectResponse(url=f"/preparations/{prep_id}", status_code=303)
+
+    # =========================================================================
+    # CV management (Phase 8)
+    # =========================================================================
+    @app.post("/cv")
+    async def upload_cv(
+        cv_file: Annotated[UploadFile | None, File()] = None,
+        cv_text: Annotated[str, Form()] = "",
+        user: User = Depends(require_user),
+    ) -> RedirectResponse:
+        """Upload / replace the user's CV from the landing page.
+
+        Always persists + generates the compact CVProfile (the landing
+        page form has no "save" toggle — pressing the button is the
+        explicit intent to save).
+        """
+        text_value = (cv_text or "").strip()
+        filename: str | None = None
+        if cv_file is not None and cv_file.filename:
+            data = await cv_file.read()
+            filename = cv_file.filename
+            try:
+                extracted = extract_text(filename, data)
+            except CVExtractionError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            if extracted.strip():
+                text_value = extracted.strip()
+
+        if not text_value:
+            raise HTTPException(
+                status_code=400,
+                detail="No CV provided. Upload a PDF or paste your CV text.",
+            )
+
+        try:
+            cv_profile = await generate_cv_profile(text_value)
+            profile_dict: dict[str, Any] | None = cv_profile.model_dump()
+        except Exception as exc:
+            logger.warning(
+                "preparation.cv_profile_failed_using_raw error=%s", str(exc)[:200],
+            )
+            profile_dict = None
+
+        with app_db.session() as session:
+            for old in session.execute(
+                select(UserCV).where(UserCV.user_id == user.id)
+            ).scalars():
+                session.delete(old)
+            session.flush()
+            session.add(UserCV(
+                user_id=user.id,
+                filename=filename,
+                text=text_value,
+                char_count=len(text_value),
+                profile_json=profile_dict,
+            ))
+        return RedirectResponse(url="/", status_code=303)
+
+
+    @app.post("/cv/delete")
+    def delete_cv(
+        user: User = Depends(require_user),
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        for cv in session.execute(
+            select(UserCV).where(UserCV.user_id == user.id)
+        ).scalars():
+            session.delete(cv)
+        return RedirectResponse(url="/", status_code=303)
+
+
+    @app.get("/preparations", response_class=HTMLResponse)
+    def list_preparations(
+        request: Request,
+        user: User = Depends(require_user),
+        session: Session = Depends(get_session_dep),
+    ) -> HTMLResponse:
+        """All preps the user has generated. Newest first."""
+        rows = list(session.execute(
+            select(Preparation, Signal, RawItem)
+            .join(Signal, Preparation.signal_id == Signal.id)
+            .join(RawItem, Signal.raw_item_id == RawItem.id)
+            .where(Preparation.user_id == user.id)
+            .order_by(desc(Preparation.created_at))
+            .limit(200)
+        ).all())
+        state = _state_for(user.id)
+        return templates.TemplateResponse(
+            request, "preparations_list.html.j2",
+            {
+                "rows": rows,
+                "task_status": state["status"],
+                "current_run_id": state["current_run_id"],
+                "user": user,
+            },
+        )
+
 
     @app.get("/preparations/{prep_id}", response_class=HTMLResponse)
     def view_preparation(
