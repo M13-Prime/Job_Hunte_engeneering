@@ -1,0 +1,75 @@
+{% extends "base.html.j2" %}
+{% block title %}En attente de validation — Signal Tracker{% endblock %}
+
+{% block extra_css %}
+  .pending-shell {
+    max-width: 520px; margin: 80px auto 40px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-xl);
+    padding: 40px 36px 32px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.025), 0 8px 24px rgba(11,40,80,0.06);
+    text-align: center;
+  }
+  @media (max-width: 560px) {
+    .pending-shell { margin: 32px 18px; padding: 28px 22px; }
+  }
+  .pending-shell .badge-wrap {
+    width: 56px; height: 56px; margin: 0 auto 18px;
+    border-radius: 50%;
+    background: var(--amber-soft);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--amber);
+  }
+  .pending-shell .badge-wrap svg {
+    width: 28px; height: 28px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .pending-shell h1 {
+    font-size: 24px; font-weight: 700; letter-spacing: -0.025em;
+    margin: 0 0 10px; color: var(--text);
+  }
+  .pending-shell p { color: var(--text-2); font-size: 14.5px; line-height: 1.55; margin: 0 0 12px; }
+  .pending-shell .email {
+    display: inline-block; padding: 4px 12px; border-radius: var(--r-full);
+    background: var(--surface-2); border: 1px solid var(--hairline);
+    font-size: 13px; color: var(--text-2); font-weight: 500;
+    margin: 4px 0 16px;
+  }
+  .pending-shell .actions {
+    display: flex; justify-content: center; gap: 10px; margin-top: 22px;
+    flex-wrap: wrap;
+  }
+  .pending-shell .actions form { margin: 0; }
+  .pending-shell .actions button,
+  .pending-shell .actions a {
+    padding: 10px 18px; border-radius: var(--r-full);
+    border: 1px solid var(--hairline);
+    background: var(--surface); color: var(--text-2);
+    font-size: 13.5px; font-weight: 500; cursor: pointer;
+    font-family: inherit; text-decoration: none;
+  }
+  .pending-shell .actions button:hover,
+  .pending-shell .actions a:hover { border-color: var(--text-3); color: var(--text); }
+{% endblock %}
+
+{% block content %}
+<div class="pending-shell">
+  <div class="badge-wrap">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+  </div>
+  <h1>Compte en attente de validation</h1>
+  {% if user %}
+  <div class="email">{{ user.email }}</div>
+  {% endif %}
+  <p>Ton compte a bien été créé, mais un administrateur doit l'approuver avant que tu puisses utiliser l'outil.</p>
+  <p>Reviens dans quelques heures, ou contacte l'admin si l'attente est trop longue.</p>
+  <div class="actions">
+    <a href="/login">Réessayer la connexion</a>
+    {% if user %}
+    <form method="post" action="/logout"><button type="submit">Se déconnecter</button></form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

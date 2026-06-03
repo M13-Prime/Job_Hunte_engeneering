@@ -1,0 +1,161 @@
+{% extends "base.html.j2" %}
+{% block title %}Admin — Comptes{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block extra_css %}
+  .admin-head {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 22px; flex-wrap: wrap;
+  }
+  .admin-head h1 {
+    font-size: 32px; font-weight: 700; color: var(--text);
+    letter-spacing: -0.028em; margin: 0;
+  }
+  .admin-head .badge {
+    background: var(--amber-soft); color: var(--amber);
+    padding: 4px 12px; border-radius: var(--r-full);
+    font-size: 12.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .admin-head .badge.zero {
+    background: rgba(0,0,0,0.06); color: var(--text-3);
+  }
+
+  .users-card { padding: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.users {
+    width: 100%; min-width: 760px;
+    border-collapse: collapse; font-size: 14px;
+  }
+  table.users thead th {
+    text-align: left; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--text-3); padding: 14px 18px 12px;
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface-2);
+  }
+  table.users tbody td {
+    padding: 16px 18px; border-bottom: 1px solid var(--hairline-2);
+    vertical-align: middle; background: var(--surface);
+  }
+  table.users tbody tr:last-child td { border-bottom: 0; }
+  table.users tbody tr.pending td { background: rgba(255,159,10,0.04); }
+
+  .user-email { font-weight: 600; color: var(--text); font-size: 15px; }
+  .user-meta { color: var(--text-3); font-size: 12.5px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  .tag {
+    display: inline-block; padding: 2px 9px; border-radius: var(--r-full);
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    margin-right: 4px;
+  }
+  .tag.approved { background: var(--green-soft); color: var(--green-deep); }
+  .tag.pending { background: var(--amber-soft); color: var(--amber); }
+  .tag.admin   { background: var(--blue-soft); color: var(--blue); }
+  .tag.you     { background: rgba(0,0,0,0.06); color: var(--text-3); }
+  .tag.inactive { background: var(--red-soft); color: var(--red); }
+
+  .row-actions {
+    display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end;
+  }
+  .row-actions form { margin: 0; }
+  .row-actions button, .row-actions a {
+    padding: 6px 12px; border: 1px solid var(--hairline);
+    border-radius: var(--r-sm); background: var(--surface);
+    font-size: 12.5px; font-weight: 500; color: var(--text-2);
+    font-family: inherit; cursor: pointer; white-space: nowrap;
+    transition: all 140ms ease; text-decoration: none;
+  }
+  .row-actions button:hover, .row-actions a:hover { border-color: var(--text-3); color: var(--text); }
+  .row-actions button.approve { background: var(--text); color: white; border-color: var(--text); }
+  .row-actions button.approve:hover { background: #000; color: white; }
+  .row-actions button.revoke:hover { border-color: var(--red); color: var(--red); background: var(--red-soft); }
+  .row-actions button.demote:hover { border-color: var(--text-3); color: var(--text-3); }
+
+  .empty-admin {
+    text-align: center; padding: 60px 24px;
+    color: var(--text-3);
+  }
+
+  .col-actions { width: 1%; white-space: nowrap; text-align: right; padding-right: 18px !important; }
+{% endblock %}
+
+{% block content %}
+<div class="admin-head">
+  <h1>Comptes</h1>
+  <span class="badge {{ 'zero' if not pending_count else '' }}">
+    {{ pending_count }} en attente
+  </span>
+</div>
+
+<div class="card users-card">
+  {% if not users %}
+  <div class="empty-admin">Aucun compte enregistré.</div>
+  {% else %}
+  <table class="users">
+    <thead>
+      <tr>
+        <th>Compte</th>
+        <th>Statut</th>
+        <th>Approuvé le</th>
+        <th class="col-actions">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr class="{{ 'pending' if not u.is_approved else '' }}">
+        <td>
+          <div class="user-email">{{ u.email }}</div>
+          <div class="user-meta">
+            Créé le {{ u.created_at.strftime("%d/%m/%Y") if u.created_at else "—" }}
+            {% if u.last_login_at %}· Dernière connexion {{ u.last_login_at.strftime("%d/%m/%Y") }}{% endif %}
+          </div>
+        </td>
+        <td>
+          {% if u.id == user.id %}<span class="tag you">Toi</span>{% endif %}
+          {% if u.is_owner %}<span class="tag admin">Admin</span>{% endif %}
+          {% if u.is_approved %}
+            <span class="tag approved">Approuvé</span>
+          {% else %}
+            <span class="tag pending">En attente</span>
+          {% endif %}
+          {% if not u.is_active %}<span class="tag inactive">Désactivé</span>{% endif %}
+        </td>
+        <td class="user-meta">
+          {{ u.approved_at.strftime("%d/%m/%Y · %H:%M") if u.approved_at else "—" }}
+        </td>
+        <td class="col-actions">
+          {% if u.id == user.id %}
+          <span class="user-meta">—</span>
+          {% else %}
+          <div class="row-actions">
+            {% if not u.is_approved %}
+              <form method="post" action="/admin/users/{{ u.id }}/approve">
+                <button type="submit" class="approve">Approuver</button>
+              </form>
+            {% else %}
+              {% if not u.is_owner %}
+              <form method="post" action="/admin/users/{{ u.id }}/promote"
+                    onsubmit="return confirm('Promouvoir {{ u.email }} en admin ?');">
+                <button type="submit">Promouvoir admin</button>
+              </form>
+              <form method="post" action="/admin/users/{{ u.id }}/revoke"
+                    onsubmit="return confirm('Révoquer l\'accès de {{ u.email }} ? Le compte sera bloqué jusqu\'à la prochaine ré-approbation.');">
+                <button type="submit" class="revoke">Révoquer</button>
+              </form>
+              {% else %}
+              <form method="post" action="/admin/users/{{ u.id }}/demote"
+                    onsubmit="return confirm('Retirer le rôle admin à {{ u.email }} ?');">
+                <button type="submit" class="demote">Retirer admin</button>
+              </form>
+              {% endif %}
+            {% endif %}
+          </div>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

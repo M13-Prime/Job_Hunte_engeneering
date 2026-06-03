@@ -311,7 +311,13 @@ class Preparation(Base):
 # ----------------------------------------------------------------------------
 
 class User(Base):
-    """Email + bcrypt password account. Owns search runs, keywords, CV, etc."""
+    """Email + bcrypt password account. Owns search runs, keywords, CV, etc.
+
+    Approval gate: new signups land with ``is_approved=False`` and cannot
+    log in until an owner approves them via the /admin/users page. The
+    first user to sign up is auto-promoted to owner + approved so the
+    instance is never left without an admin.
+    """
 
     __tablename__ = "users"
 
@@ -320,10 +326,15 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     is_owner: Mapped[bool] = mapped_column(default=False, nullable=False)
+    is_approved: Mapped[bool] = mapped_column(default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    approved_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
 
 
 class SignalFeedback(Base):

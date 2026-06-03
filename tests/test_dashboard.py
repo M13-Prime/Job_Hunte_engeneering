@@ -32,6 +32,7 @@ def db_with_signals(tmp_path: Path) -> Database:
             password_hash=hash_password("password"),
             is_active=True,
             is_owner=True,
+            is_approved=True,
         )
         s.add(user)
         s.flush()
@@ -250,6 +251,7 @@ def test_two_users_dont_see_each_others_data(db_with_signals: Database) -> None:
             email="bob@example.com",
             password_hash=hash_password("password"),
             is_active=True,
+            is_approved=True,
         ))
 
     a = TestClient(build_app(db=db_with_signals))

@@ -80,7 +80,7 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 KEYWORD_CATEGORIES = ("field", "job_title", "other")
 
 # Paths that do NOT require an authenticated user.
-PUBLIC_PATHS = {"/healthz", "/login", "/signup", "/logout"}
+PUBLIC_PATHS = {"/healthz", "/login", "/signup", "/logout", "/pending"}
 
 
 def _idle_state() -> dict[str, Any]:
@@ -189,6 +189,13 @@ def build_app(db: Database | None = None) -> FastAPI:
             if accepts_html:
                 return RedirectResponse(url="/login", status_code=303)
             return Response(status_code=401, content="Authentication required")
+        # Phase 9: unapproved users get a holding page; nothing else is
+        # reachable until an admin approves them.
+        if not user.is_approved:
+            accepts_html = "text/html" in (request.headers.get("accept") or "")
+            if accepts_html:
+                return RedirectResponse(url="/pending", status_code=303)
+            return Response(status_code=403, content="Account pending approval")
         return await call_next(request)
 
     # SessionMiddleware is added LAST so it ends up OUTERMOST in the
@@ -207,6 +214,13 @@ def build_app(db: Database | None = None) -> FastAPI:
         user: User | None = getattr(request.state, "user", None)
         if user is None:
             raise HTTPException(status_code=401, detail="Authentication required")
+        return user
+
+    def require_admin(request: Request) -> User:
+        """Owner-only routes. is_owner is the admin bit (Phase 9)."""
+        user = require_user(request)
+        if not user.is_owner:
+            raise HTTPException(status_code=403, detail="Admin access required")
         return user
 
     # =========================================================================
@@ -240,8 +254,12 @@ def build_app(db: Database | None = None) -> FastAPI:
                 },
                 status_code=401,
             )
+        # Phase 9: still let the cookie be set so the holding page recognizes
+        # them, but the middleware will keep them off everything else.
         touch_last_login(session, user)
         login_user(request, user)
+        if not user.is_approved:
+            return RedirectResponse(url="/pending", status_code=303)
         return RedirectResponse(url=_safe_redirect(next), status_code=303)
 
     @app.get("/signup", response_class=HTMLResponse)
@@ -279,16 +297,27 @@ def build_app(db: Database | None = None) -> FastAPI:
                 {"error": err, "task_status": "idle", "current_run_id": None},
                 status_code=400,
             )
+        # Phase 9: the FIRST user to sign up on a fresh instance becomes
+        # owner + auto-approved so the deployment is never admin-less.
+        # Everyone after that lands in /pending until an admin approves.
+        total_users = session.execute(select(func.count(User.id))).scalar_one()
+        is_first = total_users == 0
         user = User(
             email=email_clean,
             password_hash=hash_password(password),
             is_active=True,
-            is_owner=False,
+            is_owner=is_first,
+            is_approved=is_first,
+            approved_at=datetime.now(tz=UTC) if is_first else None,
         )
         session.add(user)
         session.flush()
+        if is_first:
+            user.approved_by_id = user.id  # self-approved
         touch_last_login(session, user)
         login_user(request, user)
+        if not user.is_approved:
+            return RedirectResponse(url="/pending", status_code=303)
         return RedirectResponse(url="/", status_code=303)
 
     @app.post("/logout")
@@ -296,9 +325,134 @@ def build_app(db: Database | None = None) -> FastAPI:
         logout_user(request)
         return RedirectResponse(url="/login", status_code=303)
 
+    @app.get("/pending", response_class=HTMLResponse)
+    def pending(request: Request) -> HTMLResponse:
+        """Holding page for accounts waiting on admin approval."""
+        user: User | None = getattr(request.state, "user", None)
+        return templates.TemplateResponse(
+            request, "pending.html.j2",
+            {
+                "user": user, "task_status": "idle", "current_run_id": None,
+            },
+        )
+
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    # =========================================================================
+    # Admin: account validation (Phase 9)
+    # =========================================================================
+    @app.get("/admin/users", response_class=HTMLResponse)
+    def admin_users(
+        request: Request,
+        user: User = Depends(require_admin),
+        session: Session = Depends(get_session_dep),
+    ) -> HTMLResponse:
+        rows = list(session.execute(
+            select(User).order_by(User.is_approved.asc(), desc(User.created_at))
+        ).scalars())
+        pending_count = sum(1 for u in rows if not u.is_approved)
+        return templates.TemplateResponse(
+            request, "admin_users.html.j2",
+            {
+                "users": rows,
+                "pending_count": pending_count,
+                "user": user,
+                "task_status": "idle",
+                "current_run_id": None,
+            },
+        )
+
+    def _act_on_user(
+        session: Session, admin: User, target_id: int,
+    ) -> User:
+        target = session.get(User, target_id)
+        if target is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        if target.id == admin.id:
+            raise HTTPException(
+                status_code=400,
+                detail="Tu ne peux pas modifier ton propre compte ici.",
+            )
+        return target
+
+    @app.post("/admin/users/{user_id}/approve")
+    def admin_approve(
+        user_id: int,
+        admin: User = Depends(require_admin),
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        target = _act_on_user(session, admin, user_id)
+        if not target.is_approved:
+            target.is_approved = True
+            target.is_active = True
+            target.approved_at = datetime.now(tz=UTC)
+            target.approved_by_id = admin.id
+            logger.info(
+                "admin.user_approved by=%s target=%s", admin.email, target.email,
+            )
+        return RedirectResponse(url="/admin/users", status_code=303)
+
+    @app.post("/admin/users/{user_id}/revoke")
+    def admin_revoke(
+        user_id: int,
+        admin: User = Depends(require_admin),
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        target = _act_on_user(session, admin, user_id)
+        if target.is_owner:
+            raise HTTPException(
+                status_code=400,
+                detail="Retire d'abord le rôle admin avant de révoquer.",
+            )
+        target.is_approved = False
+        logger.info(
+            "admin.user_revoked by=%s target=%s", admin.email, target.email,
+        )
+        return RedirectResponse(url="/admin/users", status_code=303)
+
+    @app.post("/admin/users/{user_id}/promote")
+    def admin_promote(
+        user_id: int,
+        admin: User = Depends(require_admin),
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        target = _act_on_user(session, admin, user_id)
+        if not target.is_approved:
+            raise HTTPException(
+                status_code=400,
+                detail="Approuve d'abord le compte avant de le promouvoir.",
+            )
+        target.is_owner = True
+        logger.info(
+            "admin.user_promoted by=%s target=%s", admin.email, target.email,
+        )
+        return RedirectResponse(url="/admin/users", status_code=303)
+
+    @app.post("/admin/users/{user_id}/demote")
+    def admin_demote(
+        user_id: int,
+        admin: User = Depends(require_admin),
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        target = _act_on_user(session, admin, user_id)
+        # Don't let the last admin demote — would lock everyone out of /admin.
+        other_owners = session.execute(
+            select(func.count(User.id))
+            .where(User.is_owner.is_(True))
+            .where(User.id != target.id)
+        ).scalar_one()
+        if other_owners == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Au moins un admin doit rester. Promeus quelqu'un d'autre d'abord.",
+            )
+        target.is_owner = False
+        logger.info(
+            "admin.user_demoted by=%s target=%s", admin.email, target.email,
+        )
+        return RedirectResponse(url="/admin/users", status_code=303)
 
     # =========================================================================
     # Landing

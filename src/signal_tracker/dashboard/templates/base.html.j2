@@ -465,6 +465,9 @@
       <a href="/" class="{% block nav_search %}{% endblock %}">Recherche</a>
       <a href="/results" class="{% block nav_results %}{% endblock %}">Résultats</a>
       <a href="/preparations" class="{% block nav_preparations %}{% endblock %}">Préparations</a>
+      {% if user.is_owner %}
+      <a href="/admin/users" class="{% block nav_admin %}{% endblock %}">Admin</a>
+      {% endif %}
     </nav>
     {% endif %}
     <div class="spacer"></div>

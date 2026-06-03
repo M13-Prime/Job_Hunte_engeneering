@@ -24,6 +24,7 @@ def db(tmp_path: Path) -> Database:
             password_hash=hash_password("password"),
             is_active=True,
             is_owner=True,
+            is_approved=True,
         ))
     return db
 

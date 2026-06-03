@@ -38,6 +38,12 @@ _ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("watchlist", "user_id", "INTEGER"),
     ("user_cv", "user_id", "INTEGER"),
     ("preparations", "user_id", "INTEGER"),
+    # Phase 9 — admin approval gate. New signups land unapproved until
+    # an owner clicks "Approuver" on /admin/users. Existing rows are
+    # back-filled to is_approved=1 by _backfill_user_approvals() below.
+    ("users", "is_approved", "INTEGER NOT NULL DEFAULT 0"),
+    ("users", "approved_at", "DATETIME"),
+    ("users", "approved_by_id", "INTEGER"),
 )
 
 # Same story for indexes: create_all() doesn't add new indexes to existing
@@ -76,12 +82,19 @@ class Database:
 
     def create_all(self) -> None:
         Base.metadata.create_all(self.engine)
-        self._apply_additive_migrations()
+        added = self._apply_additive_migrations()
         self._apply_additive_indexes()
+        # Only back-fill grandfathered approvals on the very deploy that
+        # introduces the is_approved column — otherwise we'd auto-approve
+        # every new signup at the next container restart.
+        if ("users", "is_approved") in added:
+            self._backfill_user_approvals()
 
-    def _apply_additive_migrations(self) -> None:
+    def _apply_additive_migrations(self) -> set[tuple[str, str]]:
+        """Run pending ALTER TABLE ADD COLUMNs; return what was just added."""
         inspector = inspect(self.engine)
         existing_tables = set(inspector.get_table_names())
+        just_added: set[tuple[str, str]] = set()
         for table, column, sql_type in _ADDITIVE_COLUMNS:
             if table not in existing_tables:
                 continue  # create_all already made it with the column
@@ -90,6 +103,40 @@ class Database:
                 with self.engine.begin() as conn:
                     conn.execute(
                         text(f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}")
+                    )
+                just_added.add((table, column))
+        return just_added
+
+    def _backfill_user_approvals(self) -> None:
+        """One-shot data migration for the Phase 9 approval gate.
+
+        Without this, deploying the gate would lock every existing user
+        out (is_approved defaults to 0 on the new column). We:
+        - Mark every pre-existing user as approved so the upgrade is
+          transparent for them.
+        - Promote the earliest-created user to owner if no owner exists,
+          so the instance always has at least one admin who can approve
+          future signups.
+
+        Called from create_all() only when the is_approved column was
+        added in the same run, so it's a one-shot — subsequent restarts
+        skip it and let unapproved post-gate signups stay unapproved.
+        """
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "UPDATE users SET is_approved = 1 WHERE is_approved = 0"
+            ))
+            owner_row = conn.execute(
+                text("SELECT id FROM users WHERE is_owner = 1 LIMIT 1")
+            ).first()
+            if owner_row is None:
+                earliest = conn.execute(
+                    text("SELECT id FROM users ORDER BY created_at ASC LIMIT 1")
+                ).first()
+                if earliest is not None:
+                    conn.execute(
+                        text("UPDATE users SET is_owner = 1 WHERE id = :uid"),
+                        {"uid": earliest[0]},
                     )
 
     def _apply_additive_indexes(self) -> None:
