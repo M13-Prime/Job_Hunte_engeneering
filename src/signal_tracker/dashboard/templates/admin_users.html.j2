@@ -77,6 +77,25 @@
   }
 
   .col-actions { width: 1%; white-space: nowrap; text-align: right; padding-right: 18px !important; }
+
+  /* ---------------- Mobile: stacked cards ---------------- */
+  @media (max-width: 640px) {
+    .users-card { overflow-x: visible; }
+    table.users, table.users tbody, table.users tr { display: block; min-width: 0; }
+    table.users thead { display: none; }
+    table.users tbody td { display: block; padding: 0; border: 0; }
+    table.users tbody tr {
+      display: block; padding: 16px;
+      border-bottom: 1px solid var(--hairline-2);
+    }
+    table.users tbody tr:last-child { border-bottom: 0; }
+    table.users tbody tr > td + td { margin-top: 10px; }
+    .col-actions { text-align: left !important; padding-right: 0 !important; }
+    .row-actions { justify-content: flex-start; }
+    .row-actions form { flex: 1 1 auto; }
+    .row-actions button, .row-actions a { width: 100%; padding: 10px 14px; }
+    .admin-head h1 { font-size: 26px; }
+  }
 {% endblock %}
 
 {% block content %}

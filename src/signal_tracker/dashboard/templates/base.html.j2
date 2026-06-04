@@ -3,8 +3,17 @@
 <head>
 <meta charset="utf-8">
 <title>{% block title %}Signal Tracker{% endblock %}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#f5f5f7">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1d1d1f" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Signal Tracker">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%2334c759'/><text x='90' y='128' font-family='-apple-system,BlinkMacSystemFont,sans-serif' font-size='110' font-weight='800' text-anchor='middle' fill='white'>S</text></svg>">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%2334c759'/><text x='32' y='46' font-family='-apple-system,BlinkMacSystemFont,sans-serif' font-size='40' font-weight='800' text-anchor='middle' fill='white'>S</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -241,8 +250,56 @@
     padding: 48px var(--container-px) 80px;
   }
   @media (max-width: 720px) {
-    main { padding: 28px 18px 48px; }
-    :root { --container-px: 18px; }
+    main { padding: 24px 16px calc(40px + env(safe-area-inset-bottom)); }
+    :root { --container-px: 16px; --nav-h: 52px; }
+  }
+
+  /* ---------------- Mobile (<= 640px) ---------------- */
+  @media (max-width: 640px) {
+    /* iOS zooms the page when an input has font-size < 16px on focus.
+       Force 16px on every form control to prevent that. */
+    input, select, textarea, button {
+      font-size: 16px !important;
+    }
+    /* Tighter app bar: smaller gap, hide the user email + status text. */
+    .appbar-inner { gap: 12px; padding: 0 14px; }
+    .brand { font-size: 15px; }
+    .brand .logo { width: 22px; height: 22px; font-size: 12px; }
+    .nav { gap: 0; overflow-x: auto; scrollbar-width: none; }
+    .nav::-webkit-scrollbar { display: none; }
+    .nav a { padding: 6px 9px; font-size: 13px; flex-shrink: 0; }
+    /* Status pill collapses to just the dot to free up bar real estate. */
+    .status-pill #status-text { display: none; }
+    .status-pill { padding: 6px 10px; }
+    /* Email is hidden, only the logout icon stays — easier one-thumb logout. */
+    .user-chip .email { display: none; }
+    .user-chip { padding: 4px; gap: 0; background: transparent; border: 0; }
+    .user-chip .logout-btn { width: 32px; height: 32px; }
+    .user-chip .logout-btn svg { width: 16px; height: 16px; }
+    /* Tap targets ≥ 44px high. */
+    .nav a, .btn-sm, .filters select, .filters input[type="number"] {
+      min-height: 36px; display: inline-flex; align-items: center;
+    }
+    .btn { padding: 12px 22px; }
+    .btn-sm { padding: 9px 16px; }
+    .btn-lg { padding: 14px 26px; font-size: 15.5px; }
+    .btn-xl { padding: 15px 28px; font-size: 16px; }
+    /* Cards: slimmer padding + edge-to-edge feel. */
+    .card { padding: 20px 18px; border-radius: var(--r-md); }
+    .card-sm { padding: 16px 18px; }
+    /* Toast: full-width at bottom instead of corner-floating. */
+    .toast {
+      left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom));
+      max-width: none;
+    }
+    /* Loader card: smaller side margins. */
+    .loader-card { min-width: auto; margin: 0 12px; padding: 26px 24px 22px; }
+  }
+
+  /* Honor the safe-area on devices with home indicator / notch. */
+  @supports (padding: env(safe-area-inset-bottom)) {
+    .appbar-inner { padding-left: max(var(--container-px), env(safe-area-inset-left));
+                    padding-right: max(var(--container-px), env(safe-area-inset-right)); }
   }
 
   .card {

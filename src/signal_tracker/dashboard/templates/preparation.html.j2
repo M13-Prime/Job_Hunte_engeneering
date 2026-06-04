@@ -144,6 +144,30 @@
   }
   .msg-template .copy-btn:hover { background: rgba(255,255,255,0.15); }
 
+  /* ---------------- Mobile (<=640px): smaller heads, no absolute copy ---------------- */
+  @media (max-width: 640px) {
+    .prep-header { gap: 12px; margin-bottom: 18px; }
+    .prep-header h1 { font-size: 22px; line-height: 1.18; }
+    .prep-header .score { min-width: 52px; padding: 8px 12px; font-size: 16px; }
+    .headline-card { padding: 16px 18px; font-size: 15.5px; }
+    .section { margin-bottom: 22px; }
+    .approach-summary { font-size: 14.5px; }
+    .talking-points .chip { font-size: 12.5px; padding: 5px 10px; }
+    /* Stack the copy button above the message instead of overlapping it. */
+    .msg-template {
+      padding: 44px 18px 16px;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+    .msg-template .copy-btn {
+      top: 10px; right: 10px;
+      padding: 8px 14px; font-size: 12px;
+    }
+    .msg-template .label { top: 14px; left: 18px; right: auto; }
+    /* Deep-dive long URLs must not bust the layout. */
+    section .section, .section { overflow-wrap: anywhere; }
+  }
+
   /* Contacts */
   .contact-row {
     display: flex; gap: 14px; padding: 14px; border: 1px solid var(--hairline);

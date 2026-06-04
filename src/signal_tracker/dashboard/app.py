@@ -80,7 +80,36 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 KEYWORD_CATEGORIES = ("field", "job_title", "other")
 
 # Paths that do NOT require an authenticated user.
-PUBLIC_PATHS = {"/healthz", "/login", "/signup", "/logout", "/pending"}
+PUBLIC_PATHS = {
+    "/healthz", "/login", "/signup", "/logout", "/pending",
+    "/manifest.webmanifest",
+}
+
+# PWA manifest. Inline (no static files needed) — served verbatim by /manifest.webmanifest.
+# Icons use the same green/S motif as the apple-touch-icon defined in base.html.j2.
+_ICON_SVG = (
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'>"
+    "<rect width='512' height='512' rx='112' fill='%2334c759'/>"
+    "<text x='256' y='362' font-family='-apple-system,BlinkMacSystemFont,sans-serif' "
+    "font-size='312' font-weight='800' text-anchor='middle' fill='white'>S</text></svg>"
+)
+PWA_MANIFEST: dict[str, Any] = {
+    "name": "Signal Tracker",
+    "short_name": "Signals",
+    "description": "Détecte les signaux d'embauche avant les offres publiques.",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#f5f5f7",
+    "theme_color": "#34c759",
+    "lang": "fr",
+    "icons": [
+        {"src": _ICON_SVG, "sizes": "any", "type": "image/svg+xml", "purpose": "any"},
+        {"src": _ICON_SVG, "sizes": "192x192", "type": "image/svg+xml", "purpose": "maskable"},
+        {"src": _ICON_SVG, "sizes": "512x512", "type": "image/svg+xml", "purpose": "maskable"},
+    ],
+}
 
 
 def _idle_state() -> dict[str, Any]:
@@ -339,6 +368,16 @@ def build_app(db: Database | None = None) -> FastAPI:
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/manifest.webmanifest")
+    def pwa_manifest() -> JSONResponse:
+        """PWA manifest — lets iOS / Android "Add to Home Screen" produce a
+        standalone-launching shortcut with the right name + icon + theme."""
+        return JSONResponse(
+            PWA_MANIFEST,
+            media_type="application/manifest+json",
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
 
     # =========================================================================
     # Admin: account validation (Phase 9)

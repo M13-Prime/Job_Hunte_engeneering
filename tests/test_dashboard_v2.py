@@ -121,6 +121,21 @@ def test_index_renders_keyword_chips(client: TestClient, db: Database) -> None:
 # Pipeline launcher
 # ---------------------------------------------------------------------------
 
+def test_manifest_is_publicly_accessible(db: Database) -> None:
+    """The PWA manifest must be reachable WITHOUT auth — iOS / Android
+    fetch it during 'Add to Home Screen' without the user's cookies."""
+    unauth = TestClient(build_app(db=db))
+    resp = unauth.get("/manifest.webmanifest")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["name"] == "Signal Tracker"
+    assert body["display"] == "standalone"
+    assert body["start_url"] == "/"
+    assert any("S" in icon.get("src", "") or "svg" in icon.get("type", "")
+               for icon in body["icons"])
+    assert resp.headers["content-type"].startswith("application/manifest+json")
+
+
 def test_run_status_starts_idle(client: TestClient) -> None:
     response = client.get("/run/status")
     assert response.status_code == 200

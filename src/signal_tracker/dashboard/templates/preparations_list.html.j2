@@ -33,6 +33,12 @@
     .prep-row { grid-template-columns: 52px 1fr auto; gap: 12px; padding: 14px 16px; }
     .prep-row .meta-right { display: none; }
   }
+  @media (max-width: 480px) {
+    /* Even tighter for narrow phones — drop the chev so the company name gets the room. */
+    .prep-row { grid-template-columns: 48px 1fr; gap: 10px; padding: 14px 12px; }
+    .prep-row .chev { display: none; }
+    .prep-row .company .name { white-space: normal; font-size: 15px; }
+  }
 
   .prep-row .score {
     display: inline-flex; align-items: center; justify-content: center;

@@ -97,6 +97,45 @@
     table.signals tbody td { padding: 14px 12px; }
     .col-source { width: 130px; }
   }
+
+  /* ---------------- Mobile: table → stacked cards ---------------- */
+  @media (max-width: 640px) {
+    .signals-card { overflow-x: visible; }
+    table.signals, table.signals tbody, table.signals tr { display: block; min-width: 0; }
+    table.signals thead { display: none; }
+    table.signals tbody td { display: block; padding: 0; border: 0; background: transparent; }
+    table.signals tbody tr {
+      display: block;
+      padding: 16px 16px 14px;
+      border-bottom: 1px solid var(--hairline-2);
+      background: var(--surface);
+    }
+    table.signals tbody tr:last-child { border-bottom: 0; }
+    table.signals tbody tr:hover td,
+    table.signals tbody tr:hover { background: var(--surface); }
+    .col-score { display: inline-block !important; margin-right: 10px; vertical-align: middle; }
+    .col-source {
+      width: auto; margin-top: 12px;
+      padding-top: 10px !important; border-top: 1px solid var(--hairline-2) !important;
+      font-size: 12.5px;
+    }
+    .col-actions {
+      width: auto !important; padding-right: 0 !important;
+      margin-top: 12px; padding-top: 12px;
+      border-top: 1px solid var(--hairline-2);
+    }
+    .row-actions {
+      opacity: 1; flex-direction: row; flex-wrap: wrap; gap: 6px;
+    }
+    .row-actions .mini { flex: 1 1 calc(50% - 3px); min-width: 0; }
+    .row-actions .mini.prepare { flex-basis: 100%; padding: 11px 14px; }
+    .summary { max-width: none; }
+    .angle, .contact { max-width: none; }
+    /* Filters row goes full width and wraps neatly. */
+    .results-head { gap: 10px; }
+    .results-head h1 { font-size: 26px; }
+    .filters { width: 100%; flex-wrap: wrap; }
+  }
   table.signals tbody tr:last-child td { border-bottom: 0; }
   table.signals tbody tr:hover td { background: rgba(0,0,0,0.018); }
   table.signals tbody tr.is-new td {
