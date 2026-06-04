@@ -195,6 +195,16 @@ class JobOffer(Base):
     matched_roles: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     is_open: Mapped[bool] = mapped_column(default=True, nullable=False, index=True)
 
+    # Phase 11 — Jobs Agent semantic verdict. NULL until the agent has
+    # reviewed this offer. agent_processed_at is the "I've looked at this"
+    # marker — set even when the agent decides the offer is irrelevant
+    # (so we don't re-score the same row every run).
+    agent_score: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
+    agent_fit_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    agent_killer_angle: Mapped[str | None] = mapped_column(Text, nullable=True)
+    agent_why_now: Mapped[str | None] = mapped_column(Text, nullable=True)
+    agent_processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     collected_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )

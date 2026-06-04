@@ -51,6 +51,14 @@ _ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("signals", "active_countries", "JSON"),
     # Phase 10 — record of what the dynamic source picker chose for the run.
     ("search_runs", "selected_sources", "JSON"),
+    # Phase 11 — Jobs Agent semantic verdict. agent_processed_at also
+    # serves as the "this row has been reviewed" marker so reruns don't
+    # repeat the LLM work.
+    ("job_offers", "agent_score", "FLOAT"),
+    ("job_offers", "agent_fit_reasoning", "TEXT"),
+    ("job_offers", "agent_killer_angle", "TEXT"),
+    ("job_offers", "agent_why_now", "TEXT"),
+    ("job_offers", "agent_processed_at", "DATETIME"),
 )
 
 # Same story for indexes: create_all() doesn't add new indexes to existing

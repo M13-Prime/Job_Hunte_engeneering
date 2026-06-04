@@ -61,6 +61,7 @@ from signal_tracker.preparation.llm import (
 from signal_tracker.preparation.schemas import CVProfile
 from signal_tracker.storage import Database, init_db
 from signal_tracker.storage.models import (
+    JobOffer,
     Preparation,
     RawItem,
     SearchRun,
@@ -231,6 +232,27 @@ def build_app(db: Database | None = None) -> FastAPI:
                 "collect": state["metrics"]["collect"],
                 "classify": classify_metrics,
             }
+
+            # Phase 11 — optional Jobs Agent pass. Runs after classify
+            # so it can scrape companies that produced fresh signals on
+            # this run. Off by default; reuses LLM_AGENT_BUDGET_USD.
+            if settings.llm_jobs_agent_enabled:
+                state["step"] = "jobs"
+                from signal_tracker.agents.jobs_agent import run_jobs_agent
+                jobs_result, jobs_state = await run_jobs_agent(
+                    db=app_db, profile=profile, user_id=user_id,
+                )
+                metrics["jobs"] = {
+                    "companies_scraped": jobs_state.companies_scraped,
+                    "jobs_added": jobs_state.jobs_added,
+                    "jobs_scored": jobs_state.jobs_scored,
+                    "jobs_skipped": jobs_state.jobs_skipped,
+                    "errors": jobs_state.errors,
+                    "agent_status": jobs_result.status,
+                    "agent_cost_usd": round(jobs_result.total_cost_usd, 4),
+                    "agent_iterations": jobs_result.iterations,
+                }
+
             state["metrics"] = metrics
             state.update(status="done", step=None)
             with app_db.session() as session:
@@ -1331,6 +1353,42 @@ def build_app(db: Database | None = None) -> FastAPI:
         state = _state_for(user.id)
         return templates.TemplateResponse(
             request, "preparations_list.html.j2",
+            {
+                "rows": rows,
+                "task_status": state["status"],
+                "current_run_id": state["current_run_id"],
+                "user": user,
+            },
+        )
+
+
+    @app.get("/jobs", response_class=HTMLResponse)
+    def list_jobs(
+        request: Request,
+        user: User = Depends(require_user),
+        session: Session = Depends(get_session_dep),
+    ) -> HTMLResponse:
+        """Open job offers — agent-scored first, then heuristic, then rest.
+
+        Single global listing (not per-user) since job_offers aren't
+        user-scoped today and the agent scores them against the active
+        user's CV at scoring time. Anyone logged in sees the same list.
+        """
+        rows = list(session.execute(
+            select(JobOffer)
+            .where(JobOffer.is_open.is_(True))
+            .order_by(
+                # NULLs last so unscored offers appear after agent-scored ones.
+                desc(JobOffer.agent_score.is_not(None)),
+                desc(JobOffer.agent_score),
+                desc(JobOffer.relevance_score),
+                desc(JobOffer.collected_at),
+            )
+            .limit(200)
+        ).scalars())
+        state = _state_for(user.id)
+        return templates.TemplateResponse(
+            request, "jobs_list.html.j2",
             {
                 "rows": rows,
                 "task_status": state["status"],

@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     # off by default so the existing linear pipeline keeps working.
     llm_research_agent_enabled: bool = False
     llm_prep_agent_enabled: bool = False
+    # Phase 11 — Jobs Agent: post-classify pass that scrapes ATS boards
+    # for signal-bearing companies and semantically rescores the offers.
+    llm_jobs_agent_enabled: bool = False
     # Per-run safety caps. Budget is best-effort (uses
     # litellm.completion_cost() to estimate per turn).
     llm_agent_budget_usd: float = 0.5
