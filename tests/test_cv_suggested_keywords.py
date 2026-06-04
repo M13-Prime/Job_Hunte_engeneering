@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 
 from signal_tracker.auth import hash_password
 from signal_tracker.dashboard.app import build_app
@@ -13,7 +15,7 @@ from signal_tracker.storage import Database, init_db
 from signal_tracker.storage.models import User, UserCV, UserKeyword
 
 
-def _seed_cv(db: Database, *, profile_json: dict | None) -> int:
+def _seed_cv(db: Database, *, profile_json: dict[str, Any] | None) -> int:
     with db.session() as s:
         s.add(User(
             email="test@example.com",
@@ -21,9 +23,7 @@ def _seed_cv(db: Database, *, profile_json: dict | None) -> int:
             is_active=True, is_owner=True, is_approved=True,
         ))
         s.flush()
-        user_id = s.execute(
-            __import__("sqlalchemy").select(User.id)
-        ).scalar_one()
+        user_id: int = s.execute(select(User.id)).scalar_one()
         s.add(UserCV(
             user_id=user_id, filename="cv.pdf",
             text="x" * 100, char_count=100,
@@ -93,9 +93,7 @@ def test_already_added_keywords_are_filtered_out(
     """If the user has already added a suggested keyword manually, it stops
     showing up in the panel — avoids the same chip appearing twice."""
     with db_with_cv.session() as s:
-        user_id = s.execute(
-            __import__("sqlalchemy").select(User.id)
-        ).scalar_one()
+        user_id = s.execute(select(User.id)).scalar_one()
         s.add(UserKeyword(
             user_id=user_id, category="field", value="design public",
         ))
@@ -126,9 +124,7 @@ def test_accept_adds_keyword(client: TestClient, db_with_cv: Database) -> None:
     assert resp.status_code == 303
     assert "/#suggested-keywords" in resp.headers["location"]
     with db_with_cv.session() as s:
-        kws = list(s.execute(
-            __import__("sqlalchemy").select(UserKeyword)
-        ).scalars())
+        kws = list(s.execute(select(UserKeyword)).scalars())
         assert any(k.value == "design de service" and k.category == "field" for k in kws)
 
 
@@ -144,8 +140,7 @@ def test_accept_is_idempotent(client: TestClient, db_with_cv: Database) -> None:
         assert resp.status_code == 303
     with db_with_cv.session() as s:
         count = s.execute(
-            __import__("sqlalchemy")
-            .select(__import__("sqlalchemy").func.count(UserKeyword.id))
+            select(func.count(UserKeyword.id))
             .where(UserKeyword.value == "Service Designer")
         ).scalar_one()
         assert count == 1

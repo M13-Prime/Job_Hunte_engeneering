@@ -303,13 +303,13 @@ def materialize_sources(
 
     # LLM-drafted extras — short timespan, conservative cap.
     for i, raw_query in enumerate(selection.extra_gdelt_queries):
-        q = (raw_query or "").strip()
-        if not q or q in seen_queries:
+        extra_q = (raw_query or "").strip()
+        if not extra_q or extra_q in seen_queries:
             continue
-        seen_queries.add(q)
+        seen_queries.add(extra_q)
         queries.append(GdeltQuery(
             id=f"picker_extra_{i}",
-            query=q,
+            query=extra_q,
             timespan="24h",
             max_records=60,
         ))

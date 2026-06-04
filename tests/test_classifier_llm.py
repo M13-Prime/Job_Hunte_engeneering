@@ -384,6 +384,7 @@ async def test_anthropic_system_prompt_is_cache_controlled(
 
     patched_litellm.return_value = _fake_response(POSITIVE_CASES[0][1])
     await classify(_make_input("x"), sample_profile)
+    assert patched_litellm.await_args is not None
     sent = patched_litellm.await_args.kwargs["messages"]
     sys_msg = sent[0]
     assert sys_msg["role"] == "system"
@@ -408,6 +409,7 @@ async def test_non_anthropic_system_prompt_stays_plain_string(
 
     patched_litellm.return_value = _fake_response(POSITIVE_CASES[0][1])
     await classify(_make_input("x"), sample_profile)
+    assert patched_litellm.await_args is not None
     sys_msg = patched_litellm.await_args.kwargs["messages"][0]
     assert isinstance(sys_msg["content"], str)
 
@@ -425,6 +427,7 @@ async def test_cache_disabled_keeps_string_content(
 
     patched_litellm.return_value = _fake_response(POSITIVE_CASES[0][1])
     await classify(_make_input("x"), sample_profile)
+    assert patched_litellm.await_args is not None
     sys_msg = patched_litellm.await_args.kwargs["messages"][0]
     assert isinstance(sys_msg["content"], str)
 
