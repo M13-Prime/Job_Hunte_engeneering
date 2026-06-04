@@ -219,6 +219,9 @@ class SearchRun(Base):
     status: Mapped[str] = mapped_column(String(32), default="running", index=True)
     keywords: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     metrics: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    # Phase 10 — what the dynamic source picker chose for this run:
+    # {selected_domain_ids: [...], extra_gdelt_queries: [...], rationale: ...}
+    selected_sources: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False, index=True

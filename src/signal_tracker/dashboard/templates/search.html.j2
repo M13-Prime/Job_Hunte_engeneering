@@ -273,6 +273,15 @@
   }
   .run-item .meta a:hover { color: var(--blue); text-decoration: none; }
   .run-item .meta .sub { color: var(--text-3); font-size: 12px; margin-top: 1px; }
+  .run-item .src-pills {
+    display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px;
+  }
+  .run-item .src-pill {
+    font-size: 10.5px; font-weight: 600; padding: 1px 7px;
+    background: var(--blue-soft); color: var(--blue);
+    border-radius: var(--r-full); text-transform: capitalize;
+    letter-spacing: 0.01em;
+  }
   .run-item .del {
     background: none; border: none; color: var(--text-4); cursor: pointer;
     width: 24px; height: 24px; border-radius: 50%; padding: 0;
@@ -495,6 +504,13 @@
                 {% if run.metrics and run.metrics.classify %} · {{ run.metrics.classify.signals_created }} signaux{% endif %}
                 {% if run.status == "running" %} · en cours{% elif run.status == "failed" %} · échec{% endif %}
               </div>
+              {% if run.selected_sources and run.selected_sources.selected_domain_ids %}
+              <div class="src-pills" title="{{ run.selected_sources.rationale or '' }}">
+                {% for d in run.selected_sources.selected_domain_ids %}
+                <span class="src-pill">{{ d|replace('_', ' ') }}</span>
+                {% endfor %}
+              </div>
+              {% endif %}
             </div>
             <form method="post" action="/searches/{{ run.id }}/delete">
               <button class="del" type="submit" title="Supprimer" aria-label="Supprimer cette recherche">×</button>

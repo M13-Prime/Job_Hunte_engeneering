@@ -150,7 +150,15 @@ def build_app(db: Database | None = None) -> FastAPI:
         return snap
 
     async def _run_search_task(run_id: int, user_id: int) -> None:
-        from signal_tracker.pipeline import run_classification, run_collection
+        from signal_tracker.agents.source_picker import (
+            load_source_registry,
+            pick_sources,
+        )
+        from signal_tracker.pipeline import (
+            build_collectors_for_selection,
+            run_classification,
+            run_collection,
+        )
 
         state = _state_for(user_id)
         state.update(
@@ -158,7 +166,29 @@ def build_app(db: Database | None = None) -> FastAPI:
             metrics={}, error=None,
         )
         try:
-            coll = await run_collection(db=app_db)
+            # Phase 10 feature 3 — let the LLM pick which curated domains
+            # to activate for this user. If the registry is empty or the
+            # picker is disabled, this falls back to all domains, then
+            # the collectors fall back to the legacy static config when
+            # there's nothing to materialize.
+            profile = load_user_profile()
+            with app_db.session() as session:
+                user_keywords = _keyword_snapshot(session, user_id)
+            selection = await pick_sources(profile, user_keywords)
+            registry = load_source_registry()
+            picker_collectors = (
+                build_collectors_for_selection(selection) if registry else []
+            )
+            # Persist the picker decision on the SearchRun so the UI can
+            # show which domains powered the run later.
+            with app_db.session() as session:
+                run = session.get(SearchRun, run_id)
+                if run is not None:
+                    run.selected_sources = selection.to_metadata()
+            coll = await run_collection(
+                collectors=picker_collectors or None,
+                db=app_db,
+            )
             state["metrics"]["collect"] = {
                 "fetched": coll.fetched, "new": coll.new, "duplicates": coll.duplicates,
             }

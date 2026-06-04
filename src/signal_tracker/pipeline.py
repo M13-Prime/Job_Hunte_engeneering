@@ -8,6 +8,11 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select
 
+from signal_tracker.agents.source_picker import (
+    PickerSelection,
+    load_source_registry,
+    materialize_sources,
+)
 from signal_tracker.classifier.feedback import load_feedback_examples
 from signal_tracker.classifier.llm import classify, prefilter
 from signal_tracker.classifier.schemas import ClassificationResult, ClassifierInput
@@ -114,6 +119,58 @@ def build_default_collectors() -> list[BaseCollector]:
                     )
                 )
 
+    return collectors
+
+
+def build_collectors_for_selection(
+    selection: PickerSelection,
+) -> list[BaseCollector]:
+    """Build collectors restricted to what the dynamic source picker chose.
+
+    Used per search-run (Phase 10 feature 3) when the LLM picker selects
+    a subset of curated domains + drafts a few extra GDELT queries. The
+    RSS + GDELT collectors are built from the materialized union; the
+    other collectors (NewsAPI / Pappers / France Travail) still come
+    from the static config because they aren't domain-tagged.
+    """
+    registry = load_source_registry()
+    feeds, gdelt_queries = materialize_sources(selection, registry)
+    collectors: list[BaseCollector] = []
+    if feeds:
+        collectors.append(RSSCollector(feeds))
+    if gdelt_queries:
+        collectors.append(GdeltCollector(gdelt_queries))
+
+    # Static-config collectors (NewsAPI / Pappers / France Travail) stay
+    # global because they're API-key gated and not domain-tagged.
+    sources = load_sources()
+    settings = get_settings()
+
+    newsapi_cfg = sources.get("newsapi") or {}
+    if newsapi_cfg.get("enabled") and settings.newsapi_key:
+        newsapi_queries = NewsApiCollector.queries_from_yaml(newsapi_cfg)
+        if newsapi_queries:
+            collectors.append(NewsApiCollector(settings.newsapi_key, newsapi_queries))
+
+    pappers_cfg = sources.get("pappers") or {}
+    if pappers_cfg.get("enabled") and settings.pappers_api_key:
+        watchlist = PappersCollector.watchlist_from_yaml(pappers_cfg)
+        if watchlist:
+            collectors.append(PappersCollector(settings.pappers_api_key, watchlist))
+
+    ft_cfg = sources.get("france_travail") or {}
+    if (
+        ft_cfg.get("enabled")
+        and settings.france_travail_client_id
+        and settings.france_travail_client_secret
+    ):
+        ft_config = FranceTravailCollector.from_yaml(ft_cfg)
+        if ft_config.rome_codes:
+            collectors.append(FranceTravailCollector(
+                client_id=settings.france_travail_client_id,
+                client_secret=settings.france_travail_client_secret,
+                config=ft_config,
+            ))
     return collectors
 
 

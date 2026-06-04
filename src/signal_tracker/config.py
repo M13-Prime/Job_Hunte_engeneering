@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     # Opt-in: send Anthropic prompt caching headers on the classifier
     # system prompt. No-op for non-Anthropic providers.
     llm_prompt_cache_enabled: bool = True
+    # Opt-in: at search-launch time, an LLM picks which curated domains
+    # from config/source_registry.yaml to activate, instead of fetching
+    # every configured source. Requires llm_cheap_model.
+    llm_source_picker_enabled: bool = False
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     gemini_api_key: str | None = None

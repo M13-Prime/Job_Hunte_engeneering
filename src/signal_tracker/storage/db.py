@@ -49,6 +49,8 @@ _ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
     # the /results filter.
     ("signals", "hq_country", "VARCHAR(96)"),
     ("signals", "active_countries", "JSON"),
+    # Phase 10 — record of what the dynamic source picker chose for the run.
+    ("search_runs", "selected_sources", "JSON"),
 )
 
 # Same story for indexes: create_all() doesn't add new indexes to existing
