@@ -193,22 +193,43 @@ def build_app(db: Database | None = None) -> FastAPI:
                 "fetched": coll.fetched, "new": coll.new, "duplicates": coll.duplicates,
             }
             state["step"] = "classify"
-            clf = await run_classification(
-                profile=load_user_profile(),
-                db=app_db,
-                search_run_id=run_id,
-                user_id=user_id,
-            )
-            metrics = {
-                "collect": state["metrics"]["collect"],
-                "classify": {
+            # Phase 11 — opt-in Research Agent. Falls back to the linear
+            # pipeline when disabled so the existing flow keeps working.
+            settings = get_settings()
+            if settings.llm_research_agent_enabled:
+                from signal_tracker.agents.research_agent import run_research_agent
+                agent_result, agent_state = await run_research_agent(
+                    db=app_db, profile=profile, user_id=user_id,
+                    search_run_id=run_id, user_keywords=user_keywords,
+                )
+                classify_metrics: dict[str, Any] = {
+                    "processed": agent_state.processed,
+                    "saved": agent_state.saved,
+                    "signals_created": agent_state.saved,  # alias for the existing UI key
+                    "skipped_prefilter": agent_state.skipped_prefilter,
+                    "errors": agent_state.errors,
+                    "agent_status": agent_result.status,
+                    "agent_cost_usd": round(agent_result.total_cost_usd, 4),
+                    "agent_iterations": agent_result.iterations,
+                }
+            else:
+                clf = await run_classification(
+                    profile=profile,
+                    db=app_db,
+                    search_run_id=run_id,
+                    user_id=user_id,
+                )
+                classify_metrics = {
                     "processed": clf.processed,
                     "relevant": clf.relevant,
                     "signals_created": clf.signals_created,
                     "signals_deduped": clf.signals_deduped,
                     "errors": clf.errors,
                     "prefiltered_out": clf.prefiltered_out,
-                },
+                }
+            metrics = {
+                "collect": state["metrics"]["collect"],
+                "classify": classify_metrics,
             }
             state["metrics"] = metrics
             state.update(status="done", step=None)
@@ -1148,20 +1169,60 @@ def build_app(db: Database | None = None) -> FastAPI:
             cv_payload = text_value
 
         try:
-            report = await generate_preparation(
-                company_name=company_name,
-                signal_type=signal_type,
-                recommended_action=recommended_action,
-                total_score=total_score,
-                summary_fr=summary_fr,
-                suggested_angle=suggested_angle,
-                source=source, url=url, title=title, content=content,
-                profile=load_user_profile(),
-                cv_text=cv_payload,
-            )
-            status = "done"
-            error_msg = None
-            report_dict: dict[str, Any] | None = report.model_dump()
+            settings = get_settings()
+            if settings.llm_prep_agent_enabled:
+                from signal_tracker.agents.prep_agent import run_prep_agent
+                _agent_res, prep_ctx = await run_prep_agent(
+                    company_name=company_name,
+                    signal_type=signal_type,
+                    recommended_action=recommended_action,
+                    total_score=total_score,
+                    summary_fr=summary_fr,
+                    suggested_angle=suggested_angle,
+                    source=source, url=url, title=title, content=content,
+                    profile=load_user_profile(),
+                    cv_text=cv_payload,
+                )
+                if prep_ctx.final_status == "done" and prep_ctx.final_report:
+                    report_dict: dict[str, Any] | None = prep_ctx.final_report
+                    status = "done"
+                    error_msg = None
+                elif prep_ctx.final_status == "no_fit":
+                    report_dict = None
+                    status = "no_fit"
+                    error_msg = prep_ctx.bailed_reason or "Faible affinité signal/CV."
+                else:
+                    # Fall back to the one-shot call if the agent didn't
+                    # converge — never punish the user for an agent miss.
+                    report = await generate_preparation(
+                        company_name=company_name,
+                        signal_type=signal_type,
+                        recommended_action=recommended_action,
+                        total_score=total_score,
+                        summary_fr=summary_fr,
+                        suggested_angle=suggested_angle,
+                        source=source, url=url, title=title, content=content,
+                        profile=load_user_profile(),
+                        cv_text=cv_payload,
+                    )
+                    report_dict = report.model_dump()
+                    status = "done"
+                    error_msg = None
+            else:
+                report = await generate_preparation(
+                    company_name=company_name,
+                    signal_type=signal_type,
+                    recommended_action=recommended_action,
+                    total_score=total_score,
+                    summary_fr=summary_fr,
+                    suggested_angle=suggested_angle,
+                    source=source, url=url, title=title, content=content,
+                    profile=load_user_profile(),
+                    cv_text=cv_payload,
+                )
+                status = "done"
+                error_msg = None
+                report_dict = report.model_dump()
         except (PreparationError, Exception) as exc:
             status = "failed"
             error_msg = str(exc)[:500]

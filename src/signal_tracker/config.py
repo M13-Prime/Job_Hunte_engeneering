@@ -56,6 +56,14 @@ class Settings(BaseSettings):
     # from config/source_registry.yaml to activate, instead of fetching
     # every configured source. Requires llm_cheap_model.
     llm_source_picker_enabled: bool = False
+    # Phase 11 — agentic loops (LLM + tools). Each agent is opt-in, both
+    # off by default so the existing linear pipeline keeps working.
+    llm_research_agent_enabled: bool = False
+    llm_prep_agent_enabled: bool = False
+    # Per-run safety caps. Budget is best-effort (uses
+    # litellm.completion_cost() to estimate per turn).
+    llm_agent_budget_usd: float = 0.5
+    llm_agent_max_iterations: int = 30
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     gemini_api_key: str | None = None
