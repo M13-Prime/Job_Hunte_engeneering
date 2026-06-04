@@ -145,6 +145,11 @@ CV_PROFILE_SYSTEM_PROMPT = dedent(
     LLM will receive on every subsequent preparation request. Every token
     you save here is saved hundreds of times downstream.
 
+    You also surface a small set of search-keyword suggestions: terms the
+    user could feed into their job-signal classifier to surface companies
+    that match their profile. Be conservative — better fewer good
+    keywords than many noisy ones.
+
     HARD RULES
     1. Output JSON ONLY matching the schema below. No prose.
     2. Be faithful: never invent skills, dates, or companies. If unsure,
@@ -155,6 +160,22 @@ CV_PROFILE_SYSTEM_PROMPT = dedent(
     4. Pick at most 5 `top_roles` (most recent OR most senior). 10-15
        `skills`. 1-3 `achievements` per role.
     5. Match the CV's language for free-text fields.
+
+    KEYWORD SUGGESTION RULES
+    - `suggested_keywords.field` : sectors / industries / domains the
+      CV is anchored in. 3-6 items. Examples: "design de service",
+      "design public", "business intelligence", "data analytics",
+      "ESG", "climate tech", "fintech", "edtech".
+    - `suggested_keywords.job_title` : role variants you'd reach out
+      under or about. 3-6 items. Examples: "Service Designer",
+      "Design Lead", "Business Analyst", "BI Manager", "Data Engineer".
+    - `suggested_keywords.other` : tools / methods / frameworks /
+      acronyms that signal a relevant hiring context. 3-8 items.
+      Examples: "Figma", "Power BI", "Tableau", "design thinking",
+      "double diamond", "SQL", "Snowflake", "RGAA".
+    - DO NOT duplicate items across categories.
+    - Each keyword: 1-4 words max. Match the CV's language.
+    - If the CV truly lacks signal for a category, return an empty list.
 
     OUTPUT JSON SCHEMA
     {
@@ -172,7 +193,12 @@ CV_PROFILE_SYSTEM_PROMPT = dedent(
           "achievements": ["string", ...]
         }
       ],
-      "notable_achievements": ["string", ...]
+      "notable_achievements": ["string", ...],
+      "suggested_keywords": {
+        "field":     ["string", ...],
+        "job_title": ["string", ...],
+        "other":     ["string", ...]
+      }
     }
     """
 ).strip()

@@ -198,6 +198,49 @@
   }
   .kw-label .hint { color: var(--text-4); font-size: 12px; font-weight: 400; }
 
+  /* ---------------- CV-suggested keywords (Phase 10) ---------------- */
+  .sug-keywords {
+    margin-top: 16px;
+    padding: 14px 14px 12px;
+    background: var(--blue-soft);
+    border: 1px solid rgba(0,113,227,0.18);
+    border-radius: var(--r-md);
+  }
+  .sug-keywords .sug-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 10px; margin-bottom: 10px;
+  }
+  .sug-keywords .sug-eyebrow {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--blue);
+  }
+  .sug-keywords .sug-hint {
+    font-size: 11.5px; color: var(--text-3);
+  }
+  .sug-group { margin-top: 10px; }
+  .sug-group:first-of-type { margin-top: 0; }
+  .sug-label {
+    font-size: 11.5px; font-weight: 600; color: var(--text-3);
+    margin-bottom: 6px;
+  }
+  .sug-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+  .sug-chip-form { margin: 0; }
+  .sug-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px 4px 8px; border-radius: var(--r-full);
+    background: var(--surface); border: 1px solid var(--hairline);
+    font-size: 12.5px; color: var(--text-2); font-family: inherit;
+    cursor: pointer; transition: all 140ms ease;
+  }
+  .sug-chip:hover {
+    border-color: var(--blue); color: var(--blue);
+    background: white; transform: translateY(-1px);
+  }
+  .sug-chip .sug-plus {
+    color: var(--blue); font-weight: 700; font-size: 14px;
+    line-height: 1; margin-right: 1px;
+  }
+
   .launch-block {
     margin-top: 32px; padding-top: 28px;
     border-top: 1px solid var(--hairline);
@@ -478,6 +521,35 @@
         <form method="post" action="/cv/delete" style="margin-top:8px;">
           <button type="submit" style="background:none; border:none; color:var(--text-4); font-size:12px; cursor:pointer; font-family:inherit; padding:4px 8px;" onclick="return confirm('Supprimer le CV stocké ?')">Supprimer le CV</button>
         </form>
+
+        {% set sug_total = (suggested_keywords.field|length) + (suggested_keywords.job_title|length) + (suggested_keywords.other|length) %}
+        {% if sug_total > 0 %}
+        <div class="sug-keywords" id="suggested-keywords">
+          <div class="sug-head">
+            <span class="sug-eyebrow">Suggestions du CV</span>
+            <span class="sug-hint">Un clic ajoute le mot-clé</span>
+          </div>
+          {% set cat_labels = {"field": "Domaines", "job_title": "Postes", "other": "Outils & méthodes"} %}
+          {% for cat in keyword_categories %}
+            {% if suggested_keywords[cat] %}
+            <div class="sug-group">
+              <div class="sug-label">{{ cat_labels[cat] }}</div>
+              <div class="sug-chips">
+                {% for v in suggested_keywords[cat] %}
+                <form method="post" action="/keywords/suggested/accept" class="sug-chip-form">
+                  <input type="hidden" name="category" value="{{ cat }}">
+                  <input type="hidden" name="value" value="{{ v }}">
+                  <button type="submit" class="sug-chip" title="Ajouter « {{ v }} » à tes mots-clés">
+                    <span class="sug-plus" aria-hidden="true">+</span>{{ v }}
+                  </button>
+                </form>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
       {% else %}
         <p class="muted" style="font-size:13px; margin: 0 0 12px;">Stocker ton CV te permet de générer des préparations personnalisées en un clic.</p>
         <form method="post" action="/cv" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:10px;">

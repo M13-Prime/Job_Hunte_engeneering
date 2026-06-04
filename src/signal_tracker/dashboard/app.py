@@ -537,12 +537,41 @@ def build_app(db: Database | None = None) -> FastAPI:
             select(UserCV).where(UserCV.user_id == user.id).limit(1)
         ).scalar_one_or_none()
 
+        # CV-suggested keywords (Phase 10): pull from profile_json, filter out
+        # any already present in the user's UserKeyword table so we never
+        # suggest something they've already added.
+        suggested_keywords: dict[str, list[str]] = {c: [] for c in KEYWORD_CATEGORIES}
+        if cv is not None and cv.profile_json:
+            raw_sug = (cv.profile_json or {}).get("suggested_keywords") or {}
+            active_by_cat: dict[str, set[str]] = {
+                c: {k.value.lower() for k in keywords_by_cat.get(c, [])}
+                for c in KEYWORD_CATEGORIES
+            }
+            for cat in KEYWORD_CATEGORIES:
+                items = raw_sug.get(cat) or []
+                if not isinstance(items, list):
+                    continue
+                # De-dupe, drop empties, drop anything already added.
+                seen: set[str] = set()
+                deduped: list[str] = []
+                for item in items:
+                    if not isinstance(item, str):
+                        continue
+                    cleaned = item.strip()
+                    key = cleaned.lower()
+                    if not cleaned or key in seen or key in active_by_cat[cat]:
+                        continue
+                    seen.add(key)
+                    deduped.append(cleaned)
+                suggested_keywords[cat] = deduped[:8]
+
         state = _state_for(user.id)
         return templates.TemplateResponse(
             request, "search.html.j2",
             {
                 "keyword_categories": KEYWORD_CATEGORIES,
                 "keywords_by_cat": keywords_by_cat,
+                "suggested_keywords": suggested_keywords,
                 "runs": runs,
                 "watchlist": watchlist,
                 "cv": cv,
@@ -899,6 +928,32 @@ def build_app(db: Database | None = None) -> FastAPI:
         except IntegrityError:
             session.rollback()
         return RedirectResponse(url="/", status_code=303)
+
+    @app.post("/keywords/suggested/accept")
+    def accept_suggested_keyword(
+        category: Annotated[str, Form()],
+        value: Annotated[str, Form()],
+        user: User = Depends(require_user),
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        """One-click add of a CV-suggested keyword (Phase 10).
+
+        Same insert as POST /keywords but redirects back to / with an
+        anchor so the user lands on the keyword editor and sees the new
+        chip immediately. Silently no-ops on the (user, category, value)
+        unique conflict, same as the regular add route.
+        """
+        if category not in KEYWORD_CATEGORIES:
+            raise HTTPException(status_code=400, detail=f"Invalid category: {category}")
+        clean_value = value.strip()
+        if not clean_value:
+            raise HTTPException(status_code=400, detail="Empty value")
+        session.add(UserKeyword(user_id=user.id, category=category, value=clean_value))
+        try:
+            session.flush()
+        except IntegrityError:
+            session.rollback()
+        return RedirectResponse(url="/#suggested-keywords", status_code=303)
 
     @app.post("/keywords/{keyword_id}/delete")
     def delete_keyword(
