@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -77,6 +78,7 @@ class AgentLoop:
         max_iterations: int = 30,
         temperature: float = 0.2,
         fallback_model: str | None = None,
+        should_continue: Callable[[], bool] | None = None,
     ) -> None:
         self.model = model
         self.system_prompt = system_prompt
@@ -85,6 +87,11 @@ class AgentLoop:
         self.max_iterations = max_iterations
         self.temperature = temperature
         self.fallback_model = fallback_model
+        # Optional cancellation hook: the dashboard's "Cancel" button
+        # flips a flag the caller reads here. We check it at the top of
+        # every turn — the longest stretch without a check is one tool's
+        # execution, which is acceptable.
+        self.should_continue = should_continue
 
     async def run(self, initial_user_message: str) -> AgentResult:
         messages: list[dict[str, Any]] = [
@@ -97,6 +104,15 @@ class AgentLoop:
 
         while iteration < self.max_iterations:
             iteration += 1
+            if self.should_continue is not None and not self.should_continue():
+                logger.info(
+                    "agent.cancelled iteration=%d cost=%.4f",
+                    iteration, total_cost,
+                )
+                return AgentResult(
+                    status="cancelled", iterations=iteration,
+                    total_cost_usd=total_cost, traces=traces,
+                )
             if total_cost >= self.budget_usd:
                 logger.info(
                     "agent.budget_exhausted iteration=%d cost=%.4f cap=%.4f",

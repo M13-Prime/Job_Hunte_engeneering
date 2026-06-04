@@ -211,6 +211,42 @@ class JobOffer(Base):
     dedup_key: Mapped[str] = mapped_column(String(256), index=True)
 
 
+class JobAgentScore(Base):
+    """Per-(user, job_offer) semantic verdict produced by the Jobs Agent.
+
+    The raw JobOffer rows are shared across users (an open position at
+    Acme is the same row for everyone), but the agent's verdict is
+    user-specific: killer_angle, why_now and fit_reasoning all come
+    from one user's CV vs that posting. Storing them on JobOffer would
+    serve user A's angle to user B — wrong.
+
+    The legacy agent_* columns on JobOffer are kept for back-compat
+    (read-only) but new writes go here.
+    """
+
+    __tablename__ = "job_agent_scores"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "job_offer_id", name="uq_job_agent_scores_user_job",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=False
+    )
+    job_offer_id: Mapped[int] = mapped_column(
+        ForeignKey("job_offers.id"), index=True, nullable=False
+    )
+    agent_score: Mapped[float] = mapped_column(Float, default=0.0, index=True)
+    agent_fit_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    agent_killer_angle: Mapped[str | None] = mapped_column(Text, nullable=True)
+    agent_why_now: Mapped[str | None] = mapped_column(Text, nullable=True)
+    processed_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False, index=True
+    )
+
+
 class SearchRun(Base):
     """One launch of the collect+classify pipeline from the dashboard.
 

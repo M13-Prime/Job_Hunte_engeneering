@@ -96,8 +96,8 @@
     Active <code>LLM_JOBS_AGENT_ENABLED</code> et relance une recherche.
   </div>
   {% else %}
-    {% for job in rows %}
-    {% set score = job.agent_score if job.agent_score is not none else job.relevance_score %}
+    {% for job, score_row in rows %}
+    {% set score = score_row.agent_score %}
     {% set tier = "hot" if score >= 75 else ("investigate" if score >= 50 else ("watch" if score >= 25 else "none")) %}
     <a class="job-row" href="{{ job.url }}" target="_blank" rel="noopener noreferrer">
       <span class="score {{ tier }}">{{ "%.0f"|format(score) }}</span>
@@ -107,20 +107,20 @@
           <span>{{ job.company_name }}</span>
           {% if job.location %}<span class="sep">·</span><span>{{ job.location }}</span>{% endif %}
           <span class="sep">·</span><span class="ats">{{ job.ats }}</span>
-          {% if job.agent_score is not none %}<span class="sep">·</span><span>agent ✓</span>{% endif %}
+          <span class="sep">·</span><span>agent ✓</span>
         </div>
       </div>
       <div class="angle">
-        {% if job.agent_killer_angle %}
-          <span class="label">Angle</span>{{ job.agent_killer_angle }}
-        {% elif job.agent_fit_reasoning %}
-          {{ job.agent_fit_reasoning }}
+        {% if score_row.agent_killer_angle %}
+          <span class="label">Angle</span>{{ score_row.agent_killer_angle }}
+        {% elif score_row.agent_fit_reasoning %}
+          {{ score_row.agent_fit_reasoning }}
         {% elif job.matched_roles %}
           <span class="label">Match</span>{{ job.matched_roles|join(", ") }}
         {% endif %}
       </div>
       <div class="meta-right">
-        {% if job.agent_why_now %}<span title="{{ job.agent_why_now }}">⚡ signal récent</span>{% endif %}
+        {% if score_row.agent_why_now %}<span title="{{ score_row.agent_why_now }}">⚡ signal récent</span>{% endif %}
         {% if job.posted_at %}<span>{{ job.posted_at.strftime("%d/%m/%Y") }}</span>{% endif %}
       </div>
     </a>

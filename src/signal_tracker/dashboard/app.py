@@ -35,7 +35,7 @@ from typing import Annotated, Any
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import desc, func, select, update
+from sqlalchemy import and_, desc, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
@@ -120,6 +120,9 @@ def _idle_state() -> dict[str, Any]:
         "current_run_id": None,
         "metrics": {},
         "error": None,
+        # Phase 11.1 — flipped by POST /search/cancel. The task reads
+        # this between steps and inside the Jobs Agent's main loop.
+        "cancel_requested": False,
     }
 
 
@@ -164,8 +167,22 @@ def build_app(db: Database | None = None) -> FastAPI:
         state = _state_for(user_id)
         state.update(
             status="running", step="collect", current_run_id=run_id,
-            metrics={}, error=None,
+            metrics={}, error=None, cancel_requested=False,
         )
+
+        def _cancelled() -> bool:
+            return bool(state.get("cancel_requested"))
+
+        def _finalize_cancelled(metrics_so_far: dict[str, Any]) -> None:
+            state["metrics"] = metrics_so_far
+            state.update(status="cancelled", step=None)
+            with app_db.session() as session:
+                run = session.get(SearchRun, run_id)
+                if run is not None:
+                    run.status = "cancelled"
+                    run.metrics = metrics_so_far
+                    run.finished_at = datetime.now(tz=UTC)
+
         try:
             # Phase 10 feature 3 — let the LLM pick which curated domains
             # to activate for this user. If the registry is empty or the
@@ -193,6 +210,9 @@ def build_app(db: Database | None = None) -> FastAPI:
             state["metrics"]["collect"] = {
                 "fetched": coll.fetched, "new": coll.new, "duplicates": coll.duplicates,
             }
+            if _cancelled():
+                _finalize_cancelled(state["metrics"])
+                return
             state["step"] = "classify"
             # Phase 11 — opt-in Research Agent. Falls back to the linear
             # pipeline when disabled so the existing flow keeps working.
@@ -232,15 +252,22 @@ def build_app(db: Database | None = None) -> FastAPI:
                 "collect": state["metrics"]["collect"],
                 "classify": classify_metrics,
             }
+            if _cancelled():
+                _finalize_cancelled(metrics)
+                return
 
             # Phase 11 — optional Jobs Agent pass. Runs after classify
             # so it can scrape companies that produced fresh signals on
             # this run. Off by default; reuses LLM_AGENT_BUDGET_USD.
+            # The Jobs Agent receives the cancel callback so a click on
+            # "Annuler" stops it inside its main loop (at most one tool
+            # call after the click).
             if settings.llm_jobs_agent_enabled:
                 state["step"] = "jobs"
                 from signal_tracker.agents.jobs_agent import run_jobs_agent
                 jobs_result, jobs_state = await run_jobs_agent(
                     db=app_db, profile=profile, user_id=user_id,
+                    should_continue=lambda: not _cancelled(),
                 )
                 metrics["jobs"] = {
                     "companies_scraped": jobs_state.companies_scraped,
@@ -876,6 +903,23 @@ def build_app(db: Database | None = None) -> FastAPI:
             },
         )
 
+    @app.post("/search/cancel")
+    def cancel_search(
+        user: User = Depends(require_user),
+    ) -> RedirectResponse:
+        """Flip the cancel flag on this user's running task.
+
+        The bg task sees the flag at the next inter-step check (or, for
+        the Jobs Agent, at the top of its next loop turn), finalizes
+        cleanly, and the SearchRun is marked status='cancelled' with
+        partial metrics intact.
+        """
+        state = _state_for(user.id)
+        if state["status"] == "running":
+            state["cancel_requested"] = True
+        return RedirectResponse(url="/", status_code=303)
+
+
     @app.post("/searches/{run_id}/delete")
     def delete_search(
         run_id: int,
@@ -1368,24 +1412,29 @@ def build_app(db: Database | None = None) -> FastAPI:
         user: User = Depends(require_user),
         session: Session = Depends(get_session_dep),
     ) -> HTMLResponse:
-        """Open job offers — agent-scored first, then heuristic, then rest.
+        """Open offers FOR THIS USER.
 
-        Single global listing (not per-user) since job_offers aren't
-        user-scoped today and the agent scores them against the active
-        user's CV at scoring time. Anyone logged in sees the same list.
+        Scope rule: we show an offer iff THIS user has a JobAgentScore
+        row for it. The JobOffer rows themselves stay shared (an open
+        position at Acme is the same posting for everyone), but the
+        agent's verdict — killer_angle, why_now, fit reasoning — is
+        user-specific because it was derived from this user's CV.
         """
+        from signal_tracker.storage.models import JobAgentScore
         rows = list(session.execute(
-            select(JobOffer)
-            .where(JobOffer.is_open.is_(True))
+            select(JobOffer, JobAgentScore)
+            .join(JobAgentScore, JobAgentScore.job_offer_id == JobOffer.id)
+            .where(and_(
+                JobOffer.is_open.is_(True),
+                JobAgentScore.user_id == user.id,
+            ))
             .order_by(
-                # NULLs last so unscored offers appear after agent-scored ones.
-                desc(JobOffer.agent_score.is_not(None)),
-                desc(JobOffer.agent_score),
+                desc(JobAgentScore.agent_score),
                 desc(JobOffer.relevance_score),
                 desc(JobOffer.collected_at),
             )
             .limit(200)
-        ).scalars())
+        ).all())
         state = _state_for(user.id)
         return templates.TemplateResponse(
             request, "jobs_list.html.j2",
