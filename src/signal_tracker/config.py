@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     # Seconds to sleep between consecutive classify() calls in the pipeline.
     # Set to ~7 on Anthropic Tier 1 (30k TPM) to avoid rate-limit retries.
     llm_rate_limit_seconds: float = 0.0
+    # Phase 11.2 — parallelism cap on run_classification. The pipeline
+    # processes up to this many articles concurrently (asyncio.gather +
+    # Semaphore). Keep it under your Anthropic tier's RPM cap; 8 is safe
+    # for paid tier, raise to 16-24 if you have headroom. Setting it to
+    # 1 reverts to the old strictly-sequential loop.
+    llm_concurrency: int = 8
     # Cheap model used for the two-stage classifier prefilter (perf #2) and
     # the CV → CVProfile distillation (perf #7). Falls back to llm_model
     # when unset. Recommended: anthropic/claude-haiku-4-5.

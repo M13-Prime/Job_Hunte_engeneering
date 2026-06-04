@@ -194,8 +194,16 @@ def build_app(db: Database | None = None) -> FastAPI:
                 user_keywords = _keyword_snapshot(session, user_id)
             selection = await pick_sources(profile, user_keywords)
             registry = load_source_registry()
+            # Phase 11.2 — country/language pre-filter. If the user
+            # targets France only, we drop English RSS feeds and add
+            # `sourcelang:french` to GDELT — saves the network round-trip
+            # and reduces the LLM classify backlog.
+            from signal_tracker.utils.geo import geographies_to_languages
+            lang_filter = geographies_to_languages(profile.geographies)
             picker_collectors = (
-                build_collectors_for_selection(selection) if registry else []
+                build_collectors_for_selection(
+                    selection, language_filter=lang_filter,
+                ) if registry else []
             )
             # Persist the picker decision on the SearchRun so the UI can
             # show which domains powered the run later.
@@ -203,8 +211,16 @@ def build_app(db: Database | None = None) -> FastAPI:
                 run = session.get(SearchRun, run_id)
                 if run is not None:
                     run.selected_sources = selection.to_metadata()
+            # Fallback path: if the picker produced nothing (registry
+            # empty), use the default static config but still apply the
+            # language filter so the country pre-filter has effect.
+            if not picker_collectors:
+                from signal_tracker.pipeline import build_default_collectors
+                picker_collectors = build_default_collectors(
+                    language_filter=lang_filter,
+                )
             coll = await run_collection(
-                collectors=picker_collectors or None,
+                collectors=picker_collectors,
                 db=app_db,
             )
             state["metrics"]["collect"] = {

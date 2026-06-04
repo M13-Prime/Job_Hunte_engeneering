@@ -18,7 +18,7 @@ from signal_tracker.classifier.llm import classify, prefilter
 from signal_tracker.classifier.schemas import ClassificationResult, ClassifierInput
 from signal_tracker.collectors.base import BaseCollector, CollectedItem
 from signal_tracker.collectors.france_travail import FranceTravailCollector
-from signal_tracker.collectors.gdelt import GdeltCollector
+from signal_tracker.collectors.gdelt import GdeltCollector, GdeltQuery
 from signal_tracker.collectors.newsapi import NewsApiCollector
 from signal_tracker.collectors.pappers import PappersCollector
 from signal_tracker.collectors.rss import FeedConfig, RSSCollector
@@ -56,7 +56,45 @@ class ClassificationReport:
     prefiltered_out: int = 0  # cheap "no" → skipped expensive call
 
 
-def build_default_collectors() -> list[BaseCollector]:
+def _filter_feeds_by_language(
+    feeds: list[FeedConfig], languages: set[str],
+) -> list[FeedConfig]:
+    """Keep feeds whose language is in `languages`, plus feeds with no
+    language tag (we don't have enough info to exclude them).
+
+    Returns the input unchanged when `languages` is empty (= no filter).
+    """
+    if not languages:
+        return feeds
+    return [f for f in feeds if (f.language or "").lower() in languages or not f.language]
+
+
+def _augment_gdelt_queries(
+    queries: list[GdeltQuery], languages: set[str],
+) -> list[GdeltQuery]:
+    """Prefix each query with a sourcelang clause so GDELT only returns
+    articles in the requested languages.
+
+    Returns the input unchanged when `languages` is empty.
+    """
+    from signal_tracker.utils.geo import languages_to_gdelt_clause
+    clause = languages_to_gdelt_clause(languages)
+    if not clause:
+        return queries
+    return [
+        GdeltQuery(
+            id=q.id,
+            query=f"{q.query} {clause}".strip(),
+            timespan=q.timespan,
+            max_records=q.max_records,
+        )
+        for q in queries
+    ]
+
+
+def build_default_collectors(
+    language_filter: set[str] | None = None,
+) -> list[BaseCollector]:
     """Instantiate collectors enabled in ``config/sources.yaml``.
 
     Each section is gated on either a presence check (RSS feeds list) or an
@@ -66,14 +104,17 @@ def build_default_collectors() -> list[BaseCollector]:
     sources = load_sources()
     settings = get_settings()
     collectors: list[BaseCollector] = []
+    languages = language_filter or set()
 
     rss_feeds = [FeedConfig.from_dict(raw) for raw in sources.get("rss", [])]
+    rss_feeds = _filter_feeds_by_language(rss_feeds, languages)
     if rss_feeds:
         collectors.append(RSSCollector(rss_feeds))
 
     gdelt_cfg = sources.get("gdelt") or {}
     if gdelt_cfg.get("enabled"):
         gdelt_queries = GdeltCollector.queries_from_yaml(gdelt_cfg)
+        gdelt_queries = _augment_gdelt_queries(gdelt_queries, languages)
         if gdelt_queries:
             collectors.append(GdeltCollector(gdelt_queries))
         else:
@@ -124,6 +165,7 @@ def build_default_collectors() -> list[BaseCollector]:
 
 def build_collectors_for_selection(
     selection: PickerSelection,
+    language_filter: set[str] | None = None,
 ) -> list[BaseCollector]:
     """Build collectors restricted to what the dynamic source picker chose.
 
@@ -132,9 +174,17 @@ def build_collectors_for_selection(
     RSS + GDELT collectors are built from the materialized union; the
     other collectors (NewsAPI / Pappers / France Travail) still come
     from the static config because they aren't domain-tagged.
+
+    When `language_filter` is provided (e.g. {"fr"} for a France-only
+    user), RSS feeds outside those languages are dropped and GDELT
+    queries are prefixed with a sourcelang clause — so we never make
+    the network round-trip for content we'd discard at /results anyway.
     """
     registry = load_source_registry()
     feeds, gdelt_queries = materialize_sources(selection, registry)
+    languages = language_filter or set()
+    feeds = _filter_feeds_by_language(feeds, languages)
+    gdelt_queries = _augment_gdelt_queries(gdelt_queries, languages)
     collectors: list[BaseCollector] = []
     if feeds:
         collectors.append(RSSCollector(feeds))
@@ -349,70 +399,87 @@ async def run_classification(
 
     import asyncio as _asyncio  # local import to keep top-level imports tight
 
-    for index, raw in enumerate(backlog):
-        if index > 0 and rate_limit > 0:
-            await _asyncio.sleep(rate_limit)
-        item = ClassifierInput(
-            source=raw.source,
-            url=raw.url,
-            title=raw.title,
-            content=raw.content,
-            published_at=raw.published_at,
-        )
+    # Phase 11.2 — parallel classifier. asyncio.gather under a Semaphore
+    # gives us 1 → N concurrency with a single knob (llm_concurrency).
+    # When concurrency == 1 the behavior matches the old sequential loop
+    # (used by tests + dev where back-pressure matters).
+    concurrency = max(1, int(settings.llm_concurrency))
+    sem = _asyncio.Semaphore(concurrency)
+    # Fail-fast signal: any task that catches a credentials error flips
+    # this. Other tasks check it at their gate and exit cheaply. We can't
+    # cancel siblings cleanly from inside a coroutine in all cases, but
+    # the gate at the top keeps the blast radius to one in-flight call
+    # per concurrency slot.
+    aborted = {"flag": False}
 
-        # Stage 1: cheap prefilter. "no" → mark classified, skip the
-        # expensive call entirely. "yes"/"maybe"/failure → fall through.
-        if prefilter_enabled:
-            verdict = await prefilter(item, profile)
-            if verdict == "no":
-                report.prefiltered_out += 1
-                with db.session() as session:
-                    row = session.get(RawItem, raw.id)
-                    if row is not None:
-                        row.classified = True
-                continue
+    async def _process_one(raw: RawItem) -> None:
+        async with sem:
+            if aborted["flag"]:
+                return
+            # Skip the rate-limit sleep when running concurrently — the
+            # semaphore already does back-pressure, and stacking sleeps
+            # on top would just serialize what we're trying to parallelize.
+            if concurrency == 1 and rate_limit > 0:
+                await _asyncio.sleep(rate_limit)
+            item = ClassifierInput(
+                source=raw.source,
+                url=raw.url,
+                title=raw.title,
+                content=raw.content,
+                published_at=raw.published_at,
+            )
 
-        try:
-            result = await classify(
-                item,
-                profile,
-                extra_examples=feedback_examples,
-                user_keywords=user_keywords or None,
-            )
-        except Exception as exc:
-            report.errors += 1
-            message = str(exc)[:200]
-            logger.error(
-                "pipeline.classify_error",
-                extra={"raw_item_id": raw.id, "error": message},
-            )
-            # Fail-fast on credential errors: no point in burning through the
-            # whole backlog with the same broken key.
-            lowered = message.lower()
-            if "authenticationerror" in lowered or (
-                "missing" in lowered and "api key" in lowered
-            ):
-                logger.error(
-                    "pipeline.aborted_credentials_missing",
-                    extra={"processed_before_abort": report.processed},
+            # Stage 1: cheap prefilter. "no" → mark classified, skip the
+            # expensive call entirely. "yes"/"maybe"/failure → fall through.
+            if prefilter_enabled:
+                verdict = await prefilter(item, profile)
+                if verdict == "no":
+                    report.prefiltered_out += 1
+                    with db.session() as session:
+                        row = session.get(RawItem, raw.id)
+                        if row is not None:
+                            row.classified = True
+                    return
+
+            try:
+                result = await classify(
+                    item,
+                    profile,
+                    extra_examples=feedback_examples,
+                    user_keywords=user_keywords or None,
                 )
-                break
-            continue
+            except Exception as exc:
+                report.errors += 1
+                message = str(exc)[:200]
+                logger.error(
+                    "pipeline.classify_error",
+                    extra={"raw_item_id": raw.id, "error": message},
+                )
+                lowered = message.lower()
+                if "authenticationerror" in lowered or (
+                    "missing" in lowered and "api key" in lowered
+                ):
+                    aborted["flag"] = True
+                    logger.error(
+                        "pipeline.aborted_credentials_missing",
+                        extra={"processed_before_abort": report.processed},
+                    )
+                return
 
-        report.processed += 1
-        with db.session() as session:
-            # Re-attach: load a fresh ORM row in this session.
-            row = session.get(RawItem, raw.id)
-            if row is None:
-                continue
-            row.classified = True
-            if result.is_relevant:
-                report.relevant += 1
-                if _store_signal(session, row, result, search_run_id=search_run_id):
-                    report.signals_created += 1
-                else:
-                    report.signals_deduped += 1
+            report.processed += 1
+            with db.session() as session:
+                row = session.get(RawItem, raw.id)
+                if row is None:
+                    return
+                row.classified = True
+                if result.is_relevant:
+                    report.relevant += 1
+                    if _store_signal(session, row, result, search_run_id=search_run_id):
+                        report.signals_created += 1
+                    else:
+                        report.signals_deduped += 1
 
+    await _asyncio.gather(*(_process_one(raw) for raw in backlog))
     return report
 
 
