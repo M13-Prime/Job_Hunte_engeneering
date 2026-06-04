@@ -212,6 +212,8 @@ def _store_signal(
             signal_type=result.signal_type,
             company_name=result.company_name,
             company_normalized=normalized,
+            hq_country=result.hq_country,
+            active_countries=result.active_countries or None,
             key_persons=[p.model_dump() for p in result.key_persons],
             relevance_score=result.relevance_score,
             urgency_score=result.urgency_score,

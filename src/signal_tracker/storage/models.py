@@ -98,6 +98,11 @@ class Signal(Base):
     signal_type: Mapped[str] = mapped_column(String(64), index=True)
     company_name: Mapped[str] = mapped_column(String(512))
     company_normalized: Mapped[str] = mapped_column(String(512), index=True)
+    # Phase 10: geographic footprint extracted by the classifier.
+    # hq_country is the canonical French name ("France", "Belgique", ...).
+    # active_countries is a JSON array always including hq_country if known.
+    hq_country: Mapped[str | None] = mapped_column(String(96), nullable=True, index=True)
+    active_countries: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
 
     key_persons: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
 

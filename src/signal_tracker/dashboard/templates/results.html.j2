@@ -36,6 +36,46 @@
   .filters select:hover, .filters input[type="number"]:hover { background: rgba(0,0,0,0.04); }
   .filters input[type="number"] { width: 72px; text-align: center; font-variant-numeric: tabular-nums; }
 
+  /* ---------------- Country filter ---------------- */
+  .country-filter { margin-bottom: 18px; }
+  .cf-details {
+    background: var(--surface); border: 1px solid var(--hairline);
+    border-radius: var(--r-md); overflow: hidden;
+  }
+  .cf-details > summary {
+    list-style: none; cursor: pointer;
+    padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+    font-size: 13.5px; color: var(--text-2);
+  }
+  .cf-details > summary::-webkit-details-marker { display: none; }
+  .cf-details > summary:hover { background: rgba(0,0,0,0.02); }
+  .cf-details[open] > summary { border-bottom: 1px solid var(--hairline-2); }
+  .cf-icon svg { width: 16px; height: 16px; }
+  .cf-chev { margin-left: auto; color: var(--text-4); transition: transform 160ms ease; }
+  .cf-details[open] .cf-chev { transform: rotate(180deg); }
+  .cf-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .cf-scope { display: flex; gap: 18px; flex-wrap: wrap; }
+  .cf-radio { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); cursor: pointer; }
+  .cf-radio input { accent-color: var(--green); }
+  .cf-radio em { color: var(--text-3); font-style: italic; }
+  .cf-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .cf-chip {
+    display: inline-flex; align-items: center;
+    padding: 5px 11px; border-radius: var(--r-full);
+    background: var(--surface-2); border: 1px solid var(--hairline);
+    font-size: 12.5px; color: var(--text-2); cursor: pointer;
+    transition: all 140ms ease;
+  }
+  .cf-chip input { display: none; }
+  .cf-chip:hover { border-color: var(--text-3); color: var(--text); }
+  .cf-chip.selected { background: var(--green-soft); border-color: var(--green); color: var(--green-deep); font-weight: 600; }
+  .cf-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
+  @media (max-width: 640px) {
+    .cf-body { padding: 12px; }
+    .cf-scope { gap: 12px; }
+    .cf-chip { padding: 7px 12px; font-size: 13px; }
+  }
+
   .run-banner {
     background: var(--green-soft); border: 1px solid rgba(52,199,89,0.25);
     color: var(--green-deep);
@@ -185,6 +225,16 @@
     background: rgba(0,0,0,0.05); color: var(--text-2);
     padding: 1px 8px; border-radius: var(--r-sm); font-weight: 500;
   }
+  .company-cell .type .country-tag {
+    background: var(--blue-soft); color: var(--blue);
+    padding: 1px 8px; border-radius: var(--r-sm); font-weight: 500;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .company-cell .type .country-tag .country-extra {
+    background: rgba(0,113,227,0.15); color: var(--blue);
+    padding: 0 5px; border-radius: var(--r-sm);
+    font-size: 10.5px; font-weight: 700;
+  }
   .summary {
     color: var(--text-2); margin: 0 0 8px; max-width: 580px; line-height: 1.5;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
@@ -271,8 +321,11 @@
   <h1>Signaux</h1>
   <span class="count-badge mono">{{ rows|length }}</span>
   <div class="spacer"></div>
-  <form class="filters" method="get" action="/results">
+  <form class="filters" method="get" action="/results" id="results-filters">
     {% if run_id %}<input type="hidden" name="run" value="{{ run_id }}">{% endif %}
+    {# Preserve country selections across filter changes #}
+    {% for c in selected_countries %}<input type="hidden" name="country" value="{{ c }}">{% endfor %}
+    <input type="hidden" name="country_scope" value="{{ country_scope }}">
     <span class="filter-label">Feedback</span>
     <select name="feedback" onchange="this.form.submit()">
       <option value="" {% if filter_feedback == "" %}selected{% endif %}>Tous</option>
@@ -285,6 +338,47 @@
     <input type="number" name="min_score" value="{{ min_score }}" min="0" max="100" step="5" onchange="this.form.submit()">
   </form>
 </div>
+
+<form class="country-filter" method="get" action="/results">
+  {% if run_id %}<input type="hidden" name="run" value="{{ run_id }}">{% endif %}
+  {% if filter_feedback %}<input type="hidden" name="feedback" value="{{ filter_feedback }}">{% endif %}
+  {% if min_score %}<input type="hidden" name="min_score" value="{{ min_score }}">{% endif %}
+  <details class="cf-details" {% if selected_countries %}open{% endif %}>
+    <summary>
+      <span class="cf-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      </span>
+      <span>Pays{% if selected_countries %} · <strong>{{ selected_countries|length }} sélectionné{{ 's' if selected_countries|length > 1 else '' }}</strong>{% endif %}</span>
+      <span class="cf-chev" aria-hidden="true">▾</span>
+    </summary>
+    <div class="cf-body">
+      <div class="cf-scope" role="radiogroup" aria-label="Portée du filtre pays">
+        <label class="cf-radio">
+          <input type="radio" name="country_scope" value="any" {% if country_scope == 'any' %}checked{% endif %}>
+          <span>HQ <em>ou</em> activités dans le pays</span>
+        </label>
+        <label class="cf-radio">
+          <input type="radio" name="country_scope" value="hq" {% if country_scope == 'hq' %}checked{% endif %}>
+          <span>HQ uniquement</span>
+        </label>
+      </div>
+      <div class="cf-chips">
+        {% for c in available_countries %}
+        <label class="cf-chip {{ 'selected' if c in selected_countries }}">
+          <input type="checkbox" name="country" value="{{ c }}" {% if c in selected_countries %}checked{% endif %}>
+          <span>{{ c }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <div class="cf-actions">
+        <button type="submit" class="btn btn-sm btn-primary">Appliquer</button>
+        {% if selected_countries or country_scope == 'hq' %}
+        <a href="/results{% if run_id %}?run={{ run_id }}{% endif %}" class="btn btn-sm btn-ghost">Réinitialiser</a>
+        {% endif %}
+      </div>
+    </div>
+  </details>
+</form>
 
 {% if task_status == "running" %}
 <div class="running-banner" id="results-running-banner">
@@ -352,6 +446,12 @@
             {{ signal.signal_type }}
             <span class="sep">·</span>
             <span class="action-tag">{{ signal.recommended_action }}</span>
+            {% if signal.hq_country %}
+            <span class="sep">·</span>
+            <span class="country-tag" title="HQ : {{ signal.hq_country }}{% if signal.active_countries %} · Activités : {{ signal.active_countries|join(', ') }}{% endif %}">
+              {{ signal.hq_country }}{% if signal.active_countries and signal.active_countries|length > 1 %} <span class="country-extra">+{{ signal.active_countries|length - 1 }}</span>{% endif %}
+            </span>
+            {% endif %}
           </div>
           <p class="summary">{{ signal.summary_fr }}</p>
           {% if signal.suggested_angle %}<div class="angle"><strong>Angle :</strong> {{ signal.suggested_angle }}</div>{% endif %}

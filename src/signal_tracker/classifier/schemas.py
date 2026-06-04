@@ -65,6 +65,13 @@ class ClassificationResult(BaseModel):
     signal_type: SignalType
     company_name: str = ""
     company_normalized: str = ""
+    # Geographic footprint (Phase 10): the LLM extracts these from the article
+    # so the user can filter signals by where the company actually operates.
+    # Country names use the French canonical form (e.g. "France", "Belgique",
+    # "Allemagne", "États-Unis") — the prompt enforces this. Empty/None means
+    # unknown, NOT "no countries".
+    hq_country: str | None = None
+    active_countries: list[str] = Field(default_factory=list)
     key_persons: list[KeyPerson] = Field(default_factory=list)
     relevance_score: float = Field(ge=0, le=100)
     urgency_score: float = Field(ge=0, le=100)

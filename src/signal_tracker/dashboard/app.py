@@ -562,6 +562,8 @@ def build_app(db: Database | None = None) -> FastAPI:
         run: Annotated[int | None, Query()] = None,
         feedback: Annotated[str | None, Query()] = None,
         min_score: Annotated[float, Query(ge=0, le=100)] = 0.0,
+        country: Annotated[list[str] | None, Query()] = None,
+        country_scope: Annotated[str, Query()] = "any",
         limit: Annotated[int, Query(ge=1, le=500)] = 200,
         user: User = Depends(require_user),
         session: Session = Depends(get_session_dep),
@@ -603,7 +605,46 @@ def build_app(db: Database | None = None) -> FastAPI:
                 .where(SignalFeedback.action == feedback)
             ))
 
+        # Phase 10 — country filter.
+        # country_scope=hq  → match against Signal.hq_country only
+        # country_scope=any → match against hq_country OR active_countries
+        #                     (= companies present in that country, HQ or not)
+        selected_countries = [c.strip() for c in (country or []) if c.strip()]
+        valid_scope = country_scope if country_scope in {"hq", "any"} else "any"
+        if selected_countries:
+            if valid_scope == "hq":
+                stmt = stmt.where(Signal.hq_country.in_(selected_countries))
+            else:
+                # SQLite can't index JSON-contains, so fall back to LIKE on the
+                # serialized array. Pre-filter on hq_country to keep planning
+                # decent — most matching rows match through HQ anyway.
+                from sqlalchemy import or_
+                conds = [Signal.hq_country.in_(selected_countries)]
+                for c in selected_countries:
+                    # Quoted exact-token match within the JSON array dump.
+                    conds.append(Signal.active_countries.like(f'%"{c}"%'))
+                stmt = stmt.where(or_(*conds))
+
         rows = list(session.execute(stmt))
+
+        # Build the list of countries present in this user's data — drives
+        # the multi-select in the UI.
+        country_rows = session.execute(
+            select(Signal.hq_country)
+            .where(Signal.search_run_id.in_(user_run_ids))
+            .where(Signal.hq_country.is_not(None))
+            .distinct()
+        ).all()
+        available_countries = sorted({c for (c,) in country_rows if c})
+        # Always expose a starter list of common ones so an empty corpus
+        # still has something selectable.
+        STARTER_COUNTRIES = (
+            "France", "Belgique", "Luxembourg", "Suisse", "Allemagne",
+            "Pays-Bas", "Espagne", "Italie", "Royaume-Uni",
+            "Maroc", "Tunisie", "Algérie", "Sénégal",
+            "États-Unis", "Canada",
+        )
+        available_countries = sorted(set(available_countries) | set(STARTER_COUNTRIES))
 
         focus_run_id = run
         if focus_run_id is None:
@@ -627,6 +668,9 @@ def build_app(db: Database | None = None) -> FastAPI:
                 "filter_feedback": feedback or "",
                 "min_score": min_score,
                 "valid_feedback": VALID_FEEDBACK,
+                "selected_countries": selected_countries,
+                "country_scope": valid_scope,
+                "available_countries": available_countries,
                 "run_id": run,
                 "focus_run_id": focus_run_id,
                 "focus_run": focus_run,

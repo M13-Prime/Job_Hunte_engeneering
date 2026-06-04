@@ -44,6 +44,11 @@ _ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("users", "is_approved", "INTEGER NOT NULL DEFAULT 0"),
     ("users", "approved_at", "DATETIME"),
     ("users", "approved_by_id", "INTEGER"),
+    # Phase 10 — country filter. The classifier extracts these on every
+    # new signal; existing rows stay NULL and are treated as "unknown" by
+    # the /results filter.
+    ("signals", "hq_country", "VARCHAR(96)"),
+    ("signals", "active_countries", "JSON"),
 )
 
 # Same story for indexes: create_all() doesn't add new indexes to existing

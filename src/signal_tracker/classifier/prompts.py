@@ -85,6 +85,24 @@ CLASSIFIER_PROMPT_V1 = dedent(
       article explicitly says the person was just appointed / hired.
 
     -----------------
+    GEOGRAPHIC EXTRACTION (Phase 10)
+    -----------------
+    Extract WHERE the company sits and operates:
+    - ``hq_country`` : the country of the company's headquarters. Use the
+      French canonical name: "France", "Belgique", "Allemagne", "Pays-Bas",
+      "Espagne", "Italie", "Royaume-Uni", "Suisse", "Luxembourg",
+      "États-Unis", "Canada", "Maroc", "Tunisie", "Algérie", "Sénégal", etc.
+      If the article doesn't say and you don't know with high confidence,
+      set ``hq_country`` to null.
+    - ``active_countries`` : array of countries (French canonical names) where
+      the company has offices, customers, partnerships, or announced
+      activity. Always include ``hq_country`` itself if known. Empty array
+      if you have no evidence.
+    - Be conservative: better empty than wrong. "European company" without
+      a specific country → empty array. Explicit "lance ses activités en
+      Belgique" → add "Belgique" to active_countries.
+
+    -----------------
     OUTPUT
     -----------------
     Return ONLY a valid JSON object with EXACTLY these keys (no markdown,
@@ -97,6 +115,8 @@ CLASSIFIER_PROMPT_V1 = dedent(
                      | "acquisition" | "regulatory" | "other",
       "company_name": str,
       "company_normalized": str,
+      "hq_country": str | null,
+      "active_countries": [str, ...],
       "key_persons": [{{"name": str, "role": str, "is_new_hire": bool}}],
       "relevance_score": int 0..100,
       "urgency_score": int 0..100,
@@ -127,6 +147,8 @@ CLASSIFIER_PROMPT_V1 = dedent(
       "signal_type": "executive_change",
       "company_name": "Carbone 4",
       "company_normalized": "carbone 4",
+      "hq_country": "France",
+      "active_countries": ["France"],
       "key_persons": [
         {{"name": "Camille Dupont", "role": "Directrice ESG", "is_new_hire": true}}
       ],
@@ -155,6 +177,8 @@ CLASSIFIER_PROMPT_V1 = dedent(
       "signal_type": "funding",
       "company_name": "Sweep",
       "company_normalized": "sweep",
+      "hq_country": "France",
+      "active_countries": ["France", "Royaume-Uni"],
       "key_persons": [],
       "relevance_score": 88,
       "urgency_score": 78,
