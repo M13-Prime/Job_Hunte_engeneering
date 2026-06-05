@@ -257,7 +257,16 @@ async def run_collection(
     collectors: list[BaseCollector] | None = None,
     db: Database | None = None,
 ) -> CollectionReport:
-    """Run all configured collectors and persist new raw items."""
+    """Run all configured collectors and persist new raw items.
+
+    Phase 11.2 — collectors run concurrently via asyncio.gather. The 4-5
+    collectors are independent (different APIs, different network
+    endpoints) so there's nothing to lose by overlapping their HTTP
+    waits. Each `_ingest` opens its own SQLAlchemy session, and asyncio
+    is single-threaded, so the DB writes are still serialized at the
+    event-loop level — safe for both Postgres (prod) and SQLite (dev).
+    """
+    import asyncio as _asyncio
     settings = get_settings()
     if db is None:
         db = init_db(resolve_db_url(settings))
@@ -265,7 +274,8 @@ async def run_collection(
         collectors = build_default_collectors()
 
     report = CollectionReport()
-    for collector in collectors:
+
+    async def _one(collector: BaseCollector) -> None:
         await _ingest(db, collector.collect(), report)
         logger.info(
             "pipeline.collector_done",
@@ -276,6 +286,8 @@ async def run_collection(
                 "duplicates": report.duplicates,
             },
         )
+
+    await _asyncio.gather(*[_one(c) for c in collectors], return_exceptions=False)
     return report
 
 
