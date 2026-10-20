@@ -1,0 +1,136 @@
+{% extends "base.html.j2" %}
+{% block title %}Candidatures — Signal Tracker{% endblock %}
+{% block nav_applications %}active{% endblock %}
+
+{% block extra_css %}
+  main { max-width: 1400px; }
+  .apps-head { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; flex-wrap: wrap; }
+  .apps-head h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.028em; margin: 0; }
+  .apps-head .count-badge {
+    background: rgba(0,0,0,0.06); color: var(--text-3);
+    padding: 4px 12px; border-radius: var(--r-full); font-size: 13px; font-weight: 600;
+  }
+  .apps-sub { color: var(--text-3); font-size: 14px; margin: 0 0 20px; }
+  .flash { background: var(--amber-soft); color: #8a4b00; border-radius: var(--r-md); padding: 12px 16px; font-size: 14px; margin-bottom: 18px; }
+
+  details.add { margin-bottom: 20px; }
+  details.add summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--blue); list-style: none; }
+  details.add summary::-webkit-details-marker { display: none; }
+  .add-form { display: grid; grid-template-columns: 1fr 1fr 1.4fr auto auto; gap: 10px; margin-top: 12px; align-items: end; }
+  @media (max-width: 900px) { .add-form { grid-template-columns: 1fr; } }
+  .add-form label { font-size: 12px; color: var(--text-3); display: block; margin-bottom: 4px; }
+  input[type=text], input[type=url], input[type=date], select, textarea {
+    width: 100%; font: inherit; font-size: 14px; padding: 8px 10px;
+    border: 1px solid var(--hairline); border-radius: var(--r-sm); background: var(--surface); color: var(--text);
+    box-sizing: border-box;
+  }
+  textarea { min-height: 64px; resize: vertical; }
+
+  .board { display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: 14px; overflow-x: auto; padding-bottom: 8px; }
+  @media (max-width: 900px) { .board { grid-template-columns: repeat(5, 82vw); scroll-snap-type: x mandatory; } .col { scroll-snap-align: start; } }
+  .col { background: rgba(0,0,0,0.03); border-radius: var(--r-lg); padding: 12px; min-height: 120px; }
+  .col-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); margin: 2px 4px 10px; }
+  .col-head .n { background: var(--surface); border-radius: var(--r-full); padding: 1px 8px; font-size: 11.5px; }
+  .col.applied .col-head { color: var(--blue); }
+  .col.interview .col-head { color: var(--purple); }
+  .col.offer .col-head { color: var(--green-deep); }
+  .col.rejected .col-head { color: var(--text-4); }
+
+  .app-card { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md); padding: 12px; margin-bottom: 10px; }
+  .app-card.due { border-color: #fdba74; box-shadow: 0 0 0 2px #ffedd5; }
+  .app-card .t { font-weight: 600; font-size: 14px; line-height: 1.3; }
+  .app-card .t a { color: var(--text); }
+  .app-card .c { font-size: 12.5px; color: var(--text-3); margin-top: 2px; }
+  .app-card .dates { font-size: 12px; color: var(--text-3); margin-top: 6px; }
+  .app-card .due-badge { display: inline-block; background: #ffedd5; color: #9a3412; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: var(--r-full); margin-top: 6px; }
+  .app-card .row { display: flex; gap: 6px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .app-card .row form { margin: 0; }
+  .app-card select { padding: 5px 8px; font-size: 12.5px; width: auto; }
+  .app-card details { margin-top: 8px; }
+  .app-card details summary { font-size: 12.5px; color: var(--blue); cursor: pointer; }
+  .app-card .edit { display: grid; gap: 6px; margin-top: 8px; }
+  .app-card .edit label { font-size: 11.5px; color: var(--text-3); }
+  .app-card .notes { font-size: 12.5px; color: var(--text-2); margin-top: 6px; white-space: pre-wrap; }
+  .linkish { background: none; border: none; color: var(--blue); font: inherit; font-size: 12.5px; cursor: pointer; padding: 0; }
+  .linkish.danger { color: var(--red); }
+  .empty-col { font-size: 12.5px; color: var(--text-4); text-align: center; padding: 18px 4px; }
+{% endblock %}
+
+{% block content %}
+<div class="apps-head">
+  <h1>Candidatures</h1>
+  <span class="count-badge mono">{{ total }}</span>
+</div>
+<p class="apps-sub">Ton pipeline de candidatures. Passer une carte en « Postulée » programme une relance automatique ; les relances dues arrivent aussi dans le digest du matin.</p>
+{% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+
+<details class="add card card-sm">
+  <summary>+ Ajouter une candidature à la main</summary>
+  <form class="add-form" method="post" action="/applications">
+    <div><label for="a-company">Entreprise</label><input id="a-company" type="text" name="company_name" required maxlength="512"></div>
+    <div><label for="a-title">Poste</label><input id="a-title" type="text" name="title" required maxlength="512"></div>
+    <div><label for="a-url">Lien de l'offre (optionnel)</label><input id="a-url" type="url" name="url" placeholder="https://…"></div>
+    <div><label for="a-status">Statut</label>
+      <select id="a-status" name="status">{% for s in statuses %}<option value="{{ s }}">{{ status_labels[s] }}</option>{% endfor %}</select></div>
+    <div><button type="submit" class="btn btn-primary btn-sm">Ajouter</button></div>
+  </form>
+</details>
+
+<div class="board">
+  {% for s in statuses %}
+  <section class="col {{ s }}">
+    <div class="col-head"><span>{{ status_labels[s] }}</span><span class="n">{{ columns[s]|length }}</span></div>
+    {% for a in columns[s] %}
+    <article class="app-card {% if a.id in due %}due{% endif %}">
+      <div class="t">
+        {% if a.job_offer_id %}<a href="/jobs/{{ a.job_offer_id }}">{{ a.title }}</a>
+        {% elif a.url %}<a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.title }}</a>
+        {% else %}{{ a.title }}{% endif %}
+      </div>
+      <div class="c">{{ a.company_name }}{% if a.signal_id %} · via un signal{% endif %}</div>
+      <div class="dates">
+        {% if a.applied_at %}Postulée le {{ a.applied_at.strftime("%d/%m/%Y") }}{% else %}Ajoutée le {{ a.created_at.strftime("%d/%m/%Y") }}{% endif %}
+        {% if a.next_followup_at and a.id not in due %} · relance le {{ a.next_followup_at.strftime("%d/%m") }}{% endif %}
+      </div>
+      {% if a.id in due %}<span class="due-badge">⏰ Relance à faire</span>{% endif %}
+      {% if a.notes %}<div class="notes">{{ a.notes }}</div>{% endif %}
+      <div class="row">
+        <form method="post" action="/applications/{{ a.id }}/status">
+          <select name="status" onchange="this.form.submit()" aria-label="Changer le statut">
+            {% for s2 in statuses %}<option value="{{ s2 }}" {% if s2 == a.status %}selected{% endif %}>{{ status_labels[s2] }}</option>{% endfor %}
+          </select>
+          <noscript><button type="submit" class="linkish">OK</button></noscript>
+        </form>
+        {% if a.tailored_at %}
+          <a href="/applications/{{ a.id }}/documents" style="font-size: 12.5px;">CV + lettre</a>
+        {% else %}
+          <form method="post" action="/applications/{{ a.id }}/tailor"
+                onsubmit="window.showLoader && window.showLoader('Rédaction en cours', 'CV adapté + lettre de motivation (~30 s)…');">
+            <button type="submit" class="linkish">Générer CV + lettre</button>
+          </form>
+        {% endif %}
+      </div>
+      <details>
+        <summary>Notes, relance…</summary>
+        <form class="edit" method="post" action="/applications/{{ a.id }}/update">
+          <label for="n-{{ a.id }}">Notes</label>
+          <textarea id="n-{{ a.id }}" name="notes">{{ a.notes or "" }}</textarea>
+          <label for="f-{{ a.id }}">Prochaine relance</label>
+          <input id="f-{{ a.id }}" type="date" name="next_followup_at" value="{{ a.next_followup_at.strftime('%Y-%m-%d') if a.next_followup_at else '' }}">
+          <div class="row">
+            <button type="submit" class="btn btn-ghost btn-sm">Enregistrer</button>
+            {% if a.id in due %}<button type="submit" name="followup_done" value="1" class="btn btn-ghost btn-sm">J'ai relancé</button>{% endif %}
+          </div>
+        </form>
+        <form method="post" action="/applications/{{ a.id }}/delete" onsubmit="return confirm('Supprimer cette candidature ?');" style="margin-top: 8px;">
+          <button type="submit" class="linkish danger">Supprimer</button>
+        </form>
+      </details>
+    </article>
+    {% else %}
+    <div class="empty-col">—</div>
+    {% endfor %}
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

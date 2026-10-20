@@ -75,6 +75,19 @@ class CVRole(BaseModel):
     achievements: list[str] = Field(default_factory=list)
 
 
+class CVSuggestedKeywords(BaseModel):
+    """Search-keyword suggestions derived from the CV (Phase 10).
+
+    Each list is a short set of terms — at most 8 per bucket — the user
+    can one-click add to their search keywords. Categories map directly
+    to the existing UserKeyword.category column so insertion is trivial.
+    """
+
+    field: list[str] = Field(default_factory=list)       # sectors / domains
+    job_title: list[str] = Field(default_factory=list)   # role variants
+    other: list[str] = Field(default_factory=list)       # techs, methods, frameworks
+
+
 class CVProfile(BaseModel):
     """Compact structured CV representation cached on UserCV.
 
@@ -91,3 +104,6 @@ class CVProfile(BaseModel):
     education: list[str] = Field(default_factory=list)
     top_roles: list[CVRole] = Field(default_factory=list)
     notable_achievements: list[str] = Field(default_factory=list)
+    # Phase 10 — keyword suggestions the user can drop straight into their
+    # search keyword editor without re-typing them.
+    suggested_keywords: CVSuggestedKeywords = Field(default_factory=CVSuggestedKeywords)

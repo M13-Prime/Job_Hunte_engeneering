@@ -1,0 +1,148 @@
+{% extends "base.html.j2" %}
+{% block title %}CV + lettre — {{ application.company_name }}{% endblock %}
+{% block nav_applications %}active{% endblock %}
+
+{% block extra_css %}
+  .back { font-size: 14px; display: inline-block; margin-bottom: 16px; }
+  .docs-head { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  .docs-head h1 { font-size: 28px; letter-spacing: -0.025em; }
+  .docs-head .sub { color: var(--text-3); font-size: 14px; margin-top: 6px; }
+  .docs-head .spacer { flex: 1; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+  .toolbar form { margin: 0; }
+
+  .notes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 22px; }
+  @media (max-width: 860px) { .notes-grid { grid-template-columns: 1fr; } }
+  .notes-grid ul { margin: 0; padding-left: 18px; font-size: 13.5px; color: var(--text-2); line-height: 1.55; }
+  .gaps { border-color: #fde68a; background: #fffbeb; }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .tabs button { border: none; background: rgba(0,0,0,0.05); padding: 7px 14px; border-radius: var(--r-full); font: inherit; font-size: 13.5px; cursor: pointer; color: var(--text-2); }
+  .tabs button[aria-selected=true] { background: var(--text); color: white; }
+
+  .paper {
+    background: white; color: #111; max-width: 820px; margin: 0 auto;
+    padding: 44px 52px; border-radius: 6px; border: 1px solid var(--hairline);
+    box-shadow: var(--shadow-md); font-size: 13.5px; line-height: 1.5;
+  }
+  @media (max-width: 640px) { .paper { padding: 24px 18px; } }
+  .paper h2.name { font-size: 26px; letter-spacing: -0.02em; margin: 0; color: #111; }
+  .paper .headline { font-size: 15px; font-weight: 600; margin-top: 4px; color: #1f3a5f; }
+  .paper .contact { font-size: 12.5px; color: #555; margin-top: 4px; }
+  .paper h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #1f3a5f; border-bottom: 1px solid #d9dee5; padding-bottom: 4px; margin: 20px 0 8px; }
+  .paper .exp { margin-bottom: 12px; page-break-inside: avoid; }
+  .paper .exp .h { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .paper .exp .h strong { font-size: 14px; }
+  .paper .exp .when { color: #555; font-size: 12.5px; }
+  .paper ul { margin: 4px 0 0; padding-left: 18px; }
+  .paper li { margin: 2px 0; }
+  .paper .letter { white-space: pre-wrap; font-size: 14px; line-height: 1.65; }
+
+  .hidden { display: none; }
+
+  @media print {
+    @page { margin: 14mm; }
+    body { background: white !important; }
+    .appbar, .mesh-bg, .back, .docs-head, .notes-grid, .tabs, .toast, .page-loader { display: none !important; }
+    main { padding: 0 !important; max-width: none !important; }
+    .paper { box-shadow: none; border: none; padding: 0; max-width: none; }
+    .print-hide { display: none !important; }
+  }
+{% endblock %}
+
+{% block content %}
+<a class="back" href="/applications">← Candidatures</a>
+<div class="docs-head">
+  <div>
+    <h1>{{ application.title }} — {{ application.company_name }}</h1>
+    <div class="sub">Généré le {{ application.tailored_at.strftime("%d/%m/%Y à %H:%M") if application.tailored_at else "—" }} · statut : {{ status_labels[application.status] }}</div>
+  </div>
+  <span class="spacer"></span>
+  <div class="toolbar">
+    <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">Imprimer / PDF</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="copy-btn">Copier</button>
+    <a class="btn btn-ghost btn-sm" href="/applications/{{ application.id }}/cv.md">CV .md</a>
+    <a class="btn btn-ghost btn-sm" href="/applications/{{ application.id }}/letter.txt">Lettre .txt</a>
+    <form method="post" action="/applications/{{ application.id }}/tailor"
+          onsubmit="window.showLoader && window.showLoader('Rédaction en cours', 'CV adapté + lettre de motivation (~30 s)…');">
+      <button type="submit" class="btn btn-link btn-sm">Régénérer</button>
+    </form>
+  </div>
+</div>
+
+<div class="notes-grid">
+  <div class="card card-sm">
+    <h2 class="section-label">Ce qui a été adapté</h2>
+    {% if changes %}<ul>{% for c in changes %}<li>{{ c }}</li>{% endfor %}</ul>{% else %}<p class="muted" style="margin:0;">—</p>{% endif %}
+  </div>
+  <div class="card card-sm gaps">
+    <h2 class="section-label">Exigences non couvertes par ton CV</h2>
+    {% if gaps %}<ul>{% for g in gaps %}<li>{{ g }}</li>{% endfor %}</ul>
+    <p class="muted" style="margin: 8px 0 0; font-size: 12.5px;">Non ajoutées au CV : à aborder honnêtement en entretien, ou à combler.</p>
+    {% else %}<p class="muted" style="margin:0;">Aucune repérée.</p>{% endif %}
+  </div>
+</div>
+
+<div class="tabs" role="tablist">
+  <button type="button" role="tab" aria-selected="true" data-tab="cv">CV adapté</button>
+  <button type="button" role="tab" aria-selected="false" data-tab="letter">Lettre de motivation</button>
+</div>
+
+<article class="paper" id="tab-cv">
+  {% if cv.name %}<h2 class="name">{{ cv.name }}</h2>{% endif %}
+  <div class="headline">{{ cv.headline }}</div>
+  {% if cv.contact_line %}<div class="contact">{{ cv.contact_line }}</div>{% endif %}
+
+  <h3>{{ labels.summary }}</h3>
+  <p style="margin: 0;">{{ cv.summary }}</p>
+
+  {% if cv.skills %}
+  <h3>{{ labels.skills }}</h3>
+  <p style="margin: 0;">{{ cv.skills|join(" · ") }}</p>
+  {% endif %}
+
+  {% if cv.experiences %}
+  <h3>{{ labels.experience }}</h3>
+  {% for e in cv.experiences %}
+  <div class="exp">
+    <div class="h"><strong>{{ e.title }} — {{ e.company }}</strong><span class="when">{{ [e.period, e.location]|select|join(" · ") }}</span></div>
+    {% if e.bullets %}<ul>{% for b in e.bullets %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if cv.education %}<h3>{{ labels.education }}</h3><ul>{% for x in cv.education %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+  {% if cv.certifications %}<h3>{{ labels.certifications }}</h3><ul>{% for x in cv.certifications %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+  {% if cv.languages %}<h3>{{ labels.languages }}</h3><p style="margin: 0;">{{ cv.languages|join(" · ") }}</p>{% endif %}
+</article>
+
+<article class="paper hidden" id="tab-letter">
+  <div class="letter">{{ letter }}</div>
+</article>
+
+<script>
+(function () {
+  var tabs = document.querySelectorAll('.tabs button');
+  var current = 'cv';
+  tabs.forEach(function (b) {
+    b.addEventListener('click', function () {
+      current = b.getAttribute('data-tab');
+      tabs.forEach(function (o) { o.setAttribute('aria-selected', o === b ? 'true' : 'false'); });
+      document.getElementById('tab-cv').classList.toggle('hidden', current !== 'cv');
+      document.getElementById('tab-letter').classList.toggle('hidden', current !== 'letter');
+    });
+  });
+  var copyBtn = document.getElementById('copy-btn');
+  copyBtn.addEventListener('click', function () {
+    var el = document.getElementById(current === 'cv' ? 'tab-cv' : 'tab-letter');
+    var text = el.innerText;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(function () {
+        copyBtn.textContent = 'Copié ✓';
+        setTimeout(function () { copyBtn.textContent = 'Copier'; }, 1600);
+      });
+    }
+  });
+})();
+</script>
+{% endblock %}

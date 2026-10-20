@@ -98,6 +98,11 @@ class Signal(Base):
     signal_type: Mapped[str] = mapped_column(String(64), index=True)
     company_name: Mapped[str] = mapped_column(String(512))
     company_normalized: Mapped[str] = mapped_column(String(512), index=True)
+    # Phase 10: geographic footprint extracted by the classifier.
+    # hq_country is the canonical French name ("France", "Belgique", ...).
+    # active_countries is a JSON array always including hq_country if known.
+    hq_country: Mapped[str | None] = mapped_column(String(96), nullable=True, index=True)
+    active_countries: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
 
     key_persons: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
 
@@ -136,6 +141,8 @@ class DigestSent(Base):
     )
     recipient: Mapped[str] = mapped_column(String(256))
     signal_ids: Mapped[list[int]] = mapped_column(JSON)
+    # Job offers already announced in a digest ("Nouvelles offres").
+    job_offer_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
 
 
 class WatchlistEntry(Base):
@@ -190,10 +197,108 @@ class JobOffer(Base):
     matched_roles: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     is_open: Mapped[bool] = mapped_column(default=True, nullable=False, index=True)
 
+    # Phase 11 — Jobs Agent semantic verdict. NULL until the agent has
+    # reviewed this offer. agent_processed_at is the "I've looked at this"
+    # marker — set even when the agent decides the offer is irrelevant
+    # (so we don't re-score the same row every run).
+    agent_score: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
+    agent_fit_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    agent_killer_angle: Mapped[str | None] = mapped_column(Text, nullable=True)
+    agent_why_now: Mapped[str | None] = mapped_column(Text, nullable=True)
+    agent_processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     collected_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
     dedup_key: Mapped[str] = mapped_column(String(256), index=True)
+
+
+class JobAgentScore(Base):
+    """Per-(user, job_offer) semantic verdict produced by the Jobs Agent.
+
+    The raw JobOffer rows are shared across users (an open position at
+    Acme is the same row for everyone), but the agent's verdict is
+    user-specific: killer_angle, why_now and fit_reasoning all come
+    from one user's CV vs that posting. Storing them on JobOffer would
+    serve user A's angle to user B — wrong.
+
+    The legacy agent_* columns on JobOffer are kept for back-compat
+    (read-only) but new writes go here.
+    """
+
+    __tablename__ = "job_agent_scores"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "job_offer_id", name="uq_job_agent_scores_user_job",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=False
+    )
+    job_offer_id: Mapped[int] = mapped_column(
+        ForeignKey("job_offers.id"), index=True, nullable=False
+    )
+    agent_score: Mapped[float] = mapped_column(Float, default=0.0, index=True)
+    agent_fit_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    agent_killer_angle: Mapped[str | None] = mapped_column(Text, nullable=True)
+    agent_why_now: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Match breakdown (Jobright-style): CV skills that the posting asks
+    # for vs. requirements the CV doesn't evidence. NULL on legacy rows.
+    matched_skills: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    missing_skills: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    processed_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False, index=True
+    )
+
+
+APPLICATION_STATUSES: tuple[str, ...] = (
+    "saved", "applied", "interview", "offer", "rejected",
+)
+
+
+class Application(Base):
+    """One tracked application in the user's pipeline (kanban).
+
+    Either tied to a scraped JobOffer, to a Signal (spontaneous
+    application) or entered by hand (both NULL). Also stores the CV and
+    cover letter tailored for that posting, so the documents live next to
+    the application they were written for.
+    """
+
+    __tablename__ = "applications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=False
+    )
+    job_offer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("job_offers.id"), index=True, nullable=True
+    )
+    signal_id: Mapped[int | None] = mapped_column(
+        ForeignKey("signals.id"), index=True, nullable=True
+    )
+    company_name: Mapped[str] = mapped_column(String(512))
+    title: Mapped[str] = mapped_column(String(512))
+    url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    # One of APPLICATION_STATUSES.
+    status: Mapped[str] = mapped_column(String(16), default="saved", index=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_followup_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
+    # Tailored documents (TailoredCV.model_dump() + plain-text letter).
+    tailored_cv: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    cover_letter: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tailored_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
 
 
 class SearchRun(Base):
@@ -214,6 +319,9 @@ class SearchRun(Base):
     status: Mapped[str] = mapped_column(String(32), default="running", index=True)
     keywords: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     metrics: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    # Phase 10 — what the dynamic source picker chose for this run:
+    # {selected_domain_ids: [...], extra_gdelt_queries: [...], rationale: ...}
+    selected_sources: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False, index=True
@@ -311,7 +419,13 @@ class Preparation(Base):
 # ----------------------------------------------------------------------------
 
 class User(Base):
-    """Email + bcrypt password account. Owns search runs, keywords, CV, etc."""
+    """Email + bcrypt password account. Owns search runs, keywords, CV, etc.
+
+    Approval gate: new signups land with ``is_approved=False`` and cannot
+    log in until an owner approves them via the /admin/users page. The
+    first user to sign up is auto-promoted to owner + approved so the
+    instance is never left without an admin.
+    """
 
     __tablename__ = "users"
 
@@ -320,10 +434,15 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     is_owner: Mapped[bool] = mapped_column(default=False, nullable=False)
+    is_approved: Mapped[bool] = mapped_column(default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    approved_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
 
 
 class SignalFeedback(Base):

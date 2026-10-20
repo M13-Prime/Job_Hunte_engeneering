@@ -1,0 +1,266 @@
+# Source registry — feeds and GDELT queries tagged by domain.
+#
+# Used by the dynamic source picker (signal_tracker/agents/source_picker.py):
+# at search-launch time, an LLM picks which domain(s) match the user's
+# keywords + profile, and the collectors only fetch the union of selected
+# domains' sources. This keeps the corpus tight + relevant per user.
+#
+# Schema (per domain):
+#   <domain_id>:
+#     label:        short human label rendered in the UI
+#     description:  1-2 sentences for the LLM picker (what kind of signals
+#                   live in this domain)
+#     keywords:     example terms the LLM should match against the user's
+#                   keywords to decide if this domain applies
+#     rss:          list of {id, name, url, language} — same shape as
+#                   config/sources.yaml -> rss
+#     gdelt_queries:list of {id, query, timespan?, max_records?} — same
+#                   shape as config/sources.yaml -> gdelt.queries
+#
+# Add new domains by appending blocks here — no code change needed.
+
+domains:
+
+  # ---------------------------------------------------------------------------
+  design_public:
+    label: "Design & design public"
+    description: >
+      Service design, product design, design thinking, public-sector
+      digital service teams (gov.uk, beta.gouv.fr style), design studios,
+      design systems. Signals: appointment of Head of Design, agency
+      hiring sprees, government innovation labs scaling teams.
+    keywords:
+      - design
+      - service designer
+      - design lead
+      - design system
+      - design public
+      - design thinking
+      - UX
+      - product design
+      - beta.gouv
+      - public service design
+    rss:
+      - id: gov_uk_design
+        name: GOV.UK Design blog
+        url: https://design.blog.gov.uk/feed/
+        language: en
+      - id: beta_gouv_blog
+        name: beta.gouv.fr — blog
+        url: https://beta.gouv.fr/rss.xml
+        language: fr
+      - id: smashing_magazine
+        name: Smashing Magazine
+        url: https://www.smashingmagazine.com/feed/
+        language: en
+      - id: gnews_service_designer_fr
+        name: Google News FR — Service Designer
+        url: https://news.google.com/rss/search?q=%22Service+Designer%22+OR+%22Design+Lead%22+France&hl=fr&gl=FR&ceid=FR:fr
+        language: fr
+      - id: gnews_design_public_fr
+        name: Google News FR — design public
+        url: https://news.google.com/rss/search?q=%22design+public%22+OR+%22design+de+service+public%22&hl=fr&gl=FR&ceid=FR:fr
+        language: fr
+    gdelt_queries:
+      - id: design_lead_appointment
+        query: '("Head of Design" OR "Design Director" OR "VP Design") (hires OR appoints OR recrute)'
+        timespan: 24h
+        max_records: 100
+      - id: service_design_agency
+        query: '"service design" (hiring OR "looking for" OR recrutement)'
+        timespan: 24h
+        max_records: 80
+
+  # ---------------------------------------------------------------------------
+  business_intelligence:
+    label: "Business intelligence & data analytics"
+    description: >
+      BI, business analyst, data analyst, data engineer, dashboarding,
+      Power BI / Tableau / Looker / Snowflake. Signals: BI lead
+      appointments, data team expansions, analytics-first scale-ups,
+      enterprises building internal BI practices.
+    keywords:
+      - business intelligence
+      - BI
+      - business analyst
+      - data analyst
+      - data engineer
+      - Power BI
+      - Tableau
+      - Looker
+      - Snowflake
+      - analytics
+      - dashboard
+      - SQL
+    rss:
+      - id: kdnuggets
+        name: KDnuggets
+        url: https://www.kdnuggets.com/feed
+        language: en
+      - id: towards_data_science
+        name: Towards Data Science (Medium)
+        url: https://towardsdatascience.com/feed
+        language: en
+      - id: gnews_bi_manager_fr
+        name: Google News FR — BI Manager / Lead
+        url: https://news.google.com/rss/search?q=%22Head+of+Data%22+OR+%22BI+Manager%22+OR+%22Lead+Data+Analyst%22+France&hl=fr&gl=FR&ceid=FR:fr
+        language: fr
+      - id: gnews_data_team_fr
+        name: Google News FR — équipe data
+        url: https://news.google.com/rss/search?q=%22équipe+data%22+recrute+OR+%22data+analyst%22+recrutement&hl=fr&gl=FR&ceid=FR:fr
+        language: fr
+    gdelt_queries:
+      - id: bi_head_appointment
+        query: '("Head of Data" OR "VP Data" OR "Chief Data Officer" OR "BI Manager") (appoints OR hires OR recrute)'
+        timespan: 24h
+        max_records: 100
+      - id: data_team_expansion
+        query: '("data team" OR "analytics team") (expand OR hiring OR "double")'
+        timespan: 24h
+        max_records: 80
+
+  # ---------------------------------------------------------------------------
+  climate_sustainability:
+    label: "Climate tech & sustainability"
+    description: >
+      Climate tech, ESG, CSRD, sustainability reporting, decarbonation,
+      carbon accounting, green finance, biodiversity tech. Signals:
+      CSO appointments, climate-tech fundraising, first CSRD publications,
+      sustainability team build-outs.
+    keywords:
+      - climate
+      - climate tech
+      - sustainability
+      - ESG
+      - CSRD
+      - decarbonation
+      - net zero
+      - carbon accounting
+      - green finance
+      - greentech
+      - biodiversity
+    rss:
+      - id: novethic
+        name: Novethic
+        url: https://www.novethic.fr/rss.html
+        language: fr
+      - id: carenews
+        name: Carenews
+        url: https://www.carenews.com/rss.xml
+        language: fr
+      - id: greenbiz
+        name: GreenBiz / Trellis
+        url: https://trellis.net/feed/
+        language: en
+      - id: esg_today
+        name: ESG Today
+        url: https://www.esgtoday.com/feed/
+        language: en
+      - id: climate_insider
+        name: Climate Insider
+        url: https://climateinsider.com/feed/
+        language: en
+    gdelt_queries:
+      - id: sustainability_exec_appointment
+        query: '"Chief Sustainability Officer" OR "VP Sustainability" OR "Head of ESG"'
+        timespan: 24h
+        max_records: 100
+      - id: csrd_publication
+        query: '"CSRD" OR "rapport durabilité" sourcelang:fre'
+        timespan: 24h
+        max_records: 100
+      - id: climate_tech_funding
+        query: '"climate tech" (raises OR funding OR "Series A" OR "Series B")'
+        timespan: 24h
+        max_records: 100
+
+  # ---------------------------------------------------------------------------
+  ai_machine_learning:
+    label: "AI & machine learning"
+    description: >
+      AI engineering, ML, LLMs, MLOps, AI compliance (AI Act), Chief AI
+      Officer appointments. Signals: Chief AI Officer hirings, AI team
+      build-outs, foundation-model raises, enterprise AI adoption announces.
+    keywords:
+      - AI
+      - artificial intelligence
+      - intelligence artificielle
+      - machine learning
+      - LLM
+      - MLOps
+      - AI Act
+      - Chief AI Officer
+      - Head of AI
+      - foundation model
+      - generative AI
+    rss:
+      - id: techcrunch
+        name: TechCrunch
+        url: https://techcrunch.com/feed/
+        language: en
+      - id: venturebeat
+        name: VentureBeat
+        url: https://venturebeat.com/feed/
+        language: en
+      - id: mit_tech_review
+        name: MIT Technology Review
+        url: https://www.technologyreview.com/feed/
+        language: en
+      - id: gnews_cao_fr
+        name: Google News FR — Chief AI Officer
+        url: https://news.google.com/rss/search?q=%22Chief+AI+Officer%22+OR+%22Head+of+AI%22+France&hl=fr&gl=FR&ceid=FR:fr
+        language: fr
+    gdelt_queries:
+      - id: ai_exec_appointment
+        query: '"Chief AI Officer" OR "Chief Data Officer" OR "Head of AI"'
+        timespan: 24h
+        max_records: 100
+      - id: ai_act_compliance
+        query: '"AI Act" (compliance OR hiring OR "Chief AI") sourcelang:eng'
+        timespan: 24h
+        max_records: 100
+
+  # ---------------------------------------------------------------------------
+  fr_tech_general:
+    label: "Tech & startups FR / EU"
+    description: >
+      French and European tech / startup news, fundraising rounds,
+      acquisitions, executive appointments — domain-agnostic. Always
+      include this domain as a safety net when the user's keywords don't
+      neatly map to a specific vertical.
+    keywords:
+      - tech
+      - startup
+      - levée
+      - funding
+      - scale-up
+      - acquisition
+      - nomination
+      - appointment
+      - hiring
+    rss:
+      - id: maddyness
+        name: Maddyness
+        url: https://www.maddyness.com/feed/
+        language: fr
+      - id: frenchweb
+        name: Frenchweb
+        url: https://www.frenchweb.fr/feed
+        language: fr
+      - id: usine_digitale
+        name: L'Usine Digitale
+        url: https://www.usine-digitale.fr/rss
+        language: fr
+      - id: sifted
+        name: Sifted
+        url: https://sifted.eu/feed
+        language: en
+      - id: eu_startups
+        name: EU-Startups
+        url: https://www.eu-startups.com/feed/
+        language: en
+      - id: crunchbase_news
+        name: Crunchbase News
+        url: https://news.crunchbase.com/feed/
+        language: en
+    gdelt_queries: []  # no extra GDELT — RSS coverage is already broad

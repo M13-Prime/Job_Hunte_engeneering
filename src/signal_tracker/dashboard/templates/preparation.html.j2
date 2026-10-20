@@ -144,6 +144,30 @@
   }
   .msg-template .copy-btn:hover { background: rgba(255,255,255,0.15); }
 
+  /* ---------------- Mobile (<=640px): smaller heads, no absolute copy ---------------- */
+  @media (max-width: 640px) {
+    .prep-header { gap: 12px; margin-bottom: 18px; }
+    .prep-header h1 { font-size: 22px; line-height: 1.18; }
+    .prep-header .score { min-width: 52px; padding: 8px 12px; font-size: 16px; }
+    .headline-card { padding: 16px 18px; font-size: 15.5px; }
+    .section { margin-bottom: 22px; }
+    .approach-summary { font-size: 14.5px; }
+    .talking-points .chip { font-size: 12.5px; padding: 5px 10px; }
+    /* Stack the copy button above the message instead of overlapping it. */
+    .msg-template {
+      padding: 44px 18px 16px;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+    .msg-template .copy-btn {
+      top: 10px; right: 10px;
+      padding: 8px 14px; font-size: 12px;
+    }
+    .msg-template .label { top: 14px; left: 18px; right: auto; }
+    /* Deep-dive long URLs must not bust the layout. */
+    section .section, .section { overflow-wrap: anywhere; }
+  }
+
   /* Contacts */
   .contact-row {
     display: flex; gap: 14px; padding: 14px; border: 1px solid var(--hairline);
@@ -240,6 +264,11 @@
       · <a href="/results">← Signaux</a>
     </div>
   </div>
+  {% if signal %}
+  <form method="post" action="/signals/{{ signal.id }}/track" style="margin: 0 0 0 auto;">
+    <button type="submit" class="btn btn-ghost btn-sm" title="Ajouter une candidature spontanée à ton suivi">+ Suivre la candidature</button>
+  </form>
+  {% endif %}
 </div>
 
 {% if prep.status == "failed" or not report %}
@@ -337,7 +366,7 @@
           <div class="fallback" style="margin-top:0;"><a href="https://www.google.com/search?q={{ (signal.company_name or '')|urlencode }}+careers" target="_blank" rel="noopener noreferrer">Chercher « {{ signal.company_name }} careers » sur Google</a></div>
         {% endif %}
       </div>
-      {% if report.company_intel.career_page_url %}
+      {% if report.company_intel.career_page_url and report.company_intel.career_page_confidence %}
       <span class="conf {{ report.company_intel.career_page_confidence }}">{{ report.company_intel.career_page_confidence }}</span>
       {% endif %}
     </div>
@@ -370,7 +399,7 @@
 
   <div class="msg-template">
     <span class="label">Premier message</span>
-    <button type="button" class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('msg-text').innerText).then(()=>{this.textContent='Copié ✓'})">Copier</button>
+    <button type="button" class="copy-btn" data-copy-target="msg-text">Copier</button>
     <div id="msg-text" style="margin-top:18px;">{{ report.approach_plan.first_message_template }}</div>
   </div>
 </section>
@@ -398,4 +427,36 @@
 </section>
 
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Copy-to-clipboard with graceful fallback: navigator.clipboard requires
+  // a secure context (https or localhost). On plain http through a tunnel
+  // it's undefined and the old onclick handler silently threw.
+  document.querySelectorAll('[data-copy-target]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var target = document.getElementById(btn.getAttribute('data-copy-target'));
+      if (!target) return;
+      var text = target.innerText;
+      var done = function () { btn.textContent = 'Copié ✓'; setTimeout(function () { btn.textContent = 'Copier'; }, 2000); };
+      var fail = function () { btn.textContent = 'Échec — sélectionne-le'; };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done).catch(fail);
+        return;
+      }
+      // Fallback: temporary textarea + execCommand.
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed'; ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        ok ? done() : fail();
+      } catch (e) { fail(); }
+    });
+  });
+</script>
 {% endblock %}

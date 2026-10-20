@@ -7,7 +7,11 @@ import asyncio
 from rich.console import Console
 
 from signal_tracker.config import get_settings, load_user_profile, resolve_db_url
-from signal_tracker.notifier.digest import DigestBuilder, record_digest_sent
+from signal_tracker.notifier.digest import (
+    DigestBuilder,
+    record_digest_sent,
+    resolve_digest_user_id,
+)
 from signal_tracker.notifier.email import (
     DryRunSender,
     EmailSenderProtocol,
@@ -26,10 +30,20 @@ async def _job() -> None:
     profile = load_user_profile()
     await run_collection(db=db)
     await run_classification(profile=profile, db=db)
+    digest_user_id = resolve_digest_user_id(db, settings.digest_to_email)
+    if settings.jobs_daily_refresh_enabled and digest_user_id is not None:
+        from signal_tracker.jobs.matching import refresh_and_score_for_user
+
+        try:
+            await refresh_and_score_for_user(db, profile, digest_user_id)
+        except Exception as exc:  # never block the digest on the jobs step
+            Console().print(f"[red]jobs step failed: {exc}[/red]")
     data = DigestBuilder(
         db=db,
         profile=profile,
         dashboard_base_url=settings.dashboard_base_url,
+        user_id=digest_user_id,
+        job_alert_threshold=settings.job_alert_threshold,
     ).build()
     rendered = render_digest(data)
 

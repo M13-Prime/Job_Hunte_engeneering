@@ -3,8 +3,17 @@
 <head>
 <meta charset="utf-8">
 <title>{% block title %}Signal Tracker{% endblock %}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#f5f5f7">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1d1d1f" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Signal Tracker">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%2334c759'/><text x='90' y='128' font-family='-apple-system,BlinkMacSystemFont,sans-serif' font-size='110' font-weight='800' text-anchor='middle' fill='white'>S</text></svg>">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%2334c759'/><text x='32' y='46' font-family='-apple-system,BlinkMacSystemFont,sans-serif' font-size='40' font-weight='800' text-anchor='middle' fill='white'>S</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -241,8 +250,56 @@
     padding: 48px var(--container-px) 80px;
   }
   @media (max-width: 720px) {
-    main { padding: 28px 18px 48px; }
-    :root { --container-px: 18px; }
+    main { padding: 24px 16px calc(40px + env(safe-area-inset-bottom)); }
+    :root { --container-px: 16px; --nav-h: 52px; }
+  }
+
+  /* ---------------- Mobile (<= 640px) ---------------- */
+  @media (max-width: 640px) {
+    /* iOS zooms the page when an input has font-size < 16px on focus.
+       Force 16px on every form control to prevent that. */
+    input, select, textarea, button {
+      font-size: 16px !important;
+    }
+    /* Tighter app bar: smaller gap, hide the user email + status text. */
+    .appbar-inner { gap: 12px; padding: 0 14px; }
+    .brand { font-size: 15px; }
+    .brand .logo { width: 22px; height: 22px; font-size: 12px; }
+    .nav { gap: 0; overflow-x: auto; scrollbar-width: none; }
+    .nav::-webkit-scrollbar { display: none; }
+    .nav a { padding: 6px 9px; font-size: 13px; flex-shrink: 0; }
+    /* Status pill collapses to just the dot to free up bar real estate. */
+    .status-pill #status-text { display: none; }
+    .status-pill { padding: 6px 10px; }
+    /* Email is hidden, only the logout icon stays — easier one-thumb logout. */
+    .user-chip .email { display: none; }
+    .user-chip { padding: 4px; gap: 0; background: transparent; border: 0; }
+    .user-chip .logout-btn { width: 32px; height: 32px; }
+    .user-chip .logout-btn svg { width: 16px; height: 16px; }
+    /* Tap targets ≥ 44px high. */
+    .nav a, .btn-sm, .filters select, .filters input[type="number"] {
+      min-height: 36px; display: inline-flex; align-items: center;
+    }
+    .btn { padding: 12px 22px; }
+    .btn-sm { padding: 9px 16px; }
+    .btn-lg { padding: 14px 26px; font-size: 15.5px; }
+    .btn-xl { padding: 15px 28px; font-size: 16px; }
+    /* Cards: slimmer padding + edge-to-edge feel. */
+    .card { padding: 20px 18px; border-radius: var(--r-md); }
+    .card-sm { padding: 16px 18px; }
+    /* Toast: full-width at bottom instead of corner-floating. */
+    .toast {
+      left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom));
+      max-width: none;
+    }
+    /* Loader card: smaller side margins. */
+    .loader-card { min-width: auto; margin: 0 12px; padding: 26px 24px 22px; }
+  }
+
+  /* Honor the safe-area on devices with home indicator / notch. */
+  @supports (padding: env(safe-area-inset-bottom)) {
+    .appbar-inner { padding-left: max(var(--container-px), env(safe-area-inset-left));
+                    padding-right: max(var(--container-px), env(safe-area-inset-right)); }
   }
 
   .card {
@@ -371,6 +428,56 @@
   .toast a { color: var(--blue); }
   .hidden { display: none !important; }
 
+  /* ---------------- Full-page loading overlay ---------------- */
+  .page-loader {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(245,245,247,0.78);
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 220ms ease;
+  }
+  .page-loader.visible { opacity: 1; pointer-events: auto; }
+  .loader-card {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-xl);
+    padding: 32px 38px 28px;
+    text-align: center;
+    box-shadow: 0 24px 64px rgba(11,40,80,0.18), 0 4px 12px rgba(11,40,80,0.06);
+    min-width: 300px; max-width: 380px; margin: 0 18px;
+  }
+  .loader-spin {
+    width: 38px; height: 38px;
+    border: 3px solid var(--hairline);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: ldspin 0.9s linear infinite;
+    margin: 0 auto 18px;
+  }
+  @keyframes ldspin { to { transform: rotate(360deg); } }
+  .loader-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 4px; letter-spacing: -0.012em; }
+  .loader-body { font-size: 13.5px; color: var(--text-3); line-height: 1.5; }
+  .loader-steps {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    margin-top: 16px; font-size: 11.5px; color: var(--text-4);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .loader-steps .dot {
+    width: 5px; height: 5px; border-radius: 50%; background: var(--text-4);
+    opacity: 0.5; animation: ldstep 1.4s ease-in-out infinite;
+  }
+  .loader-steps .dot:nth-child(2) { animation-delay: 0.2s; }
+  .loader-steps .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes ldstep {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; background: var(--green); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .loader-spin, .loader-steps .dot { animation: none; }
+  }
+
   /* ---------------- Tiny helpers ---------------- */
   .muted { color: var(--text-3); }
   .mono { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
@@ -415,6 +522,11 @@
       <a href="/" class="{% block nav_search %}{% endblock %}">Recherche</a>
       <a href="/results" class="{% block nav_results %}{% endblock %}">Résultats</a>
       <a href="/preparations" class="{% block nav_preparations %}{% endblock %}">Préparations</a>
+      <a href="/jobs" class="{% block nav_jobs %}{% endblock %}">Offres</a>
+      <a href="/applications" class="{% block nav_applications %}{% endblock %}">Candidatures</a>
+      {% if user.is_owner %}
+      <a href="/admin/users" class="{% block nav_admin %}{% endblock %}">Admin</a>
+      {% endif %}
     </nav>
     {% endif %}
     <div class="spacer"></div>
@@ -450,6 +562,17 @@
     <div>
       <div class="title" id="toast-title">Analyse en cours</div>
       <div class="body" id="toast-body"></div>
+    </div>
+  </div>
+</div>
+
+<div id="page-loader" class="page-loader" aria-hidden="true">
+  <div class="loader-card">
+    <div class="loader-spin"></div>
+    <div class="loader-title" id="loader-title">Chargement…</div>
+    <div class="loader-body" id="loader-body">Quelques secondes…</div>
+    <div class="loader-steps" aria-hidden="true">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
     </div>
   </div>
 </div>
@@ -493,9 +616,18 @@
       toastTitle.textContent = 'Analyse terminée';
       const rid = state.current_run_id;
       const link = rid ? `/results?run=${rid}` : '/results';
-      toastBody.innerHTML = (fmtMetrics(state.metrics) || '') + ` · <a href="${link}">Voir →</a>`;
+      // Build link safely (rid is numeric) — avoid innerHTML with mixed strings.
+      const metricsText = fmtMetrics(state.metrics) || '';
+      toastBody.textContent = metricsText ? metricsText + ' · ' : '';
+      const a = document.createElement('a');
+      a.href = link; a.textContent = 'Voir →';
+      toastBody.appendChild(a);
       stop();
-      if (lastStatus === 'running') {
+      // Only auto-navigate from the landing page. Anywhere else (a prep
+      // report, preparations list, etc.) we just show the toast — yanking
+      // the user mid-read is annoying.
+      const onLanding = location.pathname === '/' || location.pathname === '';
+      if (lastStatus === 'running' && onLanding) {
         setTimeout(() => { window.location.href = link; }, 1400);
       }
     } else if (status === 'failed') {
@@ -507,9 +639,49 @@
     }
     lastStatus = status;
   }
+  // SSE (perf #4) replaces the 2s polling loop. Falls back to polling if
+  // EventSource is unavailable (very old browsers) or if the SSE connection
+  // errors out repeatedly.
+  let evtSource = null;
+  let fallbackInterval = null;
   function poll() { fetch('/run/status').then(r => r.json()).then(apply).catch(() => {}); }
-  function start() { if (!polling) { polling = setInterval(poll, 2000); poll(); } }
-  function stop() { if (polling) { clearInterval(polling); polling = null; } }
+  function startFallbackPolling() {
+    if (fallbackInterval) return;
+    fallbackInterval = setInterval(poll, 2500);
+    poll();
+  }
+  function stopFallbackPolling() {
+    if (fallbackInterval) { clearInterval(fallbackInterval); fallbackInterval = null; }
+  }
+  function startSSE() {
+    if (typeof EventSource === 'undefined') { startFallbackPolling(); return; }
+    if (evtSource) return;
+    try {
+      evtSource = new EventSource('/run/events');
+    } catch (e) {
+      startFallbackPolling();
+      return;
+    }
+    let consecutiveErrors = 0;
+    evtSource.onmessage = function (ev) {
+      consecutiveErrors = 0;
+      try { apply(JSON.parse(ev.data)); } catch (e) { /* ignore malformed */ }
+    };
+    evtSource.onerror = function () {
+      consecutiveErrors += 1;
+      // After 3 errors give up on SSE and fall back to polling — keeps the
+      // banner alive even when Cloudflare / a corporate proxy strips SSE.
+      if (consecutiveErrors >= 3) {
+        if (evtSource) { evtSource.close(); evtSource = null; }
+        startFallbackPolling();
+      }
+    };
+  }
+  function start() { startSSE(); }
+  function stop() {
+    if (evtSource) { evtSource.close(); evtSource = null; }
+    stopFallbackPolling();
+  }
   if (lastStatus === 'running') start();
   window.__startStatusPolling = start;
 })();
@@ -519,6 +691,30 @@ window.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.fade-in').forEach(function (el, i) {
     setTimeout(function () { el.classList.add('is-visible'); }, 60 + i * 90);
   });
+});
+
+// Reusable page loader. Call from form submit handlers when a request
+// takes more than ~1s (LLM calls, CV upload, etc).
+window.showLoader = function (title, body) {
+  var ld = document.getElementById('page-loader');
+  if (!ld) return;
+  if (title) {
+    var t = document.getElementById('loader-title');
+    if (t) t.textContent = title;
+  }
+  if (body) {
+    var b = document.getElementById('loader-body');
+    if (b) b.textContent = body;
+  }
+  ld.classList.add('visible');
+};
+window.hideLoader = function () {
+  var ld = document.getElementById('page-loader');
+  if (ld) ld.classList.remove('visible');
+};
+// Auto-hide on back/forward navigation so a stuck loader doesn't persist.
+window.addEventListener('pageshow', function (e) {
+  if (e.persisted) window.hideLoader();
 });
 </script>
 {% block extra_js %}{% endblock %}

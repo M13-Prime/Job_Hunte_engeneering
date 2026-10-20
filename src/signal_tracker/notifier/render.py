@@ -22,10 +22,15 @@ class RenderedDigest:
 def _build_subject(data: DigestData) -> str:
     if data.is_empty:
         return f"Signal Tracker — {data.generated_at.strftime('%d %b')} — RAS"
-    return (
+    subject = (
         f"Signal Tracker — {data.generated_at.strftime('%d %b')} — "
         f"{len(data.hot)} chaud · {len(data.investigate)} a investiguer"
     )
+    if data.new_jobs:
+        subject += f" · {len(data.new_jobs)} offre(s)"
+    if data.followups:
+        subject += f" · {len(data.followups)} relance(s)"
+    return subject
 
 
 def _build_environment(templates_dir: Path = TEMPLATES_DIR) -> Environment:

@@ -21,6 +21,7 @@ Routes:
 - GET  /preparations              list (auth)
 - GET  /preparations/{id}         report
 - GET  /healthz
+- /jobs, /applications ...        see dashboard/applications_routes.py
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ from sqlalchemy import desc, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import StreamingResponse
 
 from signal_tracker.auth import (
     SESSION_USER_ID_KEY,
@@ -79,7 +81,36 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 KEYWORD_CATEGORIES = ("field", "job_title", "other")
 
 # Paths that do NOT require an authenticated user.
-PUBLIC_PATHS = {"/healthz", "/login", "/signup", "/logout"}
+PUBLIC_PATHS = {
+    "/healthz", "/login", "/signup", "/logout", "/pending",
+    "/manifest.webmanifest",
+}
+
+# PWA manifest. Inline (no static files needed) — served verbatim by /manifest.webmanifest.
+# Icons use the same green/S motif as the apple-touch-icon defined in base.html.j2.
+_ICON_SVG = (
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'>"
+    "<rect width='512' height='512' rx='112' fill='%2334c759'/>"
+    "<text x='256' y='362' font-family='-apple-system,BlinkMacSystemFont,sans-serif' "
+    "font-size='312' font-weight='800' text-anchor='middle' fill='white'>S</text></svg>"
+)
+PWA_MANIFEST: dict[str, Any] = {
+    "name": "Signal Tracker",
+    "short_name": "Signals",
+    "description": "Détecte les signaux d'embauche avant les offres publiques.",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#f5f5f7",
+    "theme_color": "#34c759",
+    "lang": "fr",
+    "icons": [
+        {"src": _ICON_SVG, "sizes": "any", "type": "image/svg+xml", "purpose": "any"},
+        {"src": _ICON_SVG, "sizes": "192x192", "type": "image/svg+xml", "purpose": "maskable"},
+        {"src": _ICON_SVG, "sizes": "512x512", "type": "image/svg+xml", "purpose": "maskable"},
+    ],
+}
 
 
 def _idle_state() -> dict[str, Any]:
@@ -89,6 +120,9 @@ def _idle_state() -> dict[str, Any]:
         "current_run_id": None,
         "metrics": {},
         "error": None,
+        # Phase 11.1 — flipped by POST /search/cancel. The task reads
+        # this between steps and inside the Jobs Agent's main loop.
+        "cancel_requested": False,
     }
 
 
@@ -120,35 +154,148 @@ def build_app(db: Database | None = None) -> FastAPI:
         return snap
 
     async def _run_search_task(run_id: int, user_id: int) -> None:
-        from signal_tracker.pipeline import run_classification, run_collection
+        from signal_tracker.agents.source_picker import (
+            load_source_registry,
+            pick_sources,
+        )
+        from signal_tracker.pipeline import (
+            build_collectors_for_selection,
+            run_classification,
+            run_collection,
+        )
 
         state = _state_for(user_id)
         state.update(
             status="running", step="collect", current_run_id=run_id,
-            metrics={}, error=None,
+            metrics={}, error=None, cancel_requested=False,
         )
+
+        def _cancelled() -> bool:
+            return bool(state.get("cancel_requested"))
+
+        def _finalize_cancelled(metrics_so_far: dict[str, Any]) -> None:
+            state["metrics"] = metrics_so_far
+            state.update(status="cancelled", step=None)
+            with app_db.session() as session:
+                run = session.get(SearchRun, run_id)
+                if run is not None:
+                    run.status = "cancelled"
+                    run.metrics = metrics_so_far
+                    run.finished_at = datetime.now(tz=UTC)
+
         try:
-            coll = await run_collection(db=app_db)
+            # Phase 10 feature 3 — let the LLM pick which curated domains
+            # to activate for this user. If the registry is empty or the
+            # picker is disabled, this falls back to all domains, then
+            # the collectors fall back to the legacy static config when
+            # there's nothing to materialize.
+            profile = load_user_profile()
+            with app_db.session() as session:
+                user_keywords = _keyword_snapshot(session, user_id)
+            selection = await pick_sources(profile, user_keywords)
+            registry = load_source_registry()
+            # Phase 11.2 — country/language pre-filter. If the user
+            # targets France only, we drop English RSS feeds and add
+            # `sourcelang:french` to GDELT — saves the network round-trip
+            # and reduces the LLM classify backlog.
+            from signal_tracker.utils.geo import geographies_to_languages
+            lang_filter = geographies_to_languages(profile.geographies)
+            picker_collectors = (
+                build_collectors_for_selection(
+                    selection, language_filter=lang_filter,
+                ) if registry else []
+            )
+            # Persist the picker decision on the SearchRun so the UI can
+            # show which domains powered the run later.
+            with app_db.session() as session:
+                run = session.get(SearchRun, run_id)
+                if run is not None:
+                    run.selected_sources = selection.to_metadata()
+            # Fallback path: if the picker produced nothing (registry
+            # empty), use the default static config but still apply the
+            # language filter so the country pre-filter has effect.
+            if not picker_collectors:
+                from signal_tracker.pipeline import build_default_collectors
+                picker_collectors = build_default_collectors(
+                    language_filter=lang_filter,
+                )
+            coll = await run_collection(
+                collectors=picker_collectors,
+                db=app_db,
+            )
             state["metrics"]["collect"] = {
                 "fetched": coll.fetched, "new": coll.new, "duplicates": coll.duplicates,
             }
+            if _cancelled():
+                _finalize_cancelled(state["metrics"])
+                return
             state["step"] = "classify"
-            clf = await run_classification(
-                profile=load_user_profile(),
-                db=app_db,
-                search_run_id=run_id,
-                user_id=user_id,
-            )
-            metrics = {
-                "collect": state["metrics"]["collect"],
-                "classify": {
+            # Phase 11 — opt-in Research Agent. Falls back to the linear
+            # pipeline when disabled so the existing flow keeps working.
+            settings = get_settings()
+            if settings.llm_research_agent_enabled:
+                from signal_tracker.agents.research_agent import run_research_agent
+                agent_result, agent_state = await run_research_agent(
+                    db=app_db, profile=profile, user_id=user_id,
+                    search_run_id=run_id, user_keywords=user_keywords,
+                )
+                classify_metrics: dict[str, Any] = {
+                    "processed": agent_state.processed,
+                    "saved": agent_state.saved,
+                    "signals_created": agent_state.saved,  # alias for the existing UI key
+                    "skipped_prefilter": agent_state.skipped_prefilter,
+                    "errors": agent_state.errors,
+                    "agent_status": agent_result.status,
+                    "agent_cost_usd": round(agent_result.total_cost_usd, 4),
+                    "agent_iterations": agent_result.iterations,
+                }
+            else:
+                clf = await run_classification(
+                    profile=profile,
+                    db=app_db,
+                    search_run_id=run_id,
+                    user_id=user_id,
+                )
+                classify_metrics = {
                     "processed": clf.processed,
                     "relevant": clf.relevant,
                     "signals_created": clf.signals_created,
                     "signals_deduped": clf.signals_deduped,
                     "errors": clf.errors,
-                },
+                    "prefiltered_out": clf.prefiltered_out,
+                }
+            metrics = {
+                "collect": state["metrics"]["collect"],
+                "classify": classify_metrics,
             }
+            if _cancelled():
+                _finalize_cancelled(metrics)
+                return
+
+            # Phase 11 — optional Jobs Agent pass. Runs after classify
+            # so it can scrape companies that produced fresh signals on
+            # this run. Off by default; reuses LLM_AGENT_BUDGET_USD.
+            # The Jobs Agent receives the cancel callback so a click on
+            # "Annuler" stops it inside its main loop (at most one tool
+            # call after the click).
+            if settings.llm_jobs_agent_enabled:
+                state["step"] = "jobs"
+                from signal_tracker.agents.jobs_agent import run_jobs_agent
+                jobs_result, jobs_state = await run_jobs_agent(
+                    db=app_db, profile=profile, user_id=user_id,
+                    should_continue=lambda: not _cancelled(),
+                )
+                metrics["jobs"] = {
+                    "companies_scraped": jobs_state.companies_scraped,
+                    "jobs_added": jobs_state.jobs_added,
+                    "jobs_scored": jobs_state.jobs_scored,
+                    "jobs_skipped": jobs_state.jobs_skipped,
+                    "errors": jobs_state.errors,
+                    "agent_status": jobs_result.status,
+                    "agent_cost_usd": round(jobs_result.total_cost_usd, 4),
+                    "agent_iterations": jobs_result.iterations,
+                }
+
             state["metrics"] = metrics
             state.update(status="done", step=None)
             with app_db.session() as session:
@@ -187,6 +334,13 @@ def build_app(db: Database | None = None) -> FastAPI:
             if accepts_html:
                 return RedirectResponse(url="/login", status_code=303)
             return Response(status_code=401, content="Authentication required")
+        # Phase 9: unapproved users get a holding page; nothing else is
+        # reachable until an admin approves them.
+        if not user.is_approved:
+            accepts_html = "text/html" in (request.headers.get("accept") or "")
+            if accepts_html:
+                return RedirectResponse(url="/pending", status_code=303)
+            return Response(status_code=403, content="Account pending approval")
         return await call_next(request)
 
     # SessionMiddleware is added LAST so it ends up OUTERMOST in the
@@ -205,6 +359,13 @@ def build_app(db: Database | None = None) -> FastAPI:
         user: User | None = getattr(request.state, "user", None)
         if user is None:
             raise HTTPException(status_code=401, detail="Authentication required")
+        return user
+
+    def require_admin(request: Request) -> User:
+        """Owner-only routes. is_owner is the admin bit (Phase 9)."""
+        user = require_user(request)
+        if not user.is_owner:
+            raise HTTPException(status_code=403, detail="Admin access required")
         return user
 
     # =========================================================================
@@ -238,8 +399,12 @@ def build_app(db: Database | None = None) -> FastAPI:
                 },
                 status_code=401,
             )
+        # Phase 9: still let the cookie be set so the holding page recognizes
+        # them, but the middleware will keep them off everything else.
         touch_last_login(session, user)
         login_user(request, user)
+        if not user.is_approved:
+            return RedirectResponse(url="/pending", status_code=303)
         return RedirectResponse(url=_safe_redirect(next), status_code=303)
 
     @app.get("/signup", response_class=HTMLResponse)
@@ -277,16 +442,27 @@ def build_app(db: Database | None = None) -> FastAPI:
                 {"error": err, "task_status": "idle", "current_run_id": None},
                 status_code=400,
             )
+        # Phase 9: the FIRST user to sign up on a fresh instance becomes
+        # owner + auto-approved so the deployment is never admin-less.
+        # Everyone after that lands in /pending until an admin approves.
+        total_users = session.execute(select(func.count(User.id))).scalar_one()
+        is_first = total_users == 0
         user = User(
             email=email_clean,
             password_hash=hash_password(password),
             is_active=True,
-            is_owner=False,
+            is_owner=is_first,
+            is_approved=is_first,
+            approved_at=datetime.now(tz=UTC) if is_first else None,
         )
         session.add(user)
         session.flush()
+        if is_first:
+            user.approved_by_id = user.id  # self-approved
         touch_last_login(session, user)
         login_user(request, user)
+        if not user.is_approved:
+            return RedirectResponse(url="/pending", status_code=303)
         return RedirectResponse(url="/", status_code=303)
 
     @app.post("/logout")
@@ -294,9 +470,144 @@ def build_app(db: Database | None = None) -> FastAPI:
         logout_user(request)
         return RedirectResponse(url="/login", status_code=303)
 
+    @app.get("/pending", response_class=HTMLResponse)
+    def pending(request: Request) -> HTMLResponse:
+        """Holding page for accounts waiting on admin approval."""
+        user: User | None = getattr(request.state, "user", None)
+        return templates.TemplateResponse(
+            request, "pending.html.j2",
+            {
+                "user": user, "task_status": "idle", "current_run_id": None,
+            },
+        )
+
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/manifest.webmanifest")
+    def pwa_manifest() -> JSONResponse:
+        """PWA manifest — lets iOS / Android "Add to Home Screen" produce a
+        standalone-launching shortcut with the right name + icon + theme."""
+        return JSONResponse(
+            PWA_MANIFEST,
+            media_type="application/manifest+json",
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+
+    # =========================================================================
+    # Admin: account validation (Phase 9)
+    # =========================================================================
+    @app.get("/admin/users", response_class=HTMLResponse)
+    def admin_users(
+        request: Request,
+        user: User = Depends(require_admin),
+        session: Session = Depends(get_session_dep),
+    ) -> HTMLResponse:
+        rows = list(session.execute(
+            select(User).order_by(User.is_approved.asc(), desc(User.created_at))
+        ).scalars())
+        pending_count = sum(1 for u in rows if not u.is_approved)
+        return templates.TemplateResponse(
+            request, "admin_users.html.j2",
+            {
+                "users": rows,
+                "pending_count": pending_count,
+                "user": user,
+                "task_status": "idle",
+                "current_run_id": None,
+            },
+        )
+
+    def _act_on_user(
+        session: Session, admin: User, target_id: int,
+    ) -> User:
+        target = session.get(User, target_id)
+        if target is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        if target.id == admin.id:
+            raise HTTPException(
+                status_code=400,
+                detail="Tu ne peux pas modifier ton propre compte ici.",
+            )
+        return target
+
+    @app.post("/admin/users/{user_id}/approve")
+    def admin_approve(
+        user_id: int,
+        admin: User = Depends(require_admin),
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        target = _act_on_user(session, admin, user_id)
+        if not target.is_approved:
+            target.is_approved = True
+            target.is_active = True
+            target.approved_at = datetime.now(tz=UTC)
+            target.approved_by_id = admin.id
+            logger.info(
+                "admin.user_approved by=%s target=%s", admin.email, target.email,
+            )
+        return RedirectResponse(url="/admin/users", status_code=303)
+
+    @app.post("/admin/users/{user_id}/revoke")
+    def admin_revoke(
+        user_id: int,
+        admin: User = Depends(require_admin),
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        target = _act_on_user(session, admin, user_id)
+        if target.is_owner:
+            raise HTTPException(
+                status_code=400,
+                detail="Retire d'abord le rôle admin avant de révoquer.",
+            )
+        target.is_approved = False
+        logger.info(
+            "admin.user_revoked by=%s target=%s", admin.email, target.email,
+        )
+        return RedirectResponse(url="/admin/users", status_code=303)
+
+    @app.post("/admin/users/{user_id}/promote")
+    def admin_promote(
+        user_id: int,
+        admin: User = Depends(require_admin),
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        target = _act_on_user(session, admin, user_id)
+        if not target.is_approved:
+            raise HTTPException(
+                status_code=400,
+                detail="Approuve d'abord le compte avant de le promouvoir.",
+            )
+        target.is_owner = True
+        logger.info(
+            "admin.user_promoted by=%s target=%s", admin.email, target.email,
+        )
+        return RedirectResponse(url="/admin/users", status_code=303)
+
+    @app.post("/admin/users/{user_id}/demote")
+    def admin_demote(
+        user_id: int,
+        admin: User = Depends(require_admin),
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        target = _act_on_user(session, admin, user_id)
+        # Don't let the last admin demote — would lock everyone out of /admin.
+        other_owners = session.execute(
+            select(func.count(User.id))
+            .where(User.is_owner.is_(True))
+            .where(User.id != target.id)
+        ).scalar_one()
+        if other_owners == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Au moins un admin doit rester. Promeus quelqu'un d'autre d'abord.",
+            )
+        target.is_owner = False
+        logger.info(
+            "admin.user_demoted by=%s target=%s", admin.email, target.email,
+        )
+        return RedirectResponse(url="/admin/users", status_code=303)
 
     # =========================================================================
     # Landing
@@ -342,12 +653,41 @@ def build_app(db: Database | None = None) -> FastAPI:
             select(UserCV).where(UserCV.user_id == user.id).limit(1)
         ).scalar_one_or_none()
 
+        # CV-suggested keywords (Phase 10): pull from profile_json, filter out
+        # any already present in the user's UserKeyword table so we never
+        # suggest something they've already added.
+        suggested_keywords: dict[str, list[str]] = {c: [] for c in KEYWORD_CATEGORIES}
+        if cv is not None and cv.profile_json:
+            raw_sug = (cv.profile_json or {}).get("suggested_keywords") or {}
+            active_by_cat: dict[str, set[str]] = {
+                c: {k.value.lower() for k in keywords_by_cat.get(c, [])}
+                for c in KEYWORD_CATEGORIES
+            }
+            for cat in KEYWORD_CATEGORIES:
+                items = raw_sug.get(cat) or []
+                if not isinstance(items, list):
+                    continue
+                # De-dupe, drop empties, drop anything already added.
+                seen: set[str] = set()
+                deduped: list[str] = []
+                for item in items:
+                    if not isinstance(item, str):
+                        continue
+                    cleaned = item.strip()
+                    key = cleaned.lower()
+                    if not cleaned or key in seen or key in active_by_cat[cat]:
+                        continue
+                    seen.add(key)
+                    deduped.append(cleaned)
+                suggested_keywords[cat] = deduped[:8]
+
         state = _state_for(user.id)
         return templates.TemplateResponse(
             request, "search.html.j2",
             {
                 "keyword_categories": KEYWORD_CATEGORIES,
                 "keywords_by_cat": keywords_by_cat,
+                "suggested_keywords": suggested_keywords,
                 "runs": runs,
                 "watchlist": watchlist,
                 "cv": cv,
@@ -367,6 +707,8 @@ def build_app(db: Database | None = None) -> FastAPI:
         run: Annotated[int | None, Query()] = None,
         feedback: Annotated[str | None, Query()] = None,
         min_score: Annotated[float, Query(ge=0, le=100)] = 0.0,
+        country: Annotated[list[str] | None, Query()] = None,
+        country_scope: Annotated[str, Query()] = "any",
         limit: Annotated[int, Query(ge=1, le=500)] = 200,
         user: User = Depends(require_user),
         session: Session = Depends(get_session_dep),
@@ -408,7 +750,46 @@ def build_app(db: Database | None = None) -> FastAPI:
                 .where(SignalFeedback.action == feedback)
             ))
 
+        # Phase 10 — country filter.
+        # country_scope=hq  → match against Signal.hq_country only
+        # country_scope=any → match against hq_country OR active_countries
+        #                     (= companies present in that country, HQ or not)
+        selected_countries = [c.strip() for c in (country or []) if c.strip()]
+        valid_scope = country_scope if country_scope in {"hq", "any"} else "any"
+        if selected_countries:
+            if valid_scope == "hq":
+                stmt = stmt.where(Signal.hq_country.in_(selected_countries))
+            else:
+                # SQLite can't index JSON-contains, so fall back to LIKE on the
+                # serialized array. Pre-filter on hq_country to keep planning
+                # decent — most matching rows match through HQ anyway.
+                from sqlalchemy import or_
+                conds = [Signal.hq_country.in_(selected_countries)]
+                for c in selected_countries:
+                    # Quoted exact-token match within the JSON array dump.
+                    conds.append(Signal.active_countries.like(f'%"{c}"%'))
+                stmt = stmt.where(or_(*conds))
+
         rows = list(session.execute(stmt))
+
+        # Build the list of countries present in this user's data — drives
+        # the multi-select in the UI.
+        country_rows = session.execute(
+            select(Signal.hq_country)
+            .where(Signal.search_run_id.in_(user_run_ids))
+            .where(Signal.hq_country.is_not(None))
+            .distinct()
+        ).all()
+        available_countries = sorted({c for (c,) in country_rows if c})
+        # Always expose a starter list of common ones so an empty corpus
+        # still has something selectable.
+        STARTER_COUNTRIES = (
+            "France", "Belgique", "Luxembourg", "Suisse", "Allemagne",
+            "Pays-Bas", "Espagne", "Italie", "Royaume-Uni",
+            "Maroc", "Tunisie", "Algérie", "Sénégal",
+            "États-Unis", "Canada",
+        )
+        available_countries = sorted(set(available_countries) | set(STARTER_COUNTRIES))
 
         focus_run_id = run
         if focus_run_id is None:
@@ -432,6 +813,9 @@ def build_app(db: Database | None = None) -> FastAPI:
                 "filter_feedback": feedback or "",
                 "min_score": min_score,
                 "valid_feedback": VALID_FEEDBACK,
+                "selected_countries": selected_countries,
+                "country_scope": valid_scope,
+                "available_countries": available_countries,
                 "run_id": run,
                 "focus_run_id": focus_run_id,
                 "focus_run": focus_run,
@@ -475,6 +859,82 @@ def build_app(db: Database | None = None) -> FastAPI:
     @app.get("/run/status")
     def run_status(user: User = Depends(require_user)) -> JSONResponse:
         return JSONResponse(_state_for(user.id))
+
+    @app.get("/run/events")
+    async def run_events(user: User = Depends(require_user)) -> StreamingResponse:
+        """Server-sent events stream for the current user's pipeline state.
+
+        Replaces the 2-3s ``/run/status`` polling with a single long-lived
+        connection that pushes deltas as they happen. Wakes up roughly
+        every 500ms server-side to check the in-memory state dict; only
+        emits an event when the state changed (or after a 15s heartbeat
+        so proxies / Cloudflare don't drop the idle connection).
+        """
+        import json as _json
+
+        async def gen() -> Any:
+            last_serialized: str | None = None
+            heartbeat_every = 15.0
+            last_heartbeat = 0.0
+            elapsed = 0.0
+            poll_interval = 0.5
+            # Emit an initial snapshot so the client renders something
+            # immediately without waiting for a state change.
+            initial = _state_for(user.id)
+            last_serialized = _json.dumps(initial, sort_keys=True, default=str)
+            yield f"data: {last_serialized}\n\n"
+            # Cap the stream lifetime to 10 minutes — clients reconnect
+            # transparently. Avoids leaking connections if the browser
+            # forgets to close.
+            while elapsed < 600.0:
+                await asyncio.sleep(poll_interval)
+                elapsed += poll_interval
+                last_heartbeat += poll_interval
+                state = _state_for(user.id)
+                serialized = _json.dumps(state, sort_keys=True, default=str)
+                if serialized != last_serialized:
+                    yield f"data: {serialized}\n\n"
+                    last_serialized = serialized
+                    last_heartbeat = 0.0
+                elif last_heartbeat >= heartbeat_every:
+                    yield ": heartbeat\n\n"
+                    last_heartbeat = 0.0
+                # Once the run reaches a terminal state and the client has
+                # seen it, close the stream — no point in holding a
+                # connection while idle.
+                if (
+                    state.get("status") in {"done", "failed", "idle"}
+                    and elapsed > 2.0
+                    and serialized == last_serialized
+                ):
+                    break
+
+        return StreamingResponse(
+            gen(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache, no-transform",
+                "X-Accel-Buffering": "no",
+                "Connection": "keep-alive",
+            },
+        )
+
+    @app.post("/search/cancel")
+    def cancel_search(
+        user: User = Depends(require_user),
+    ) -> RedirectResponse:
+        """Flip the cancel flag on this user's running task.
+
+        The bg task sees the flag at the next inter-step check (or, for
+        the Jobs Agent, at the top of its next loop turn), finalizes
+        cleanly, and the SearchRun is marked status='cancelled' with
+        partial metrics intact.
+        """
+        state = _state_for(user.id)
+        if state["status"] == "running":
+            state["cancel_requested"] = True
+        return RedirectResponse(url="/", status_code=303)
+
 
     @app.post("/searches/{run_id}/delete")
     def delete_search(
@@ -601,6 +1061,32 @@ def build_app(db: Database | None = None) -> FastAPI:
         except IntegrityError:
             session.rollback()
         return RedirectResponse(url="/", status_code=303)
+
+    @app.post("/keywords/suggested/accept")
+    def accept_suggested_keyword(
+        category: Annotated[str, Form()],
+        value: Annotated[str, Form()],
+        user: User = Depends(require_user),
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        """One-click add of a CV-suggested keyword (Phase 10).
+
+        Same insert as POST /keywords but redirects back to / with an
+        anchor so the user lands on the keyword editor and sees the new
+        chip immediately. Silently no-ops on the (user, category, value)
+        unique conflict, same as the regular add route.
+        """
+        if category not in KEYWORD_CATEGORIES:
+            raise HTTPException(status_code=400, detail=f"Invalid category: {category}")
+        clean_value = value.strip()
+        if not clean_value:
+            raise HTTPException(status_code=400, detail="Empty value")
+        session.add(UserKeyword(user_id=user.id, category=category, value=clean_value))
+        try:
+            session.flush()
+        except IntegrityError:
+            session.rollback()
+        return RedirectResponse(url="/#suggested-keywords", status_code=303)
 
     @app.post("/keywords/{keyword_id}/delete")
     def delete_keyword(
@@ -765,20 +1251,60 @@ def build_app(db: Database | None = None) -> FastAPI:
             cv_payload = text_value
 
         try:
-            report = await generate_preparation(
-                company_name=company_name,
-                signal_type=signal_type,
-                recommended_action=recommended_action,
-                total_score=total_score,
-                summary_fr=summary_fr,
-                suggested_angle=suggested_angle,
-                source=source, url=url, title=title, content=content,
-                profile=load_user_profile(),
-                cv_text=cv_payload,
-            )
-            status = "done"
-            error_msg = None
-            report_dict: dict[str, Any] | None = report.model_dump()
+            settings = get_settings()
+            if settings.llm_prep_agent_enabled:
+                from signal_tracker.agents.prep_agent import run_prep_agent
+                _agent_res, prep_ctx = await run_prep_agent(
+                    company_name=company_name,
+                    signal_type=signal_type,
+                    recommended_action=recommended_action,
+                    total_score=total_score,
+                    summary_fr=summary_fr,
+                    suggested_angle=suggested_angle,
+                    source=source, url=url, title=title, content=content,
+                    profile=load_user_profile(),
+                    cv_text=cv_payload,
+                )
+                if prep_ctx.final_status == "done" and prep_ctx.final_report:
+                    report_dict: dict[str, Any] | None = prep_ctx.final_report
+                    status = "done"
+                    error_msg = None
+                elif prep_ctx.final_status == "no_fit":
+                    report_dict = None
+                    status = "no_fit"
+                    error_msg = prep_ctx.bailed_reason or "Faible affinité signal/CV."
+                else:
+                    # Fall back to the one-shot call if the agent didn't
+                    # converge — never punish the user for an agent miss.
+                    report = await generate_preparation(
+                        company_name=company_name,
+                        signal_type=signal_type,
+                        recommended_action=recommended_action,
+                        total_score=total_score,
+                        summary_fr=summary_fr,
+                        suggested_angle=suggested_angle,
+                        source=source, url=url, title=title, content=content,
+                        profile=load_user_profile(),
+                        cv_text=cv_payload,
+                    )
+                    report_dict = report.model_dump()
+                    status = "done"
+                    error_msg = None
+            else:
+                report = await generate_preparation(
+                    company_name=company_name,
+                    signal_type=signal_type,
+                    recommended_action=recommended_action,
+                    total_score=total_score,
+                    summary_fr=summary_fr,
+                    suggested_angle=suggested_angle,
+                    source=source, url=url, title=title, content=content,
+                    profile=load_user_profile(),
+                    cv_text=cv_payload,
+                )
+                status = "done"
+                error_msg = None
+                report_dict = report.model_dump()
         except (PreparationError, Exception) as exc:
             status = "failed"
             error_msg = str(exc)[:500]
@@ -919,6 +1445,21 @@ def build_app(db: Database | None = None) -> FastAPI:
                 "user": user,
             },
         )
+
+    # Phase 12 — offers with AI match score, tailored CV + letter,
+    # application tracker. Lives in its own module to keep this one sane.
+    from signal_tracker.dashboard.applications_routes import (
+        register_application_routes,
+    )
+
+    register_application_routes(
+        app,
+        app_db=app_db,
+        templates=templates,
+        require_user=require_user,
+        get_session_dep=get_session_dep,
+        state_for=_state_for,
+    )
 
     return app
 

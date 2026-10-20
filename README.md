@@ -1,6 +1,6 @@
 # Signal Tracker
 
-[![CI](https://github.com/M13-Prime/Score_Simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/M13-Prime/Score_Simulator/actions/workflows/ci.yml)
+[![CI](https://github.com/M13-Prime/Job_Hunte_engeneering/actions/workflows/ci.yml/badge.svg)](https://github.com/M13-Prime/Job_Hunte_engeneering/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Tests](https://img.shields.io/badge/tests-79%20passing-brightgreen)
@@ -211,6 +211,29 @@ make dashboard       # http://127.0.0.1:8000 (uvicorn, --reload)
 - Watchlist d'entreprises prioritaires (ajout / suppression)
 - Le lien "Marquer comme contacté" du digest email pointe ici si
   `DASHBOARD_BASE_URL` est défini.
+
+## Offres, CV adapté et suivi des candidatures (Phase 12)
+
+Inspiré de Jobright.ai, mais branché sur les pages carrières des entreprises
+que tu surveilles (watchlist + signaux), pas sur un agrégateur en retard.
+
+- **`/jobs` — score de match IA** : chaque offre ouverte reçoit un score
+  0-100 contre ton CV, avec ce que ton CV prouve, ce qui manque, l'angle
+  d'attaque et le « pourquoi maintenant » si un signal récent existe.
+  Bouton *Actualiser les offres* (scraping + score en arrière-plan) et
+  *Scorer* offre par offre.
+- **CV adapté + lettre de motivation** : depuis une offre, un clic génère un
+  CV réécrit pour le poste (format ATS) et une lettre, **uniquement à partir
+  des faits de ton CV** ; les exigences non couvertes sont listées à part.
+  Export : impression → PDF, `.md`, `.txt`.
+- **`/applications` — suivi kanban** : À postuler → Postulée → Entretien →
+  Offre / Refus, notes, relance automatique J+7 après « Postulée ».
+- **Digest du matin** : nouvelles offres avec un score ≥ `JOB_ALERT_THRESHOLD`
+  et relances dues, pour le compte `DIGEST_TO_EMAIL` (ou le propriétaire).
+
+Coût : un appel LLM léger par offre scorée (plafonné par
+`JOBS_AUTO_SCORE_LIMIT`), un appel par CV adapté. Rien n'est envoyé
+automatiquement aux recruteurs.
 
 ## Garde-fous
 

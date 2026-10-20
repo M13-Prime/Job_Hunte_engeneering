@@ -83,10 +83,20 @@ def cv_profile_to_prompt_block(profile: CVProfile) -> str:
 
 
 async def generate_cv_profile(cv_text: str) -> CVProfile:
-    """One-shot LLM call: raw CV text → compact CVProfile JSON."""
+    """One-shot LLM call: raw CV text → compact CVProfile JSON.
+
+    Uses ``llm_cheap_model`` when set (e.g. Haiku) — this step is structure
+    extraction from clean text, no reasoning needed, so a 10x cheaper /
+    3x faster model is the right default. Falls back to ``llm_model`` when
+    the cheap model isn't configured.
+    """
     settings = get_settings()
-    model = settings.llm_model
-    fallbacks = _resolve_fallbacks(settings.llm_fallback_model)
+    model = settings.llm_cheap_model or settings.llm_model
+    # Fall back to the main model if the cheap call fails for any reason.
+    fallbacks_source = settings.llm_fallback_model or (
+        settings.llm_model if settings.llm_cheap_model else None
+    )
+    fallbacks = _resolve_fallbacks(fallbacks_source)
 
     messages = [
         {"role": "system", "content": CV_PROFILE_SYSTEM_PROMPT},

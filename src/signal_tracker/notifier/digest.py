@@ -8,8 +8,14 @@ Three sections per the brief:
                                           signals (score < 60) in the last
                                           ``watch_window_days`` days.
 
-Signals that have already been included in a previous digest are filtered
-out using the ``digests_sent`` table.
+Phase 12 adds two per-user sections (only when ``user_id`` is given):
+
+4. 💼 "Nouvelles offres"  — open offers collected recently whose AI match
+                             score for this user is >= ``job_alert_threshold``.
+5. ⏰ "Relances à faire"  — tracked applications whose follow-up date is due.
+
+Signals and offers that have already been included in a previous digest
+are filtered out using the ``digests_sent`` table.
 """
 
 from __future__ import annotations
@@ -18,12 +24,19 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from signal_tracker.config import UserProfile
 from signal_tracker.storage import Database
-from signal_tracker.storage.models import DigestSent, RawItem, Signal
+from signal_tracker.storage.models import (
+    Application,
+    DigestSent,
+    JobAgentScore,
+    JobOffer,
+    RawItem,
+    Signal,
+)
 
 HOT_THRESHOLD = 80.0
 INVESTIGATE_THRESHOLD = 60.0
@@ -59,6 +72,32 @@ class WatchEntry:
 
 
 @dataclass(slots=True)
+class DigestJob:
+    """A new open offer with a strong AI match score for the user."""
+
+    id: int
+    score: float
+    company_name: str
+    title: str
+    location: str | None
+    url: str
+    killer_angle: str | None
+    fit_reasoning: str | None
+
+
+@dataclass(slots=True)
+class DigestFollowup:
+    """A tracked application whose follow-up date is due."""
+
+    id: int
+    company_name: str
+    title: str
+    status: str
+    applied_at: datetime | None
+    due_at: datetime
+
+
+@dataclass(slots=True)
 class DigestData:
     """Everything the template needs to render one digest email."""
 
@@ -68,6 +107,8 @@ class DigestData:
     investigate: list[DigestSignal] = field(default_factory=list)
     watch: list[WatchEntry] = field(default_factory=list)
     dashboard_base_url: str | None = None
+    new_jobs: list[DigestJob] = field(default_factory=list)
+    followups: list[DigestFollowup] = field(default_factory=list)
 
     @property
     def total_signal_count(self) -> int:
@@ -75,7 +116,10 @@ class DigestData:
 
     @property
     def is_empty(self) -> bool:
-        return not (self.hot or self.investigate or self.watch)
+        return not (
+            self.hot or self.investigate or self.watch
+            or self.new_jobs or self.followups
+        )
 
 
 def _signal_to_view(signal: Signal, raw: RawItem | None) -> DigestSignal:
@@ -105,6 +149,14 @@ def _load_already_sent_ids(session: Session) -> set[int]:
     return sent
 
 
+def _load_already_sent_job_ids(session: Session) -> set[int]:
+    sent: set[int] = set()
+    for row in session.execute(select(DigestSent.job_offer_ids)).scalars():
+        for jid in row or []:
+            sent.add(int(jid))
+    return sent
+
+
 class DigestBuilder:
     """Read signals from the DB and structure them into ``DigestData``."""
 
@@ -113,10 +165,14 @@ class DigestBuilder:
         db: Database,
         profile: UserProfile | None = None,
         dashboard_base_url: str | None = None,
+        user_id: int | None = None,
+        job_alert_threshold: float = 60.0,
     ) -> None:
         self.db = db
         self.profile = profile
         self.dashboard_base_url = dashboard_base_url
+        self.user_id = user_id
+        self.job_alert_threshold = job_alert_threshold
 
     def build(
         self,
@@ -187,6 +243,12 @@ class DigestBuilder:
             )
         watch.sort(key=lambda w: w.count, reverse=True)
 
+        new_jobs: list[DigestJob] = []
+        followups: list[DigestFollowup] = []
+        if self.user_id is not None:
+            new_jobs = self._new_jobs(cutoff_recent)
+            followups = self._due_followups(now)
+
         return DigestData(
             generated_at=now,
             user_name=(self.profile.name if self.profile else None),
@@ -194,16 +256,98 @@ class DigestBuilder:
             investigate=investigate,
             watch=watch,
             dashboard_base_url=self.dashboard_base_url,
+            new_jobs=new_jobs,
+            followups=followups,
         )
+
+    def _new_jobs(self, since: datetime, limit: int = 10) -> list[DigestJob]:
+        # DB columns are naive UTC; compare with a naive cutoff.
+        naive_since = since.replace(tzinfo=None)
+        with self.db.session() as session:
+            sent = _load_already_sent_job_ids(session)
+            rows = list(session.execute(
+                select(JobOffer, JobAgentScore)
+                .join(JobAgentScore, JobAgentScore.job_offer_id == JobOffer.id)
+                .where(and_(
+                    JobAgentScore.user_id == self.user_id,
+                    JobAgentScore.agent_score >= self.job_alert_threshold,
+                    JobOffer.is_open.is_(True),
+                    JobOffer.collected_at >= naive_since,
+                ))
+                .order_by(JobAgentScore.agent_score.desc())
+            ).all())
+        out: list[DigestJob] = []
+        for job, score in rows:
+            if job.id in sent:
+                continue
+            out.append(DigestJob(
+                id=job.id,
+                score=float(score.agent_score),
+                company_name=job.company_name,
+                title=job.title,
+                location=job.location,
+                url=job.url,
+                killer_angle=score.agent_killer_angle,
+                fit_reasoning=score.agent_fit_reasoning,
+            ))
+            if len(out) >= limit:
+                break
+        return out
+
+    def _due_followups(self, now: datetime) -> list[DigestFollowup]:
+        naive_now = now.replace(tzinfo=None)
+        with self.db.session() as session:
+            rows = list(session.execute(
+                select(Application)
+                .where(and_(
+                    Application.user_id == self.user_id,
+                    Application.status.in_(("applied", "interview")),
+                    Application.next_followup_at.is_not(None),
+                    Application.next_followup_at <= naive_now,
+                ))
+                .order_by(Application.next_followup_at)
+            ).scalars())
+        return [
+            DigestFollowup(
+                id=a.id,
+                company_name=a.company_name,
+                title=a.title,
+                status=a.status,
+                applied_at=a.applied_at,
+                due_at=a.next_followup_at,  # type: ignore[arg-type]
+            )
+            for a in rows
+        ]
+
+
+def resolve_digest_user_id(db: Database, email: str | None) -> int | None:
+    """Whose offers/applications go in the digest: the account matching
+    DIGEST_TO_EMAIL, else the instance owner, else nobody."""
+    from signal_tracker.storage.models import User
+
+    with db.session() as session:
+        if email:
+            uid = session.execute(
+                select(User.id).where(User.email == email.strip().lower())
+            ).scalar_one_or_none()
+            if uid is not None:
+                return int(uid)
+        owner = session.execute(
+            select(User.id).where(User.is_owner.is_(True)).order_by(User.id).limit(1)
+        ).scalar_one_or_none()
+        return int(owner) if owner is not None else None
 
 
 def record_digest_sent(db: Database, recipient: str, data: DigestData) -> None:
-    """Persist a row in ``digests_sent`` so signals don't reappear later."""
+    """Persist a row in ``digests_sent`` so signals/offers don't reappear later."""
     signal_ids = [s.id for s in data.hot] + [s.id for s in data.investigate]
-    if not signal_ids:
+    job_ids = [j.id for j in data.new_jobs]
+    if not signal_ids and not job_ids:
         return
     with db.session() as session:
-        session.add(DigestSent(recipient=recipient, signal_ids=signal_ids))
+        session.add(DigestSent(
+            recipient=recipient, signal_ids=signal_ids, job_offer_ids=job_ids or None,
+        ))
 
 
 __all__ = [
@@ -211,7 +355,10 @@ __all__ = [
     "INVESTIGATE_THRESHOLD",
     "DigestBuilder",
     "DigestData",
+    "DigestFollowup",
+    "DigestJob",
     "DigestSignal",
     "WatchEntry",
     "record_digest_sent",
+    "resolve_digest_user_id",
 ]

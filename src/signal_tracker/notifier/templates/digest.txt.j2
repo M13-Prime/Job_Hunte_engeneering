@@ -31,6 +31,26 @@ Pas de nouveau signal aujourd'hui.
 {% endfor %}
 {% endif %}
 
+{% if data.new_jobs %}
+=== NOUVELLES OFFRES POUR TOI (match IA) ===
+{% for j in data.new_jobs %}
+[{{ "%.0f"|format(j.score) }}/100] {{ j.title }} — {{ j.company_name }}{% if j.location %} ({{ j.location }}){% endif %}
+
+  {% if j.killer_angle %}Angle : {{ j.killer_angle }}{% elif j.fit_reasoning %}{{ j.fit_reasoning }}{% endif %}
+
+  {{ j.url }}
+
+{% endfor %}
+{% endif %}
+
+{% if data.followups %}
+=== RELANCES A FAIRE ===
+{% for f in data.followups %}
+{{ f.company_name }} — {{ f.title }}{% if f.applied_at %} (postule le {{ f.applied_at.strftime("%d/%m") }}){% endif %}
+
+{% endfor %}
+{% endif %}
+
 {% if data.watch %}
 === VEILLE EN COURS ===
 {% for w in data.watch %}

@@ -24,6 +24,7 @@ def db(tmp_path: Path) -> Database:
             password_hash=hash_password("password"),
             is_active=True,
             is_owner=True,
+            is_approved=True,
         ))
     return db
 
@@ -120,6 +121,21 @@ def test_index_renders_keyword_chips(client: TestClient, db: Database) -> None:
 # Pipeline launcher
 # ---------------------------------------------------------------------------
 
+def test_manifest_is_publicly_accessible(db: Database) -> None:
+    """The PWA manifest must be reachable WITHOUT auth — iOS / Android
+    fetch it during 'Add to Home Screen' without the user's cookies."""
+    unauth = TestClient(build_app(db=db))
+    resp = unauth.get("/manifest.webmanifest")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["name"] == "Signal Tracker"
+    assert body["display"] == "standalone"
+    assert body["start_url"] == "/"
+    assert any("S" in icon.get("src", "") or "svg" in icon.get("type", "")
+               for icon in body["icons"])
+    assert resp.headers["content-type"].startswith("application/manifest+json")
+
+
 def test_run_status_starts_idle(client: TestClient) -> None:
     response = client.get("/run/status")
     assert response.status_code == 200
@@ -140,6 +156,7 @@ def test_launch_search_kicks_background_task(
     async def fake_classify(*_args: Any, **_kwargs: Any) -> Any:
         class R:
             processed, relevant, signals_created, signals_deduped, errors = 5, 2, 2, 0, 0
+            prefiltered_out = 0
         return R()
 
     monkeypatch.setattr("signal_tracker.pipeline.run_collection", fake_collect)
@@ -182,6 +199,7 @@ def test_launch_while_running_is_ignored(
     async def fake_classify(*_args: Any, **_kwargs: Any) -> Any:
         class R:
             processed, relevant, signals_created, signals_deduped, errors = 0, 0, 0, 0, 0
+            prefiltered_out = 0
         return R()
 
     monkeypatch.setattr("signal_tracker.pipeline.run_collection", slow_collect)

@@ -41,6 +41,50 @@ class Settings(BaseSettings):
     # Seconds to sleep between consecutive classify() calls in the pipeline.
     # Set to ~7 on Anthropic Tier 1 (30k TPM) to avoid rate-limit retries.
     llm_rate_limit_seconds: float = 0.0
+    # Phase 11.2 — parallelism cap on run_classification. The pipeline
+    # processes up to this many articles concurrently (asyncio.gather +
+    # Semaphore). Keep it under your Anthropic tier's RPM cap; 8 is safe
+    # for paid tier, raise to 16-24 if you have headroom. Setting it to
+    # 1 reverts to the old strictly-sequential loop.
+    llm_concurrency: int = 8
+    # Cheap model used for the two-stage classifier prefilter (perf #2) and
+    # the CV → CVProfile distillation (perf #7). Falls back to llm_model
+    # when unset. Recommended: anthropic/claude-haiku-4-5.
+    llm_cheap_model: str | None = None
+    # Opt-in: if true, every article goes through a Haiku yes/no/maybe
+    # prefilter before the full Sonnet classification. Cuts cost and time
+    # ~60-70% when the news corpus is mostly noise. Requires llm_cheap_model.
+    llm_prefilter_enabled: bool = False
+    # Opt-in: send Anthropic prompt caching headers on the classifier
+    # system prompt. No-op for non-Anthropic providers.
+    llm_prompt_cache_enabled: bool = True
+    # Opt-in: at search-launch time, an LLM picks which curated domains
+    # from config/source_registry.yaml to activate, instead of fetching
+    # every configured source. Requires llm_cheap_model.
+    llm_source_picker_enabled: bool = False
+    # Phase 11 — agentic loops (LLM + tools). Each agent is opt-in, both
+    # off by default so the existing linear pipeline keeps working.
+    llm_research_agent_enabled: bool = False
+    llm_prep_agent_enabled: bool = False
+    # Phase 11 — Jobs Agent: post-classify pass that scrapes ATS boards
+    # for signal-bearing companies and semantically rescores the offers.
+    llm_jobs_agent_enabled: bool = False
+    # Per-run safety caps. Budget is best-effort (uses
+    # litellm.completion_cost() to estimate per turn).
+    llm_agent_budget_usd: float = 0.5
+    llm_agent_max_iterations: int = 30
+    # Phase 12 — job alerts. The daily run refreshes the ATS boards of the
+    # user's watchlist + signal companies, then AI-scores at most
+    # `jobs_auto_score_limit` new offers (cheap model, ~1 call each) whose
+    # keyword score is >= `jobs_auto_score_min_heuristic`. Offers scoring
+    # >= `job_alert_threshold` land in the morning digest. Set the limit
+    # to 0 to keep scoring 100% manual (button on /jobs).
+    jobs_daily_refresh_enabled: bool = True
+    jobs_auto_score_limit: int = 10
+    jobs_auto_score_min_heuristic: float = 10.0
+    job_alert_threshold: float = 60.0
+    # Days after "postulée" before the tracker suggests a follow-up.
+    application_followup_days: int = 7
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     gemini_api_key: str | None = None

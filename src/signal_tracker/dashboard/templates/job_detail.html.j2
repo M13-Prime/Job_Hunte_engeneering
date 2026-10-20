@@ -1,0 +1,126 @@
+{% extends "base.html.j2" %}
+{% block title %}{{ job.title }} — {{ job.company_name }}{% endblock %}
+{% block nav_jobs %}active{% endblock %}
+
+{% block extra_css %}
+  .back { font-size: 14px; display: inline-block; margin-bottom: 16px; }
+  .job-hero h1 { font-size: 30px; letter-spacing: -0.028em; line-height: 1.15; }
+  .job-hero .meta { color: var(--text-3); font-size: 14px; margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .job-hero .meta .sep { color: var(--text-4); }
+  .flash {
+    background: var(--blue-soft); color: var(--blue-strong);
+    border-radius: var(--r-md); padding: 12px 16px; font-size: 14px; margin: 18px 0 0;
+  }
+  .flash.warn { background: var(--amber-soft); color: #8a4b00; }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); gap: 22px; margin-top: 24px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+  .match-score { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+  .match-score .big {
+    font-size: 40px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
+    width: 92px; height: 92px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .big.hot { background: var(--green-soft); color: var(--green-deep); }
+  .big.investigate { background: var(--blue-soft); color: var(--blue); }
+  .big.watch { background: var(--amber-soft); color: var(--amber); }
+  .big.none { background: rgba(0,0,0,0.06); color: var(--text-3); }
+  .match-score .verdict { font-size: 15px; color: var(--text-2); line-height: 1.45; }
+
+  .kv { margin: 14px 0 0; }
+  .kv .k { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); margin-bottom: 6px; }
+  .kv .v { font-size: 14.5px; color: var(--text); line-height: 1.5; }
+  .skill-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .skill { font-size: 12.5px; padding: 4px 10px; border-radius: var(--r-full); }
+  .skill.ok { background: var(--green-soft); color: var(--green-deep); }
+  .skill.gap { background: var(--red-soft); color: #b42318; }
+
+  .actions-card .btn { width: 100%; margin-top: 10px; }
+  .actions-card form { margin: 0; }
+  .actions-card .hint { font-size: 12.5px; color: var(--text-3); margin-top: 6px; line-height: 1.4; }
+  .status-badge { display: inline-block; background: var(--purple-soft); color: var(--purple); padding: 3px 10px; border-radius: var(--r-full); font-size: 12.5px; font-weight: 600; }
+
+  .description { white-space: pre-wrap; font-size: 14.5px; line-height: 1.6; color: var(--text-2); max-height: 640px; overflow: auto; }
+{% endblock %}
+
+{% block content %}
+<a class="back" href="/jobs">← Offres</a>
+<div class="job-hero">
+  <h1>{{ job.title }}</h1>
+  <div class="meta">
+    <strong>{{ job.company_name }}</strong>
+    {% if job.location %}<span class="sep">·</span><span>{{ job.location }}</span>{% endif %}
+    {% if job.department %}<span class="sep">·</span><span>{{ job.department }}</span>{% endif %}
+    {% if job.posted_at %}<span class="sep">·</span><span>publiée le {{ job.posted_at.strftime("%d/%m/%Y") }}</span>{% endif %}
+    {% if not job.is_open %}<span class="sep">·</span><span style="color: var(--red);">offre fermée</span>{% endif %}
+  </div>
+  {% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+  {% if not has_cv %}<div class="flash warn">Ajoute ton CV depuis la page <a href="/">Recherche</a> pour le score IA et le CV adapté.</div>{% endif %}
+</div>
+
+<div class="layout">
+  <div>
+    <div class="card">
+      <h2 class="section-label">Score de match IA</h2>
+      {% if score %}
+        {% set s = score.agent_score %}
+        {% set tier = "hot" if s >= 75 else ("investigate" if s >= 60 else ("watch" if s >= 40 else "none")) %}
+        <div class="match-score">
+          <span class="big {{ tier }}">{{ "%.0f"|format(s) }}</span>
+          <div class="verdict">{{ score.agent_fit_reasoning or "—" }}</div>
+        </div>
+        {% if score.matched_skills %}
+        <div class="kv"><div class="k">Ce que ton CV prouve</div>
+          <div class="skill-list">{% for k in score.matched_skills %}<span class="skill ok">✓ {{ k }}</span>{% endfor %}</div></div>
+        {% endif %}
+        {% if score.missing_skills %}
+        <div class="kv"><div class="k">Ce qui manque ou n'apparaît pas</div>
+          <div class="skill-list">{% for k in score.missing_skills %}<span class="skill gap">{{ k }}</span>{% endfor %}</div></div>
+        {% endif %}
+        {% if score.agent_killer_angle %}<div class="kv"><div class="k">Angle d'attaque</div><div class="v">{{ score.agent_killer_angle }}</div></div>{% endif %}
+        {% if score.agent_why_now %}<div class="kv"><div class="k">Pourquoi maintenant</div><div class="v">{{ score.agent_why_now }}</div></div>{% endif %}
+        <form method="post" action="/jobs/{{ job.id }}/score" style="margin-top: 14px;"
+              onsubmit="window.showLoader && window.showLoader('Score IA en cours', 'Comparaison de l\'offre avec ton CV…');">
+          <button type="submit" class="btn btn-link btn-sm" {% if not has_cv %}disabled{% endif %}>Recalculer</button>
+        </form>
+      {% else %}
+        <p class="muted" style="margin: 0 0 14px;">Pas encore de score IA pour cette offre (score mots-clés : {{ "%.0f"|format(job.relevance_score) }}).</p>
+        <form method="post" action="/jobs/{{ job.id }}/score"
+              onsubmit="window.showLoader && window.showLoader('Score IA en cours', 'Comparaison de l\'offre avec ton CV…');">
+          <button type="submit" class="btn btn-primary btn-sm" {% if not has_cv %}disabled{% endif %}>Calculer le score de match</button>
+        </form>
+      {% endif %}
+    </div>
+
+    <div class="card" style="margin-top: 22px;">
+      <h2 class="section-label">Description de l'offre</h2>
+      <div class="description">{{ job.description or "Pas de description récupérée — ouvre l'offre originale." }}</div>
+    </div>
+  </div>
+
+  <div class="card actions-card">
+    <h2 class="section-label">Candidater</h2>
+    {% if application %}
+      <div>Suivi : <span class="status-badge">{{ status_labels[application.status] }}</span></div>
+    {% endif %}
+    <form method="post" action="/jobs/{{ job.id }}/tailor"
+          onsubmit="window.showLoader && window.showLoader('Rédaction en cours', 'CV adapté + lettre de motivation (~30 s)…');">
+      <button type="submit" class="btn btn-primary" {% if not has_cv %}disabled{% endif %}>
+        {% if application and application.tailored_at %}Régénérer CV adapté + lettre{% else %}Générer CV adapté + lettre{% endif %}
+      </button>
+    </form>
+    <p class="hint">Réécrit ton CV pour cette offre à partir de tes vraies expériences uniquement — rien n'est inventé ; les manques sont listés à part.</p>
+    {% if application and application.tailored_at %}
+      <a class="btn btn-ghost" href="/applications/{{ application.id }}/documents">Voir les documents</a>
+    {% endif %}
+    {% if not application %}
+    <form method="post" action="/jobs/{{ job.id }}/track">
+      <button type="submit" class="btn btn-ghost">Ajouter au suivi</button>
+    </form>
+    {% else %}
+      <a class="btn btn-ghost" href="/applications">Ouvrir le suivi</a>
+    {% endif %}
+    <a class="btn btn-link" href="{{ job.url }}" target="_blank" rel="noopener noreferrer">Postuler sur le site ↗</a>
+  </div>
+</div>
+{% endblock %}

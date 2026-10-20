@@ -1,4 +1,4 @@
-"""Daily orchestrator: collect -> classify -> digest, in one shot."""
+"""Daily orchestrator: collect -> classify -> jobs -> digest, in one shot."""
 
 from __future__ import annotations
 
@@ -8,7 +8,11 @@ import asyncio
 from rich.console import Console
 
 from signal_tracker.config import get_settings, load_user_profile, resolve_db_url
-from signal_tracker.notifier.digest import DigestBuilder, record_digest_sent
+from signal_tracker.notifier.digest import (
+    DigestBuilder,
+    record_digest_sent,
+    resolve_digest_user_id,
+)
 from signal_tracker.notifier.email import (
     DryRunSender,
     EmailSenderProtocol,
@@ -29,24 +33,44 @@ async def _main(dry_run: bool) -> None:
     db = init_db(resolve_db_url(settings))
     profile = load_user_profile()
 
-    console.print("[bold]1/3 collect[/bold]")
+    console.print("[bold]1/4 collect[/bold]")
     coll = await run_collection(db=db)
     console.print(
         f"  fetched={coll.fetched}  new={coll.new}  duplicates={coll.duplicates}"
     )
 
-    console.print("[bold]2/3 classify[/bold]")
+    console.print("[bold]2/4 classify[/bold]")
     clf = await run_classification(profile=profile, db=db)
     console.print(
         f"  processed={clf.processed}  relevant={clf.relevant}  "
         f"signals={clf.signals_created}  errors={clf.errors}"
     )
 
-    console.print("[bold]3/3 digest[/bold]")
+    digest_user_id = resolve_digest_user_id(db, settings.digest_to_email)
+
+    console.print("[bold]3/4 jobs (refresh + AI match)[/bold]")
+    if settings.jobs_daily_refresh_enabled and digest_user_id is not None:
+        from signal_tracker.jobs.matching import refresh_and_score_for_user
+
+        try:
+            jobs = await refresh_and_score_for_user(db, profile, digest_user_id)
+            console.print(
+                f"  companies={jobs.companies}  with_ats={jobs.companies_with_ats}  "
+                f"new_offers={jobs.jobs_new}  scored={jobs.jobs_scored}  "
+                f"errors={len(jobs.errors)}"
+            )
+        except Exception as exc:  # never block the digest on the jobs step
+            console.print(f"  [red]jobs step failed: {exc}[/red]")
+    else:
+        console.print("  skipped (disabled or no user account yet)")
+
+    console.print("[bold]4/4 digest[/bold]")
     builder = DigestBuilder(
         db=db,
         profile=profile,
         dashboard_base_url=settings.dashboard_base_url,
+        user_id=digest_user_id,
+        job_alert_threshold=settings.job_alert_threshold,
     )
     data = builder.build()
     rendered = render_digest(data)

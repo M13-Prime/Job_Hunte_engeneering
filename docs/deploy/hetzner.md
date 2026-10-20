@@ -48,7 +48,7 @@ exit
 
 ssh deploy@<PUBLIC_IP>
 
-curl -fsSL https://raw.githubusercontent.com/M13-Prime/Score_Simulator/main/scripts/deploy.sh | bash
+curl -fsSL https://raw.githubusercontent.com/M13-Prime/Job_Hunte_engeneering/main/scripts/deploy.sh | bash
 ```
 
 The script will:

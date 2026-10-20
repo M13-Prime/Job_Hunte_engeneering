@@ -6,7 +6,7 @@
 #
 # Usage (on the VM, as the default sudo-able user, e.g. `ubuntu`):
 #
-#     curl -fsSL https://raw.githubusercontent.com/M13-Prime/Score_Simulator/main/scripts/deploy.sh | bash
+#     curl -fsSL https://raw.githubusercontent.com/M13-Prime/Job_Hunte_engeneering/main/scripts/deploy.sh | bash
 #
 # Or, if you've already cloned the repo:
 #
@@ -14,8 +14,8 @@
 
 set -euo pipefail
 
-REPO_URL=${REPO_URL:-https://github.com/M13-Prime/Score_Simulator.git}
-BRANCH=${BRANCH:-claude/signal-tracker-system-W4FNB}
+REPO_URL=${REPO_URL:-https://github.com/M13-Prime/Job_Hunte_engeneering.git}
+BRANCH=${BRANCH:-main}
 APP_DIR=${APP_DIR:-/opt/signal-tracker}
 
 log() { printf "\n\033[36m==> %s\033[0m\n" "$*"; }

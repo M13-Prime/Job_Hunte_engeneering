@@ -16,7 +16,11 @@ from rich.console import Console
 from rich.table import Table
 
 from signal_tracker.config import get_settings, load_user_profile, resolve_db_url
-from signal_tracker.notifier.digest import DigestBuilder, record_digest_sent
+from signal_tracker.notifier.digest import (
+    DigestBuilder,
+    record_digest_sent,
+    resolve_digest_user_id,
+)
 from signal_tracker.notifier.email import (
     DryRunSender,
     EmailSenderProtocol,
@@ -40,6 +44,8 @@ async def _main(dry_run: bool, preview_out: Path | None) -> None:
         db=db,
         profile=profile,
         dashboard_base_url=settings.dashboard_base_url,
+        user_id=resolve_digest_user_id(db, settings.digest_to_email),
+        job_alert_threshold=settings.job_alert_threshold,
     )
     data = builder.build()
     rendered = render_digest(data)
@@ -50,6 +56,8 @@ async def _main(dry_run: bool, preview_out: Path | None) -> None:
     summary.add_row("hot (>=80)", str(len(data.hot)))
     summary.add_row("investigate (60-79)", str(len(data.investigate)))
     summary.add_row("watch", str(len(data.watch)))
+    summary.add_row("new jobs", str(len(data.new_jobs)))
+    summary.add_row("follow-ups", str(len(data.followups)))
     summary.add_row("subject", rendered.subject)
     console.print(summary)
 

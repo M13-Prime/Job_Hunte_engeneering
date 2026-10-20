@@ -64,6 +64,7 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 # idiom; B008 (no function call in argument defaults) flags it as a false
 # positive there.
 "src/signal_tracker/dashboard/app.py" = ["B008"]
+"src/signal_tracker/dashboard/applications_routes.py" = ["B008"]
 
 [tool.mypy]
 python_version = "3.11"

@@ -38,6 +38,41 @@ _ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("watchlist", "user_id", "INTEGER"),
     ("user_cv", "user_id", "INTEGER"),
     ("preparations", "user_id", "INTEGER"),
+    # Phase 9 — admin approval gate. New signups land unapproved until
+    # an owner clicks "Approuver" on /admin/users. Existing rows are
+    # back-filled to is_approved=1 by _backfill_user_approvals() below.
+    ("users", "is_approved", "INTEGER NOT NULL DEFAULT 0"),
+    ("users", "approved_at", "DATETIME"),
+    ("users", "approved_by_id", "INTEGER"),
+    # Phase 10 — country filter. The classifier extracts these on every
+    # new signal; existing rows stay NULL and are treated as "unknown" by
+    # the /results filter.
+    ("signals", "hq_country", "VARCHAR(96)"),
+    ("signals", "active_countries", "JSON"),
+    # Phase 10 — record of what the dynamic source picker chose for the run.
+    ("search_runs", "selected_sources", "JSON"),
+    # Phase 11 — Jobs Agent semantic verdict. agent_processed_at also
+    # serves as the "this row has been reviewed" marker so reruns don't
+    # repeat the LLM work.
+    ("job_offers", "agent_score", "FLOAT"),
+    ("job_offers", "agent_fit_reasoning", "TEXT"),
+    ("job_offers", "agent_killer_angle", "TEXT"),
+    ("job_offers", "agent_why_now", "TEXT"),
+    ("job_offers", "agent_processed_at", "DATETIME"),
+    # Phase 12 — match breakdown + job alerts in the digest.
+    ("job_agent_scores", "matched_skills", "JSON"),
+    ("job_agent_scores", "missing_skills", "JSON"),
+    ("digests_sent", "job_offer_ids", "JSON"),
+)
+
+# Same story for indexes: create_all() doesn't add new indexes to existing
+# tables, so the (user_id, created_at) covering indexes used by the
+# /preparations and sidebar /searches list pages need an explicit step.
+_ADDITIVE_INDEXES: tuple[tuple[str, str, str], ...] = (
+    # (index_name, table, columns)
+    ("idx_preparations_user_created", "preparations", "user_id, created_at DESC"),
+    ("idx_search_runs_user_created", "search_runs", "user_id, created_at DESC"),
+    ("idx_signal_feedback_user_action", "signal_feedback", "user_id, action"),
 )
 
 
@@ -66,11 +101,19 @@ class Database:
 
     def create_all(self) -> None:
         Base.metadata.create_all(self.engine)
-        self._apply_additive_migrations()
+        added = self._apply_additive_migrations()
+        self._apply_additive_indexes()
+        # Only back-fill grandfathered approvals on the very deploy that
+        # introduces the is_approved column — otherwise we'd auto-approve
+        # every new signup at the next container restart.
+        if ("users", "is_approved") in added:
+            self._backfill_user_approvals()
 
-    def _apply_additive_migrations(self) -> None:
+    def _apply_additive_migrations(self) -> set[tuple[str, str]]:
+        """Run pending ALTER TABLE ADD COLUMNs; return what was just added."""
         inspector = inspect(self.engine)
         existing_tables = set(inspector.get_table_names())
+        just_added: set[tuple[str, str]] = set()
         for table, column, sql_type in _ADDITIVE_COLUMNS:
             if table not in existing_tables:
                 continue  # create_all already made it with the column
@@ -80,6 +123,57 @@ class Database:
                     conn.execute(
                         text(f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}")
                     )
+                just_added.add((table, column))
+        return just_added
+
+    def _backfill_user_approvals(self) -> None:
+        """One-shot data migration for the Phase 9 approval gate.
+
+        Without this, deploying the gate would lock every existing user
+        out (is_approved defaults to 0 on the new column). We:
+        - Mark every pre-existing user as approved so the upgrade is
+          transparent for them.
+        - Promote the earliest-created user to owner if no owner exists,
+          so the instance always has at least one admin who can approve
+          future signups.
+
+        Called from create_all() only when the is_approved column was
+        added in the same run, so it's a one-shot — subsequent restarts
+        skip it and let unapproved post-gate signups stay unapproved.
+        """
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "UPDATE users SET is_approved = 1 WHERE is_approved = 0"
+            ))
+            owner_row = conn.execute(
+                text("SELECT id FROM users WHERE is_owner = 1 LIMIT 1")
+            ).first()
+            if owner_row is None:
+                earliest = conn.execute(
+                    text("SELECT id FROM users ORDER BY created_at ASC LIMIT 1")
+                ).first()
+                if earliest is not None:
+                    conn.execute(
+                        text("UPDATE users SET is_owner = 1 WHERE id = :uid"),
+                        {"uid": earliest[0]},
+                    )
+
+    def _apply_additive_indexes(self) -> None:
+        inspector = inspect(self.engine)
+        existing_tables = set(inspector.get_table_names())
+        for index_name, table, columns in _ADDITIVE_INDEXES:
+            if table not in existing_tables:
+                continue
+            existing = {idx["name"] for idx in inspector.get_indexes(table)}
+            if index_name in existing:
+                continue
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        f"CREATE INDEX IF NOT EXISTS {index_name} "
+                        f"ON {table} ({columns})"
+                    )
+                )
 
     @contextmanager
     def session(self) -> Iterator[Session]:

@@ -85,6 +85,24 @@ CLASSIFIER_PROMPT_V1 = dedent(
       article explicitly says the person was just appointed / hired.
 
     -----------------
+    GEOGRAPHIC EXTRACTION (Phase 10)
+    -----------------
+    Extract WHERE the company sits and operates:
+    - ``hq_country`` : the country of the company's headquarters. Use the
+      French canonical name: "France", "Belgique", "Allemagne", "Pays-Bas",
+      "Espagne", "Italie", "Royaume-Uni", "Suisse", "Luxembourg",
+      "États-Unis", "Canada", "Maroc", "Tunisie", "Algérie", "Sénégal", etc.
+      If the article doesn't say and you don't know with high confidence,
+      set ``hq_country`` to null.
+    - ``active_countries`` : array of countries (French canonical names) where
+      the company has offices, customers, partnerships, or announced
+      activity. Always include ``hq_country`` itself if known. Empty array
+      if you have no evidence.
+    - Be conservative: better empty than wrong. "European company" without
+      a specific country → empty array. Explicit "lance ses activités en
+      Belgique" → add "Belgique" to active_countries.
+
+    -----------------
     OUTPUT
     -----------------
     Return ONLY a valid JSON object with EXACTLY these keys (no markdown,
@@ -97,6 +115,8 @@ CLASSIFIER_PROMPT_V1 = dedent(
                      | "acquisition" | "regulatory" | "other",
       "company_name": str,
       "company_normalized": str,
+      "hq_country": str | null,
+      "active_countries": [str, ...],
       "key_persons": [{{"name": str, "role": str, "is_new_hire": bool}}],
       "relevance_score": int 0..100,
       "urgency_score": int 0..100,
@@ -127,6 +147,8 @@ CLASSIFIER_PROMPT_V1 = dedent(
       "signal_type": "executive_change",
       "company_name": "Carbone 4",
       "company_normalized": "carbone 4",
+      "hq_country": "France",
+      "active_countries": ["France"],
       "key_persons": [
         {{"name": "Camille Dupont", "role": "Directrice ESG", "is_new_hire": true}}
       ],
@@ -155,6 +177,8 @@ CLASSIFIER_PROMPT_V1 = dedent(
       "signal_type": "funding",
       "company_name": "Sweep",
       "company_normalized": "sweep",
+      "hq_country": "France",
+      "active_countries": ["France", "Royaume-Uni"],
       "key_persons": [],
       "relevance_score": 88,
       "urgency_score": 78,
@@ -319,9 +343,54 @@ def render_user_prompt(item: ClassifierInput) -> str:
     ).strip()
 
 
+# ---------------------------------------------------------------------------
+# Prefilter prompts (cheap pre-classification pass — perf #2)
+# ---------------------------------------------------------------------------
+
+PREFILTER_SYSTEM_PROMPT = dedent(
+    """
+    You are a fast triage filter. Given an article and a user profile,
+    decide whether the article *might* contain a weak hiring signal for the
+    user's target sectors. You are NOT scoring or extracting — just routing.
+
+    Rules:
+    - Be inclusive. Anything plausibly about: executive appointments, fundraising,
+      sustainability / CSRD reports, hiring announcements, strategic
+      expansion in the user's domains, acquisitions, or sector-relevant
+      regulation → output "yes".
+    - Output "no" ONLY for items that are clearly unrelated to the user's
+      domains and roles (e.g. consumer product launches, sports, lifestyle,
+      celebrity news, articles about other industries entirely).
+    - When unsure, output "maybe". A "no" wrongly applied loses a real
+      signal, so err toward "maybe".
+
+    Output strict JSON: {"verdict": "yes" | "maybe" | "no", "reason": "<<=15 words>"}.
+    """
+).strip()
+
+
+def render_prefilter_user_prompt(item: ClassifierInput, profile: UserProfile) -> str:
+    """Compact user turn for the prefilter — kept short to minimize tokens."""
+    title = (item.title or "")[:280]
+    snippet = (item.content or "")[:600]
+    return dedent(
+        f"""
+        USER DOMAINS: {", ".join(profile.domains) or "(none)"}
+        USER ROLES: {", ".join(profile.target_roles) or "(none)"}
+
+        ARTICLE TITLE: {title or "(no title)"}
+        ARTICLE SNIPPET: {snippet or "(no snippet)"}
+
+        Decide.
+        """
+    ).strip()
+
+
 __all__ = [
     "CLASSIFIER_PROMPT_V1",
     "CLASSIFIER_PROMPT_VERSION",
+    "PREFILTER_SYSTEM_PROMPT",
+    "render_prefilter_user_prompt",
     "render_system_prompt",
     "render_user_prompt",
 ]

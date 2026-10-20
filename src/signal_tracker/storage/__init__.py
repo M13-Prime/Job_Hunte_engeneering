@@ -1,8 +1,11 @@
 from signal_tracker.storage.db import Database, get_session, init_db
 from signal_tracker.storage.models import (
+    APPLICATION_STATUSES,
+    Application,
     Base,
     Company,
     DigestSent,
+    JobAgentScore,
     JobOffer,
     Person,
     Preparation,
@@ -17,10 +20,13 @@ from signal_tracker.storage.models import (
 )
 
 __all__ = [
+    "APPLICATION_STATUSES",
+    "Application",
     "Base",
     "Company",
     "Database",
     "DigestSent",
+    "JobAgentScore",
     "JobOffer",
     "Person",
     "Preparation",
