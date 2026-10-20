@@ -189,7 +189,6 @@ async def classify(
             "model": model,
             "messages": messages,
             "response_format": {"type": "json_object"},
-            "temperature": 0.0,
         }
         if fallbacks:
             kwargs["fallbacks"] = fallbacks
@@ -321,7 +320,6 @@ async def prefilter(
             "model": model,
             "messages": messages,
             "response_format": {"type": "json_object"},
-            "temperature": 0.0,
             "max_tokens": 80,  # response is a 3-key JSON, ~30 tokens
         }
         if fallbacks:

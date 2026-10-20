@@ -235,7 +235,6 @@ async def pick_sources(
         "model": model,
         "messages": messages,
         "response_format": {"type": "json_object"},
-        "temperature": 0.0,
         "max_tokens": 400,
     }
     if fallbacks:

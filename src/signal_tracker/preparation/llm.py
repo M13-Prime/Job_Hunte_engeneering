@@ -115,7 +115,6 @@ async def generate_cv_profile(cv_text: str) -> CVProfile:
             "model": model,
             "messages": messages,
             "response_format": {"type": "json_object"},
-            "temperature": 0.0,
         }
         if fallbacks:
             kwargs["fallbacks"] = fallbacks
@@ -202,7 +201,6 @@ async def generate_preparation(
             "model": model,
             "messages": messages,
             "response_format": {"type": "json_object"},
-            "temperature": 0.2,
         }
         if fallbacks:
             kwargs["fallbacks"] = fallbacks

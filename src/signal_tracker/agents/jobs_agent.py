@@ -178,7 +178,6 @@ async def _semantic_score(
             {"role": "user", "content": user},
         ],
         "response_format": {"type": "json_object"},
-        "temperature": 0.0,
         "max_tokens": 600,
     }
     if fallbacks:
@@ -517,7 +516,6 @@ async def run_jobs_agent(
         tools=tools,
         budget_usd=budget_usd if budget_usd is not None else settings.llm_agent_budget_usd,
         max_iterations=settings.llm_agent_max_iterations,
-        temperature=0.0,
         fallback_model=settings.llm_fallback_model,
         should_continue=should_continue,
     )
