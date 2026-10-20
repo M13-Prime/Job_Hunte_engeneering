@@ -96,12 +96,12 @@ def db_jobs(tmp_path: Path) -> Database:
         s.add(UserKeyword(user_id=u.id, category="field", value="sustainability"))
         offers = [
             (
-                "Sustainability & AI Manager", "Paris, France",
+                "Sustainability and AI Manager", "Paris, France",
                 "Build AI for ESG. 5-8 years of experience.",
             ),
             ("Sustainability Manager", "Paris, France", "ESG reporting. 6 years of experience."),
             ("Director of Sustainability", "Paris, France", "Lead everything."),
-            ("Sustainability & AI Lead", "London, UK", "AI and ESG. 6 years of experience."),
+            ("Sustainability and AI Lead", "London, UK", "AI and ESG. 6 years of experience."),
         ]
         for i, (title, loc, desc) in enumerate(offers):
             s.add(JobOffer(
@@ -123,14 +123,14 @@ def client(db_jobs: Database) -> TestClient:
 
 def test_jobs_default_view_uses_country_france(client: TestClient) -> None:
     body = client.get("/jobs").text
-    assert "Sustainability &amp; AI Manager" in body
+    assert "Sustainability and AI Manager" in body
     assert "London, UK" not in body
 
 
 def test_jobs_keywords_all_requires_both(client: TestClient) -> None:
     body = client.get("/jobs?f=1&country=all&kw=sustainability&kw=AI&mode=all").text
-    assert "Sustainability &amp; AI Manager" in body
-    assert "Sustainability &amp; AI Lead" in body        # country=all keeps London
+    assert "Sustainability and AI Manager" in body
+    assert "Sustainability and AI Lead" in body        # country=all keeps London
     assert 'href="/jobs/2"' not in body                    # no AI -> hidden under AND
     assert "Director of Sustainability" not in body
 
