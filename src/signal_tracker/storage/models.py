@@ -445,6 +445,8 @@ class User(Base):
     )
     # Phase 13 — weekly newsletter. Opt-out via the link in every email.
     newsletter_opt_in: Mapped[bool] = mapped_column(default=True, nullable=False)
+    # Target country for searches (canonical French name). Defaults to France.
+    country: Mapped[str] = mapped_column(String(96), default="France", nullable=False)
     newsletter_last_sent_at: Mapped[datetime | None] = mapped_column(
         DateTime, nullable=True
     )

@@ -76,6 +76,23 @@ _GDELT_LANGUAGE_FULL = {
 }
 
 
+DEFAULT_COUNTRY = "France"
+
+# Choices offered in the "Pays cible" selector (canonical French names).
+# "Europe" and "Monde" are open labels: no language restriction at collect time.
+COUNTRY_CHOICES: tuple[str, ...] = (
+    "France", "Belgique", "Suisse", "Luxembourg", "Canada",
+    "Royaume-Uni", "États-Unis", "Allemagne", "Espagne", "Italie",
+    "Pays-Bas", "Irlande", "Europe", "Monde",
+)
+
+
+def normalize_country(value: str | None) -> str:
+    """Return a valid canonical country, falling back to France."""
+    v = (value or "").strip()
+    return v if v in COUNTRY_CHOICES else DEFAULT_COUNTRY
+
+
 def geographies_to_languages(geographies: list[str]) -> set[str]:
     """Map a UserProfile.geographies list to the ISO-639 languages we
     keep at collect time.

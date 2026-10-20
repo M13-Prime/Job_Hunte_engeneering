@@ -81,7 +81,7 @@ def client(db_with_country_signals: Database) -> TestClient:
 
 def test_no_filter_returns_all(client: TestClient) -> None:
     """Without country params the filter is a no-op."""
-    resp = client.get("/results")
+    resp = client.get("/results?country_scope=any")
     assert resp.status_code == 200
     body = resp.text
     assert "Greenly" in body
@@ -121,7 +121,7 @@ def test_filter_multi_country(client: TestClient) -> None:
 
 def test_country_chips_render_in_ui(client: TestClient) -> None:
     """The available countries from the corpus + starter list appear as chips."""
-    resp = client.get("/results")
+    resp = client.get("/results?country_scope=any")
     body = resp.text
     # Starter list common countries
     assert "France" in body
@@ -132,8 +132,56 @@ def test_country_chips_render_in_ui(client: TestClient) -> None:
 
 def test_country_tag_renders_on_each_row(client: TestClient) -> None:
     """Each signal row that has hq_country shows it as a country-tag."""
-    resp = client.get("/results")
+    resp = client.get("/results?country_scope=any")
     body = resp.text
     assert 'class="country-tag"' in body
     # Verify the +N badge appears for the BeCo row (HQ Belgique, +France).
     assert "+1" in body
+
+
+# ---------------------------------------------------------------------------
+# Default target country (France unless changed on the Recherche page)
+# ---------------------------------------------------------------------------
+
+
+def test_default_view_is_france_and_keeps_unknown_hq(client: TestClient) -> None:
+    """Bare /results shows the user's country (France), plus unknown HQs."""
+    body = client.get("/results").text
+    assert "Greenly" in body       # HQ France
+    assert "BeCo" in body          # France among active countries
+    assert "Unknown HQ" in body    # never hidden silently
+    assert "Munich Co" not in body
+
+
+def test_new_user_country_defaults_to_france(db_with_country_signals: Database) -> None:
+    with db_with_country_signals.session() as s:
+        assert s.query(User).one().country == "France"
+
+
+def test_set_country_changes_default_view(client: TestClient) -> None:
+    resp = client.post(
+        "/settings/country", data={"country": "Allemagne"}, follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    body = client.get("/results").text
+    assert "Munich Co" in body
+    assert "Greenly" not in body
+
+
+def test_set_country_rejects_unknown_value(
+    client: TestClient, db_with_country_signals: Database,
+) -> None:
+    client.post("/settings/country", data={"country": "Atlantide"})
+    with db_with_country_signals.session() as s:
+        assert s.query(User).one().country == "France"
+
+
+def test_search_page_shows_country_selector(client: TestClient) -> None:
+    body = client.get("/").text
+    assert "Pays cible" in body
+    assert '<option value="France" selected>' in body
+
+
+def test_ticking_nothing_shows_all_countries(client: TestClient) -> None:
+    body = client.get("/results?country_scope=any").text
+    assert "Munich Co" in body and "Greenly" in body
