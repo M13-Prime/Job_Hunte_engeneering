@@ -279,7 +279,7 @@ def build_app(db: Database | None = None) -> FastAPI:
                     "signals_deduped": clf.signals_deduped,
                     "errors": clf.errors,
                     "prefiltered_out": clf.prefiltered_out,
-                    "keyword_filtered": clf.keyword_filtered,
+                    "keyword_filtered": getattr(clf, "keyword_filtered", 0),
                 }
             metrics = {
                 "collect": state["metrics"]["collect"],
