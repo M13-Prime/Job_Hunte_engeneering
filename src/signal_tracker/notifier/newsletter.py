@@ -21,6 +21,7 @@ from itsdangerous import BadSignature, URLSafeSerializer
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlalchemy import and_, desc, func, select
 
+from signal_tracker.jobs.filters import offer_passes, user_default_filter
 from signal_tracker.notifier.email import EmailSenderProtocol
 from signal_tracker.storage import Database
 from signal_tracker.storage.models import (
@@ -286,6 +287,8 @@ class NewsletterBuilder:
                 ))
                 .order_by(desc(JobAgentScore.agent_score))
             ).all())
+            flt = user_default_filter(s.get(User, user_id))
+        rows = [r for r in rows if offer_passes(r[0], flt)]
         data.jobs_total = len(rows)
         for job, score in rows[: self.max_items]:
             data.jobs.append(NewsJob(

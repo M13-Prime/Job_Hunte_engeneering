@@ -98,7 +98,9 @@ shows something it doesn't. If there is no recent signal, set why_now to
 an empty string.
 
 Score guide:
-  0-30  : not a match (sector or seniority mismatch)
+  0-30  : not a match (sector, country or seniority mismatch; a posting
+          asking far more or far less experience than the candidate's
+          target range stays in this band)
   31-60 : partial match (some skills relevant, key gaps)
   61-85 : strong match
   86-100: textbook match
@@ -145,7 +147,7 @@ def _load_cv_text(db: Database, user_id: int | None) -> str:
 
 async def _semantic_score(
     *, job: JobOffer, recent_signal: Signal | None,
-    profile: UserProfile, cv_text: str,
+    profile: UserProfile, cv_text: str, preferences_note: str = "",
 ) -> dict[str, Any]:
     """One cheap LLM call: 0-100 score + reasoning + killer angle + why_now."""
     import litellm
@@ -167,7 +169,8 @@ async def _semantic_score(
         f"{signal_block}\n"
         f"USER TARGET ROLES: {', '.join(profile.target_roles) or '(none)'}\n"
         f"USER DOMAINS: {', '.join(profile.domains) or '(none)'}\n"
-        f"USER GEOGRAPHIES: {', '.join(profile.geographies) or '(none)'}\n\n"
+        f"USER GEOGRAPHIES: {', '.join(profile.geographies) or '(none)'}\n"
+        f"{preferences_note}\n"
         f"USER CV (excerpt):\n{cv_text[:3000]}\n\n"
         "Rescore + extract the angle + explain the timing."
     )

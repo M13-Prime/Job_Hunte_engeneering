@@ -447,6 +447,9 @@ class User(Base):
     newsletter_opt_in: Mapped[bool] = mapped_column(default=True, nullable=False)
     # Target country for searches (canonical French name). Defaults to France.
     country: Mapped[str] = mapped_column(String(96), default="France", nullable=False)
+    # Years of experience the user targets (NULL = no constraint).
+    exp_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    exp_max: Mapped[int | None] = mapped_column(Integer, nullable=True)
     newsletter_last_sent_at: Mapped[datetime | None] = mapped_column(
         DateTime, nullable=True
     )

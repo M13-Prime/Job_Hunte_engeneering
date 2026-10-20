@@ -28,6 +28,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from signal_tracker.config import UserProfile
+from signal_tracker.jobs.filters import offer_passes, user_default_filter
 from signal_tracker.storage import Database
 from signal_tracker.storage.models import (
     Application,
@@ -36,6 +37,7 @@ from signal_tracker.storage.models import (
     JobOffer,
     RawItem,
     Signal,
+    User,
 )
 
 HOT_THRESHOLD = 80.0
@@ -276,9 +278,10 @@ class DigestBuilder:
                 ))
                 .order_by(JobAgentScore.agent_score.desc())
             ).all())
+            flt = user_default_filter(session.get(User, self.user_id))
         out: list[DigestJob] = []
         for job, score in rows:
-            if job.id in sent:
+            if job.id in sent or not offer_passes(job, flt):
                 continue
             out.append(DigestJob(
                 id=job.id,
@@ -323,8 +326,6 @@ class DigestBuilder:
 def resolve_digest_user_id(db: Database, email: str | None) -> int | None:
     """Whose offers/applications go in the digest: the account matching
     DIGEST_TO_EMAIL, else the instance owner, else nobody."""
-    from signal_tracker.storage.models import User
-
     with db.session() as session:
         if email:
             uid = session.execute(

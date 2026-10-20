@@ -97,6 +97,23 @@
     text-align: center; padding: 56px 24px; color: var(--text-3); font-size: 14.5px; line-height: 1.6;
   }
   .empty-jobs strong { color: var(--text); font-weight: 600; }
+
+  .filter-panel { padding: 16px 18px; margin-bottom: 14px; }
+  .fp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }
+  .fp-wide { grid-column: 1 / -1; }
+  .fp-field { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
+  .fp-field > span { font-weight: 700; }
+  .fp-field small { color: var(--muted); font-size: 12.5px; }
+  .fp-range { display: flex; align-items: center; gap: 8px; }
+  .fp-range input { width: 84px; }
+  .fp-check, .fp-inline { font-weight: 500; font-size: 12.5px; display: inline-flex; gap: 6px; align-items: center; margin-left: 10px; }
+  .fp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fp-chip input { position: absolute; opacity: 0; pointer-events: none; }
+  .fp-chip span { display: inline-block; padding: 4px 12px; border: 1px solid var(--hairline); border-radius: 999px; cursor: pointer; font-size: 13px; }
+  .fp-chip input:checked + span { background: var(--accent, #fca61f); border-color: var(--accent, #fca61f); font-weight: 700; }
+  .fp-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px; }
+  .fp-hidden { color: var(--muted); font-size: 12.5px; margin-left: auto; }
+  @media (max-width: 720px) { .fp-grid { grid-template-columns: 1fr; } }
 {% endblock %}
 
 {% block content %}
@@ -125,6 +142,55 @@
 {% elif refresh.status == "failed" %}
 <div class="flash warn">L'actualisation a échoué : {{ refresh.error }}</div>
 {% endif %}
+
+<form class="card filter-panel" method="get" action="/jobs" id="job-filters">
+  <input type="hidden" name="f" value="1">
+  {% if min_score %}<input type="hidden" name="min_score" value="{{ min_score }}">{% endif %}
+  <div class="fp-grid">
+    <label class="fp-field">
+      <span>Pays de l'entreprise</span>
+      <select name="country">
+        <option value="all" {% if not flt.country %}selected{% endif %}>Tous les pays</option>
+        {% for c in country_choices %}{% if c not in ("Europe", "Monde") %}
+        <option value="{{ c }}" {% if c == flt.country %}selected{% endif %}>{{ c }}</option>
+        {% endif %}{% endfor %}
+      </select>
+      <label class="fp-check"><input type="checkbox" name="unknown" value="1" {% if flt.include_unknown %}checked{% endif %}> garder les lieux non précisés / remote</label>
+    </label>
+    <div class="fp-field">
+      <span>Expérience visée (années)</span>
+      <div class="fp-range">
+        <input type="number" name="exp_min" min="0" max="60" placeholder="min" value="{{ flt.exp_min if flt.exp_min is not none else '' }}">
+        <span>à</span>
+        <input type="number" name="exp_max" min="0" max="60" placeholder="max" value="{{ flt.exp_max if flt.exp_max is not none else '' }}">
+      </div>
+      <small>Masque les postes de direction si tu vises moins de 12 ans, et les postes juniors si tu vises 4 ans ou plus.</small>
+    </div>
+    <div class="fp-field fp-wide">
+      <span>Mots-clés
+        <label class="fp-inline"><input type="radio" name="mode" value="all" {% if flt.keyword_mode == "all" %}checked{% endif %}> tous (ET)</label>
+        <label class="fp-inline"><input type="radio" name="mode" value="any" {% if flt.keyword_mode == "any" %}checked{% endif %}> au moins un (OU)</label>
+      </span>
+      <div class="fp-chips">
+        {% for k in keyword_choices %}
+        <label class="fp-chip"><input type="checkbox" name="kw" value="{{ k }}" {% if k in flt.keywords %}checked{% endif %}><span>{{ k }}</span></label>
+        {% endfor %}
+        {% if not keyword_choices %}<small>Ajoute des mots-clés sur la page Recherche pour les choisir ici.</small>{% endif %}
+      </div>
+      <input type="text" name="extra" value="{{ extra_terms }}" placeholder="Autres termes, séparés par des virgules (ex : sustainability, AI)">
+    </div>
+  </div>
+  <div class="fp-actions">
+    <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
+    <a href="/jobs" class="btn btn-ghost btn-sm">Réinitialiser</a>
+    <button type="submit" formmethod="post" formaction="/jobs/prefs" class="btn btn-secondary btn-sm"
+            title="Enregistre le pays et l'expérience : ils s'appliquent aussi au digest et à la newsletter">Enregistrer pays et expérience</button>
+    {% if hidden_total %}
+    <span class="fp-hidden">{{ hidden_total }} offre{{ "s" if hidden_total > 1 }} masquée{{ "s" if hidden_total > 1 }} :
+      {% for label, n in hidden %}{{ n }} {{ label }}{{ ", " if not loop.last }}{% endfor %}</span>
+    {% endif %}
+  </div>
+</form>
 
 <div class="filters">
   <a href="/jobs" class="{% if not min_score %}active{% endif %}">Toutes</a>
