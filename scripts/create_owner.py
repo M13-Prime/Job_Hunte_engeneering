@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import sys
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 
@@ -69,6 +70,8 @@ def main() -> int:
                 password_hash=hash_password(password),
                 is_active=True,
                 is_owner=True,
+                is_approved=True,
+                approved_at=datetime.now(tz=UTC),
             )
             session.add(user)
             session.flush()
@@ -77,6 +80,9 @@ def main() -> int:
             user.password_hash = hash_password(password)
             user.is_active = True
             user.is_owner = True
+            if not user.is_approved:
+                user.is_approved = True
+                user.approved_at = datetime.now(tz=UTC)
             print(f"updated existing user id={user.id} email={user.email}")
         owner_id = user.id
 
