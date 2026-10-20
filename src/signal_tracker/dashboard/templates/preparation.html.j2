@@ -264,6 +264,11 @@
       · <a href="/results">← Signaux</a>
     </div>
   </div>
+  {% if signal %}
+  <form method="post" action="/signals/{{ signal.id }}/track" style="margin: 0 0 0 auto;">
+    <button type="submit" class="btn btn-ghost btn-sm" title="Ajouter une candidature spontanée à ton suivi">+ Suivre la candidature</button>
+  </form>
+  {% endif %}
 </div>
 
 {% if prep.status == "failed" or not report %}

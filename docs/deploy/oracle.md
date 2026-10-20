@@ -88,7 +88,7 @@ ssh -i ~/.ssh/id_ed25519 ubuntu@<PUBLIC_IP>
 Run the one-line bootstrap:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/M13-Prime/Score_Simulator/main/scripts/deploy.sh | bash
+curl -fsSL https://raw.githubusercontent.com/M13-Prime/Job_Hunte_engeneering/main/scripts/deploy.sh | bash
 ```
 
 (Replace `main` with your default branch name if it's different.)

@@ -22,7 +22,7 @@ Both deploy the same Docker image, so you can move between them later.
 
 ## Shared building blocks (all guides reference these)
 
-- **Code**: `git clone -b <branch> https://github.com/M13-Prime/Score_Simulator.git`
+- **Code**: `git clone -b <branch> https://github.com/M13-Prime/Job_Hunte_engeneering.git`
 - **Bootstrap**: `bash scripts/deploy.sh` (idempotent, safe to re-run)
 - **HTTPS**: Cloudflare Tunnel (zero-config, no Let's Encrypt needed)
 - **Auth**: HTTP Basic Auth on every dashboard route, gated on

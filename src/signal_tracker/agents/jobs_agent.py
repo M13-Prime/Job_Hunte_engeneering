@@ -87,8 +87,14 @@ hiring signal at the company. Output strict JSON only:
   "fit_score": int 0..100,
   "fit_reasoning": "1 short FR sentence",
   "killer_angle": "1 FR sentence: the single strongest CV → role link",
-  "why_now": "1 FR sentence: why the recent signal makes the timing right"
+  "why_now": "1 FR sentence: why the recent signal makes the timing right",
+  "matched_skills": ["<=6 short items: requirements of the posting the CV clearly evidences"],
+  "missing_skills": ["<=6 short items: requirements of the posting the CV does NOT evidence"]
 }
+
+Only list skills that actually appear in the posting. Never claim the CV
+shows something it doesn't. If there is no recent signal, set why_now to
+an empty string.
 
 Score guide:
   0-30  : not a match (sector or seniority mismatch)
@@ -172,7 +178,7 @@ async def _semantic_score(
         ],
         "response_format": {"type": "json_object"},
         "temperature": 0.0,
-        "max_tokens": 400,
+        "max_tokens": 600,
     }
     if fallbacks:
         kwargs["fallbacks"] = fallbacks
@@ -189,13 +195,31 @@ async def _semantic_score(
         "fit_reasoning": str(data.get("fit_reasoning", ""))[:500],
         "killer_angle": str(data.get("killer_angle", ""))[:500],
         "why_now": str(data.get("why_now", ""))[:500],
+        "matched_skills": _str_list(data.get("matched_skills")),
+        "missing_skills": _str_list(data.get("missing_skills")),
     }
+
+
+def _str_list(value: Any, *, limit: int = 6) -> list[str]:
+    """Coerce an LLM list field into <= `limit` short, non-empty strings."""
+    if not isinstance(value, list):
+        return []
+    out: list[str] = []
+    for item in value:
+        text = str(item).strip()
+        if text:
+            out.append(text[:80])
+        if len(out) >= limit:
+            break
+    return out
 
 
 def _upsert_score(
     db: Database, *, user_id: int, job_offer_id: int,
     fit_score: float, fit_reasoning: str | None,
     killer_angle: str | None, why_now: str | None,
+    matched_skills: list[str] | None = None,
+    missing_skills: list[str] | None = None,
 ) -> None:
     """Insert-or-update one row in job_agent_scores."""
     with db.session() as s:
@@ -210,6 +234,7 @@ def _upsert_score(
                 user_id=user_id, job_offer_id=job_offer_id,
                 agent_score=fit_score, agent_fit_reasoning=fit_reasoning,
                 agent_killer_angle=killer_angle, agent_why_now=why_now,
+                matched_skills=matched_skills, missing_skills=missing_skills,
                 processed_at=datetime.now(UTC),
             ))
         else:
@@ -217,6 +242,8 @@ def _upsert_score(
             existing.agent_fit_reasoning = fit_reasoning
             existing.agent_killer_angle = killer_angle
             existing.agent_why_now = why_now
+            existing.matched_skills = matched_skills
+            existing.missing_skills = missing_skills
             existing.processed_at = datetime.now(UTC)
 
 
@@ -415,6 +442,8 @@ def _build_tools(state: JobsState) -> ToolRegistry:
                     fit_reasoning=verdict["fit_reasoning"],
                     killer_angle=verdict["killer_angle"],
                     why_now=verdict["why_now"],
+                    matched_skills=verdict["matched_skills"],
+                    missing_skills=verdict["missing_skills"],
                 )
                 state.jobs_scored += 1
                 return {"job_id": job.id, "status": "scored", **verdict}

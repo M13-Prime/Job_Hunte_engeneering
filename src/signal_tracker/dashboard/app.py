@@ -21,6 +21,7 @@ Routes:
 - GET  /preparations              list (auth)
 - GET  /preparations/{id}         report
 - GET  /healthz
+- /jobs, /applications ...        see dashboard/applications_routes.py
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ from typing import Annotated, Any
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import and_, desc, func, select, update
+from sqlalchemy import desc, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
@@ -61,7 +62,6 @@ from signal_tracker.preparation.llm import (
 from signal_tracker.preparation.schemas import CVProfile
 from signal_tracker.storage import Database, init_db
 from signal_tracker.storage.models import (
-    JobOffer,
     Preparation,
     RawItem,
     SearchRun,
@@ -1422,47 +1422,6 @@ def build_app(db: Database | None = None) -> FastAPI:
         )
 
 
-    @app.get("/jobs", response_class=HTMLResponse)
-    def list_jobs(
-        request: Request,
-        user: User = Depends(require_user),
-        session: Session = Depends(get_session_dep),
-    ) -> HTMLResponse:
-        """Open offers FOR THIS USER.
-
-        Scope rule: we show an offer iff THIS user has a JobAgentScore
-        row for it. The JobOffer rows themselves stay shared (an open
-        position at Acme is the same posting for everyone), but the
-        agent's verdict — killer_angle, why_now, fit reasoning — is
-        user-specific because it was derived from this user's CV.
-        """
-        from signal_tracker.storage.models import JobAgentScore
-        rows = list(session.execute(
-            select(JobOffer, JobAgentScore)
-            .join(JobAgentScore, JobAgentScore.job_offer_id == JobOffer.id)
-            .where(and_(
-                JobOffer.is_open.is_(True),
-                JobAgentScore.user_id == user.id,
-            ))
-            .order_by(
-                desc(JobAgentScore.agent_score),
-                desc(JobOffer.relevance_score),
-                desc(JobOffer.collected_at),
-            )
-            .limit(200)
-        ).all())
-        state = _state_for(user.id)
-        return templates.TemplateResponse(
-            request, "jobs_list.html.j2",
-            {
-                "rows": rows,
-                "task_status": state["status"],
-                "current_run_id": state["current_run_id"],
-                "user": user,
-            },
-        )
-
-
     @app.get("/preparations/{prep_id}", response_class=HTMLResponse)
     def view_preparation(
         request: Request,
@@ -1486,6 +1445,21 @@ def build_app(db: Database | None = None) -> FastAPI:
                 "user": user,
             },
         )
+
+    # Phase 12 — offers with AI match score, tailored CV + letter,
+    # application tracker. Lives in its own module to keep this one sane.
+    from signal_tracker.dashboard.applications_routes import (
+        register_application_routes,
+    )
+
+    register_application_routes(
+        app,
+        app_db=app_db,
+        templates=templates,
+        require_user=require_user,
+        get_session_dep=get_session_dep,
+        state_for=_state_for,
+    )
 
     return app
 

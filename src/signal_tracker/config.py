@@ -73,6 +73,18 @@ class Settings(BaseSettings):
     # litellm.completion_cost() to estimate per turn).
     llm_agent_budget_usd: float = 0.5
     llm_agent_max_iterations: int = 30
+    # Phase 12 — job alerts. The daily run refreshes the ATS boards of the
+    # user's watchlist + signal companies, then AI-scores at most
+    # `jobs_auto_score_limit` new offers (cheap model, ~1 call each) whose
+    # keyword score is >= `jobs_auto_score_min_heuristic`. Offers scoring
+    # >= `job_alert_threshold` land in the morning digest. Set the limit
+    # to 0 to keep scoring 100% manual (button on /jobs).
+    jobs_daily_refresh_enabled: bool = True
+    jobs_auto_score_limit: int = 10
+    jobs_auto_score_min_heuristic: float = 10.0
+    job_alert_threshold: float = 60.0
+    # Days after "postulée" before the tracker suggests a follow-up.
+    application_followup_days: int = 7
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     gemini_api_key: str | None = None

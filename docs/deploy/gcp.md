@@ -97,7 +97,7 @@ free -h    # confirms "Swap: 2.0Gi"
 ## Step 4 — Run the bootstrap (10 min)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/M13-Prime/Score_Simulator/main/scripts/deploy.sh | bash
+curl -fsSL https://raw.githubusercontent.com/M13-Prime/Job_Hunte_engeneering/main/scripts/deploy.sh | bash
 ```
 
 This installs Docker, clones the repo to `/opt/signal-tracker`, and

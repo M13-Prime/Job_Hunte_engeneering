@@ -59,6 +59,10 @@ _ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("job_offers", "agent_killer_angle", "TEXT"),
     ("job_offers", "agent_why_now", "TEXT"),
     ("job_offers", "agent_processed_at", "DATETIME"),
+    # Phase 12 — match breakdown + job alerts in the digest.
+    ("job_agent_scores", "matched_skills", "JSON"),
+    ("job_agent_scores", "missing_skills", "JSON"),
+    ("digests_sent", "job_offer_ids", "JSON"),
 )
 
 # Same story for indexes: create_all() doesn't add new indexes to existing

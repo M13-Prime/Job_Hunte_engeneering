@@ -141,6 +141,8 @@ class DigestSent(Base):
     )
     recipient: Mapped[str] = mapped_column(String(256))
     signal_ids: Mapped[list[int]] = mapped_column(JSON)
+    # Job offers already announced in a digest ("Nouvelles offres").
+    job_offer_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
 
 
 class WatchlistEntry(Base):
@@ -242,8 +244,60 @@ class JobAgentScore(Base):
     agent_fit_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
     agent_killer_angle: Mapped[str | None] = mapped_column(Text, nullable=True)
     agent_why_now: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Match breakdown (Jobright-style): CV skills that the posting asks
+    # for vs. requirements the CV doesn't evidence. NULL on legacy rows.
+    matched_skills: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    missing_skills: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     processed_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False, index=True
+    )
+
+
+APPLICATION_STATUSES: tuple[str, ...] = (
+    "saved", "applied", "interview", "offer", "rejected",
+)
+
+
+class Application(Base):
+    """One tracked application in the user's pipeline (kanban).
+
+    Either tied to a scraped JobOffer, to a Signal (spontaneous
+    application) or entered by hand (both NULL). Also stores the CV and
+    cover letter tailored for that posting, so the documents live next to
+    the application they were written for.
+    """
+
+    __tablename__ = "applications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=False
+    )
+    job_offer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("job_offers.id"), index=True, nullable=True
+    )
+    signal_id: Mapped[int | None] = mapped_column(
+        ForeignKey("signals.id"), index=True, nullable=True
+    )
+    company_name: Mapped[str] = mapped_column(String(512))
+    title: Mapped[str] = mapped_column(String(512))
+    url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    # One of APPLICATION_STATUSES.
+    status: Mapped[str] = mapped_column(String(16), default="saved", index=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_followup_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
+    # Tailored documents (TailoredCV.model_dump() + plain-text letter).
+    tailored_cv: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    cover_letter: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tailored_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
     )
 
 
