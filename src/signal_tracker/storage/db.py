@@ -65,6 +65,7 @@ _ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("digests_sent", "job_offer_ids", "JSON"),
     # Phase 13 — newsletter opt-out (existing users stay subscribed).
     ("users", "newsletter_opt_in", "BOOLEAN NOT NULL DEFAULT TRUE"),
+    ("users", "country", "VARCHAR(96) NOT NULL DEFAULT 'France'"),
     ("users", "newsletter_last_sent_at", "TIMESTAMP"),
 )
 

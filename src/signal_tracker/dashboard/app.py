@@ -72,6 +72,7 @@ from signal_tracker.storage.models import (
     UserKeyword,
     WatchlistEntry,
 )
+from signal_tracker.utils.geo import COUNTRY_CHOICES, normalize_country
 from signal_tracker.utils.logging import get_logger
 from signal_tracker.utils.normalize import normalize_company_name
 
@@ -197,6 +198,13 @@ def build_app(db: Database | None = None) -> FastAPI:
             profile = load_user_profile()
             with app_db.session() as session:
                 user_keywords = _keyword_snapshot(session, user_id)
+                owner_row = session.get(User, user_id)
+                user_country = normalize_country(
+                    owner_row.country if owner_row is not None else None
+                )
+            # The country picked on the Recherche page replaces the global
+            # geographies from config/user_profile.yaml (France by default).
+            profile = profile.model_copy(update={"geographies": [user_country]})
             selection = await pick_sources(profile, user_keywords)
             registry = load_source_registry()
             # Phase 11.2 — country/language pre-filter. If the user
@@ -757,6 +765,8 @@ def build_app(db: Database | None = None) -> FastAPI:
                 "active_apps": active_apps,
                 "due_followups": due_followups,
                 "newsletter_opt_in": newsletter_opt_in,
+                "user_country": normalize_country(me.country if me is not None else None),
+                "country_choices": COUNTRY_CHOICES,
                 "week_signals": week_signals,
                 "keyword_categories": KEYWORD_CATEGORIES,
                 "keywords_by_cat": keywords_by_cat,
@@ -842,6 +852,16 @@ def build_app(db: Database | None = None) -> FastAPI:
         #                     (= companies present in that country, HQ or not)
         selected_countries = [c.strip() for c in (country or []) if c.strip()]
         valid_scope = country_scope if country_scope in {"hq", "any"} else "any"
+        # Default view: the user's target country (France unless changed).
+        # Only when arriving without any filter in the URL; submitting the
+        # filter form with nothing ticked shows every country.
+        default_country_applied = False
+        if country is None and "country_scope" not in request.query_params:
+            me_row = session.get(User, user.id)
+            default_country = normalize_country(me_row.country if me_row else None)
+            if default_country not in {"Europe", "Monde"}:
+                selected_countries = [default_country]
+                default_country_applied = True
         if selected_countries:
             if valid_scope == "hq":
                 stmt = stmt.where(Signal.hq_country.in_(selected_countries))
@@ -851,6 +871,9 @@ def build_app(db: Database | None = None) -> FastAPI:
                 # decent — most matching rows match through HQ anyway.
                 from sqlalchemy import or_
                 conds = [Signal.hq_country.in_(selected_countries)]
+                if default_country_applied:
+                    # Unknown HQ: keep it visible rather than hiding it silently.
+                    conds.append(Signal.hq_country.is_(None))
                 for c in selected_countries:
                     # Quoted exact-token match within the JSON array dump.
                     conds.append(Signal.active_countries.like(f'%"{c}"%'))
@@ -1005,6 +1028,17 @@ def build_app(db: Database | None = None) -> FastAPI:
                 "Connection": "keep-alive",
             },
         )
+
+    @app.post("/settings/country")
+    def set_country(
+        country: Annotated[str, Form()] = "France",
+        user: User = Depends(require_user),
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        row = session.get(User, user.id)
+        if row is not None:
+            row.country = normalize_country(country)
+        return RedirectResponse(url="/", status_code=303)
 
     @app.post("/search/cancel")
     def cancel_search(

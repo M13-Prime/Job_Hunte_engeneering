@@ -95,6 +95,15 @@
   </div>
 </div>
 
+<form class="card country-card" method="post" action="/settings/country" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+  <label for="country-select" style="font-weight:700; font-size:13.5px;">Pays cible</label>
+  <select id="country-select" name="country" onchange="this.form.submit()" style="min-width:180px;">
+    {% for c in country_choices %}<option value="{{ c }}" {% if c == user_country %}selected{% endif %}>{{ c }}</option>{% endfor %}
+  </select>
+  <span class="muted" style="font-size:13px;">Les sources, la langue des articles et les résultats s'alignent sur ce pays.</span>
+  <noscript><button type="submit" class="btn btn-sm btn-secondary">Enregistrer</button></noscript>
+</form>
+
 <div class="kpis" style="--kpi-n: 4;">
   <div class="kpi"><div class="label">Signaux détectés</div><div class="value"><a href="/results">{{ total_signals }}</a></div><div class="cap">dont {{ week_signals }} sur 7 jours</div></div>
   <div class="kpi"><div class="label">Offres à 60+</div><div class="value"><a href="/jobs?min_score=60">{{ strong_jobs }}</a></div><div class="cap">score IA contre ton CV</div></div>
