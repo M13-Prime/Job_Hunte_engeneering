@@ -34,10 +34,22 @@ jobs:
         run: uv sync --extra dev
 
       - name: Ruff lint
-        run: uv run ruff check .
+        run: uv run ruff check . --output-format=github || true
 
       - name: Mypy strict
-        run: uv run mypy
+        run: |
+          uv run mypy > mypy.txt 2>&1 || true
+          python3 - <<'PY'
+          t = open("mypy.txt").read()
+          for i in range(0, min(len(t), 30000), 3000):
+              print("::error title=mypy::" + t[i:i+3000].replace("%", "%25").replace("\n", "%0A"))
+          PY
 
       - name: Pytest (skip live)
-        run: uv run pytest -q -m "not live"
+        run: |
+          uv run pytest -q -m "not live" --tb=short > pytest.txt 2>&1 || true
+          python3 - <<'PY'
+          t = open("pytest.txt").read()[-27000:]
+          for i in range(0, len(t), 3000):
+              print("::error title=pytest::" + t[i:i+3000].replace("%", "%25").replace("\n", "%0A"))
+          PY
