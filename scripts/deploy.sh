@@ -24,12 +24,17 @@ warn() { printf "\n\033[33m!!  %s\033[0m\n" "$*" >&2; }
 # ---------------------------------------------------------------------------
 # 1. System packages
 # ---------------------------------------------------------------------------
-log "Installing system packages (docker, git, iptables-persistent)..."
+log "Installing system packages (git, curl, iptables-persistent)..."
 sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    git curl ca-certificates \
-    docker.io docker-compose-v2 \
-    iptables-persistent
+    git curl ca-certificates iptables-persistent
+
+# Docker + compose plugin. The official script works on Debian and Ubuntu
+# (the Ubuntu-only 'docker-compose-v2' package does not exist on Debian).
+if ! docker compose version >/dev/null 2>&1; then
+    log "Installing Docker (get.docker.com)..."
+    curl -fsSL https://get.docker.com | sudo sh
+fi
 
 sudo systemctl enable --now docker
 
