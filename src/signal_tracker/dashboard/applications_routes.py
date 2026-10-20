@@ -29,7 +29,7 @@ from typing import Annotated, Any
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import and_, desc, or_, select
+from sqlalchemy import ColumnElement, and_, desc, or_, select
 from sqlalchemy.orm import Session
 
 from signal_tracker.applications.render import cv_to_markdown, safe_filename, section_labels
@@ -165,7 +165,7 @@ def register_application_routes(
             JobAgentScore.job_offer_id == JobOffer.id,
             JobAgentScore.user_id == user.id,
         )
-        conditions = [JobAgentScore.id.is_not(None)]
+        conditions: list[ColumnElement[bool]] = [JobAgentScore.id.is_not(None)]
         if normalized:
             conditions.append(and_(
                 JobOffer.company_normalized.in_(normalized),
