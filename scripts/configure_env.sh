@@ -30,14 +30,28 @@ else
 fi
 
 set_value() {
+    # Robust against any characters in the value (|, &, /, \\ ...) and strips
+    # stray CR/LF/spaces coming from copy-paste.
     local key="$1"
-    local value="$2"
-    if grep -q "^${key}=" .env; then
-        # Use | as sed delimiter so URLs and base64 keys don't clash.
-        sed -i "s|^${key}=.*|${key}=${value}|" .env
-    else
-        echo "${key}=${value}" >> .env
-    fi
+    local value
+    value=$(printf '%s' "$2" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    KEY="$key" VALUE="$value" python3 - <<'PY'
+import os, pathlib
+key, value = os.environ["KEY"], os.environ["VALUE"]
+path = pathlib.Path(".env")
+lines = path.read_text().splitlines() if path.exists() else []
+out, done = [], False
+for line in lines:
+    if line.startswith(key + "="):
+        if not done:
+            out.append(f"{key}={value}")
+            done = True
+    else:
+        out.append(line)
+if not done:
+    out.append(f"{key}={value}")
+path.write_text("\n".join(out) + "\n")
+PY
 }
 
 comment_line() {
