@@ -19,18 +19,25 @@ from signal_tracker.notifier.email import (
 )
 from signal_tracker.notifier.render import render_digest
 from signal_tracker.notifier.scheduler import run_forever
-from signal_tracker.pipeline import run_classification, run_collection
-from signal_tracker.storage import init_db
+from signal_tracker.pipeline import (
+    collectors_for_user,
+    run_classification,
+    run_collection,
+)
+from signal_tracker.storage import Database, init_db
 from signal_tracker.utils.logging import setup_logging
 
 
 async def _job() -> None:
     settings = get_settings()
     db = init_db(resolve_db_url(settings))
+    from signal_tracker.utils.llm_usage import set_usage_db
+
+    set_usage_db(db)
     profile = load_user_profile()
-    await run_collection(db=db)
-    await run_classification(profile=profile, db=db)
     digest_user_id = resolve_digest_user_id(db, settings.digest_to_email)
+    await run_collection(collectors=collectors_for_user(db, digest_user_id), db=db)
+    await run_classification(profile=profile, db=db)
     if settings.jobs_daily_refresh_enabled and digest_user_id is not None:
         from signal_tracker.jobs.matching import refresh_and_score_for_user
 
@@ -67,6 +74,32 @@ async def _job() -> None:
         sender=settings.digest_from_email,
     )
     record_digest_sent(db, recipient=settings.digest_to_email, data=data)
+    await _maybe_send_newsletter(db, sender)
+
+
+async def _maybe_send_newsletter(db: Database, sender: EmailSenderProtocol) -> None:
+    """Weekly newsletter on NEWSLETTER_WEEKDAY (Phase 13)."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from signal_tracker.notifier.newsletter import send_newsletters
+
+    settings = get_settings()
+    today = datetime.now(ZoneInfo(settings.digest_timezone)).weekday()
+    if settings.newsletter_weekday < 0 or today != settings.newsletter_weekday:
+        return
+    if not settings.digest_from_email:
+        return
+    stats = await send_newsletters(
+        db,
+        sender=sender,
+        from_email=settings.digest_from_email,
+        base_url=settings.dashboard_base_url,
+        secret=settings.session_secret_key,
+        period_days=settings.newsletter_period_days,
+        job_threshold=settings.job_alert_threshold,
+    )
+    Console().print(f"newsletter: {stats}")
 
 
 def main() -> None:

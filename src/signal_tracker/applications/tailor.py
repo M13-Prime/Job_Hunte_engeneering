@@ -24,7 +24,8 @@ from tenacity import (
 
 from signal_tracker.applications.schemas import TailoredDocuments
 from signal_tracker.classifier.llm import _extract_json, _resolve_fallbacks
-from signal_tracker.config import get_settings
+from signal_tracker.config import get_settings, model_for
+from signal_tracker.utils.llm_usage import record_usage
 from signal_tracker.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -135,7 +136,7 @@ async def generate_tailored_documents(
     if not cv_text.strip():
         raise TailoringError("Aucun CV enregistré : ajoute ton CV d'abord.")
     settings = get_settings()
-    model = settings.llm_model
+    model = model_for("write", settings)
     fallbacks = _resolve_fallbacks(settings.llm_fallback_model)
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -165,6 +166,7 @@ async def generate_tailored_documents(
         start = time.perf_counter()
         response = await litellm.acompletion(**kwargs)
         latency = time.perf_counter() - start
+        record_usage("write", model, response)
         text = response.choices[0].message.content
         if not isinstance(text, str) or not text.strip():
             raise TailoringError(

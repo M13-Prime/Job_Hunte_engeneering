@@ -1,0 +1,63 @@
+{% extends "base.html.j2" %}
+{% block title %}Newsletter — Signal Tracker{% endblock %}
+{% block nav_newsletter %}active{% endblock %}
+
+{% block extra_css %}
+  .nl-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; margin-top: 4px; }
+  @media (max-width: 1100px) { .nl-grid { grid-template-columns: 1fr; } }
+  .preview-frame { width: 100%; height: 760px; border: 1px solid var(--border); border-radius: var(--r-md); background: #f4f4f6; }
+  .kv { list-style: none; margin: 0; padding: 0; }
+  .kv li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--rule); font-size: 14px; }
+  .kv li:first-child { border-top: 0; padding-top: 0; }
+  .kv .v { color: var(--muted); text-align: right; overflow-wrap: anywhere; }
+  .rcpt { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow: auto; }
+  .rcpt li { padding: 7px 0; border-top: 1px solid var(--rule); font-size: 14px; }
+  .rcpt li:first-child { border-top: 0; }
+  .send-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+  .send-row form { margin: 0; }
+{% endblock %}
+
+{% set days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"] %}
+
+{% block content %}
+<div class="page-head">
+  <div class="titles">
+    <h1>Newsletter</h1>
+    <p class="sub">{{ recipients|length }} abonné{{ "s" if recipients|length != 1 }}. Envoi automatique {% if weekday >= 0 %}chaque {{ days[weekday] }} avec le digest du matin{% else %}désactivé{% endif %}, sur les {{ period_days }} derniers jours.</p>
+  </div>
+</div>
+{% if flash %}<div class="flash{% if 'vide' in flash or 'Aucun' in flash %} warn{% endif %}">{{ flash }}</div>{% endif %}
+
+<div class="nl-grid">
+  <section class="card">
+    <h2 class="section-label">Aperçu de ta newsletter</h2>
+    <iframe class="preview-frame" src="/newsletter/preview" title="Aperçu de la newsletter"></iframe>
+  </section>
+
+  <aside class="card">
+    <h2 class="section-label">Envoi</h2>
+    <ul class="kv">
+      <li><span>Expéditeur</span><span class="v">{{ from_email or "non configuré" }}</span></li>
+      <li><span>Liens vers l'outil</span><span class="v">{{ base_url or "adresse de cette page" }}</span></li>
+    </ul>
+    <div class="send-row">
+      <form method="post" action="/admin/newsletter/send">
+        <input type="hidden" name="scope" value="me">
+        <button type="submit" class="btn btn-ghost btn-sm">M'envoyer un test</button>
+      </form>
+      <form method="post" action="/admin/newsletter/send" onsubmit="return confirm('Envoyer la newsletter à {{ recipients|length }} abonné(s) ?');">
+        <input type="hidden" name="scope" value="all">
+        <button type="submit" class="btn btn-primary btn-sm">Envoyer à tous</button>
+      </form>
+    </div>
+    <p class="muted" style="font-size: 13px; margin: 14px 0 18px;">Les abonnés sans aucune nouveauté sur la période ne reçoivent rien. Chaque email contient un lien de désabonnement.</p>
+
+    <h2 class="section-label">Abonnés <span class="count">{{ recipients|length }}</span></h2>
+    {% if recipients %}
+    <ul class="rcpt">{% for uid, email in recipients %}<li>{{ email }}</li>{% endfor %}</ul>
+    {% else %}
+    <p class="muted" style="margin:0; font-size: 14px;">Aucun abonné pour l'instant.</p>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

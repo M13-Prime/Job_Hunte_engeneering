@@ -54,6 +54,9 @@ class ClassificationReport:
     errors: int = 0
     # Two-stage prefilter metrics (zero when the prefilter is disabled).
     prefiltered_out: int = 0  # cheap "no" → skipped expensive call
+    # Phase 13 — free keyword gate: no user keyword / profile / trigger
+    # term in the article → skipped without any LLM call.
+    keyword_filtered: int = 0
 
 
 def _filter_feeds_by_language(
@@ -253,6 +256,41 @@ async def _ingest(
             report.new += 1
 
 
+def load_user_keywords(db: Database, user_id: int | None) -> dict[str, list[str]]:
+    """The user's saved keywords by category ({} when user_id is None)."""
+    if user_id is None:
+        return {}
+    from signal_tracker.storage.models import UserKeyword
+
+    out: dict[str, list[str]] = {}
+    with db.session() as session:
+        for kw in session.execute(
+            select(UserKeyword).where(UserKeyword.user_id == user_id)
+        ).scalars():
+            out.setdefault(kw.category, []).append(kw.value)
+    return out
+
+
+def collectors_for_user(db: Database, user_id: int | None) -> list[BaseCollector]:
+    """Default collectors + collectors built from the user's keywords.
+
+    Used by the daily run so the morning collection also covers what the
+    user searches for, not only the static config.
+    """
+    from signal_tracker.utils.geo import geographies_to_languages
+    from signal_tracker.utils.keywords import keyword_collectors
+
+    languages = geographies_to_languages(load_user_profile().geographies)
+    collectors = build_default_collectors(language_filter=languages)
+    collectors.extend(keyword_collectors(
+        load_user_keywords(db, user_id),
+        languages=languages,
+        gdelt_enabled=bool((load_sources().get("gdelt") or {}).get("enabled")),
+        newsapi_key=get_settings().newsapi_key,
+    ))
+    return collectors
+
+
 async def run_collection(
     collectors: list[BaseCollector] | None = None,
     db: Database | None = None,
@@ -398,9 +436,23 @@ async def run_classification(
             extra={"count": len(feedback_examples)},
         )
 
+    # Phase 13 — free keyword gate. Only active once the user has saved
+    # keywords (otherwise there is nothing user-specific to match on).
+    from signal_tracker.config import load_keywords
+    from signal_tracker.utils.keywords import KeywordMatcher, prefilter_terms
+
+    keyword_gate: KeywordMatcher | None = None
+    if settings.keyword_prefilter_enabled and any(user_keywords.values()):
+        keyword_gate = KeywordMatcher(prefilter_terms(
+            user_keywords,
+            [*profile.domains, *profile.target_roles, *profile.target_company_types],
+            load_keywords(),
+        ))
+
     rate_limit = max(0.0, float(settings.llm_rate_limit_seconds))
     prefilter_enabled = bool(
-        settings.llm_prefilter_enabled and settings.llm_cheap_model
+        settings.llm_prefilter_enabled
+        and (settings.llm_cheap_model or settings.llm_model_prefilter)
     )
 
     with db.session() as session:
@@ -440,6 +492,17 @@ async def run_classification(
                 content=raw.content,
                 published_at=raw.published_at,
             )
+
+            # Stage 0: free keyword gate (no LLM call at all).
+            if keyword_gate is not None and not keyword_gate.matches(
+                f"{raw.title or ''} {raw.content or ''}"
+            ):
+                report.keyword_filtered += 1
+                with db.session() as session:
+                    row = session.get(RawItem, raw.id)
+                    if row is not None:
+                        row.classified = True
+                return
 
             # Stage 1: cheap prefilter. "no" → mark classified, skip the
             # expensive call entirely. "yes"/"maybe"/failure → fall through.

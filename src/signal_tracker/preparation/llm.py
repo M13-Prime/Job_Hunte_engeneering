@@ -20,7 +20,7 @@ from tenacity import (
 )
 
 from signal_tracker.classifier.llm import _extract_json, _resolve_fallbacks
-from signal_tracker.config import UserProfile, get_settings
+from signal_tracker.config import UserProfile, get_settings, model_for
 from signal_tracker.preparation.prompts import (
     CV_PROFILE_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
@@ -28,6 +28,7 @@ from signal_tracker.preparation.prompts import (
     render_user_prompt,
 )
 from signal_tracker.preparation.schemas import CVProfile, PreparationReport
+from signal_tracker.utils.llm_usage import record_usage
 from signal_tracker.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -91,10 +92,10 @@ async def generate_cv_profile(cv_text: str) -> CVProfile:
     the cheap model isn't configured.
     """
     settings = get_settings()
-    model = settings.llm_cheap_model or settings.llm_model
+    model = model_for("extract", settings)
     # Fall back to the main model if the cheap call fails for any reason.
     fallbacks_source = settings.llm_fallback_model or (
-        settings.llm_model if settings.llm_cheap_model else None
+        settings.llm_model if model != settings.llm_model else None
     )
     fallbacks = _resolve_fallbacks(fallbacks_source)
 
@@ -121,6 +122,7 @@ async def generate_cv_profile(cv_text: str) -> CVProfile:
         start = time.perf_counter()
         response = await litellm.acompletion(**kwargs)
         latency = time.perf_counter() - start
+        record_usage("extract", model, response)
 
         text = response.choices[0].message.content
         if not isinstance(text, str) or not text.strip():
@@ -162,7 +164,7 @@ async def generate_preparation(
 ) -> PreparationReport:
     """Run the LLM to produce a structured preparation report."""
     settings = get_settings()
-    model = settings.llm_model
+    model = model_for("write", settings)
     fallbacks = _resolve_fallbacks(settings.llm_fallback_model)
 
     messages = [
@@ -206,6 +208,7 @@ async def generate_preparation(
             kwargs["fallbacks"] = fallbacks
         response = await litellm.acompletion(**kwargs)
         latency = time.perf_counter() - start
+        record_usage("write", model, response)
 
         text = response.choices[0].message.content
         if not isinstance(text, str) or not text.strip():

@@ -63,6 +63,9 @@ _ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("job_agent_scores", "matched_skills", "JSON"),
     ("job_agent_scores", "missing_skills", "JSON"),
     ("digests_sent", "job_offer_ids", "JSON"),
+    # Phase 13 — newsletter opt-out (existing users stay subscribed).
+    ("users", "newsletter_opt_in", "BOOLEAN NOT NULL DEFAULT TRUE"),
+    ("users", "newsletter_last_sent_at", "TIMESTAMP"),
 )
 
 # Same story for indexes: create_all() doesn't add new indexes to existing

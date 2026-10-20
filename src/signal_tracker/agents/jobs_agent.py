@@ -39,10 +39,11 @@ from sqlalchemy.orm import Session
 from signal_tracker.agents.loop import AgentLoop, AgentResult
 from signal_tracker.agents.tools.base import ToolError, ToolRegistry, tool
 from signal_tracker.classifier.llm import _extract_json, _resolve_fallbacks
-from signal_tracker.config import UserProfile, get_settings
+from signal_tracker.config import UserProfile, get_settings, model_for
 from signal_tracker.jobs.scraper import JobsScraper, ScrapingReport, persist_result
 from signal_tracker.storage import Database
 from signal_tracker.storage.models import JobAgentScore, JobOffer, Signal, UserCV
+from signal_tracker.utils.llm_usage import record_usage
 from signal_tracker.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -149,7 +150,7 @@ async def _semantic_score(
     """One cheap LLM call: 0-100 score + reasoning + killer angle + why_now."""
     import litellm
     settings = get_settings()
-    model = settings.llm_cheap_model or settings.llm_model
+    model = model_for("extract", settings)
     fallbacks = _resolve_fallbacks(settings.llm_fallback_model)
     signal_block = (
         f"RECENT SIGNAL: {recent_signal.signal_type} — {recent_signal.summary_fr}\n"
@@ -183,6 +184,7 @@ async def _semantic_score(
     if fallbacks:
         kwargs["fallbacks"] = fallbacks
     response = await litellm.acompletion(**kwargs)
+    record_usage("extract", model, response)
     text = response.choices[0].message.content
     if not isinstance(text, str) or not text.strip():
         raise ToolError("empty semantic-score response")
@@ -510,7 +512,7 @@ async def run_jobs_agent(
     )
     tools = _build_tools(state)
     agent = AgentLoop(
-        model=settings.llm_model,
+        model=model_for("agent", settings),
         system_prompt=SYSTEM_PROMPT,
         tools=tools,
         budget_usd=budget_usd if budget_usd is not None else settings.llm_agent_budget_usd,

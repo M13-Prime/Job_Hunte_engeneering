@@ -21,9 +21,10 @@ from typing import Any
 from signal_tracker.agents.loop import AgentLoop, AgentResult
 from signal_tracker.agents.tools.base import ToolError, ToolRegistry, tool
 from signal_tracker.classifier.llm import _extract_json
-from signal_tracker.config import UserProfile, get_settings
+from signal_tracker.config import UserProfile, get_settings, model_for
 from signal_tracker.preparation.llm import generate_preparation
 from signal_tracker.preparation.schemas import PreparationReport
+from signal_tracker.utils.llm_usage import record_usage
 from signal_tracker.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -101,7 +102,7 @@ async def _quick_fit_assessment(ctx: PrepContext) -> tuple[int, str]:
 
     from signal_tracker.classifier.llm import _resolve_fallbacks
     settings = get_settings()
-    model = settings.llm_cheap_model or settings.llm_model
+    model = model_for("extract", settings)
     fallbacks = _resolve_fallbacks(settings.llm_fallback_model)
     user = (
         f"COMPANY: {ctx.company_name}\n"
@@ -126,6 +127,7 @@ async def _quick_fit_assessment(ctx: PrepContext) -> tuple[int, str]:
     if fallbacks:
         kwargs["fallbacks"] = fallbacks
     response = await litellm.acompletion(**kwargs)
+    record_usage("extract", model, response)
     text = response.choices[0].message.content
     if not isinstance(text, str) or not text.strip():
         raise ToolError("empty fit-assessment response")
@@ -251,7 +253,7 @@ async def run_prep_agent(
     )
     tools = _build_tools(ctx)
     agent = AgentLoop(
-        model=settings.llm_model,
+        model=model_for("agent", settings),
         system_prompt=SYSTEM_PROMPT,
         tools=tools,
         budget_usd=budget_usd if budget_usd is not None else settings.llm_agent_budget_usd,

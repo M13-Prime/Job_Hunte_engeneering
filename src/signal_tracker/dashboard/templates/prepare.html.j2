@@ -19,7 +19,7 @@
   @media (max-width: 960px) { .prep-grid { grid-template-columns: 1fr; } }
 
   .signal-recap { font-size: 14px; color: var(--text-2); }
-  .signal-recap .label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-4); margin: 14px 0 4px; }
+  .signal-recap .label { font-size: 12.5px; font-weight: 700; letter-spacing: 0; color: var(--text-4); margin: 14px 0 4px; }
   .signal-recap .label:first-of-type { margin-top: 0; }
   .signal-recap p { margin: 0; line-height: 1.55; }
   .signal-recap .summary { color: var(--text); font-size: 15px; line-height: 1.55; margin-top: 4px; }
@@ -49,8 +49,7 @@
   .upload-zone.drag-over .icon { color: var(--blue); }
 
   .divider {
-    display: flex; align-items: center; gap: 12px; color: var(--text-4); font-size: 11.5px;
-    text-transform: uppercase; letter-spacing: 0.08em;
+    display: flex; align-items: center; gap: 12px; color: var(--text-4); font-size: 12.5px; letter-spacing: 0;
   }
   .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--hairline); }
 
@@ -61,7 +60,7 @@
     line-height: 1.5; outline: none;
     transition: border-color 160ms ease, box-shadow 160ms ease;
   }
-  textarea.cv-paste:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(0,113,227,0.12); }
+  textarea.cv-paste:focus { border-color: var(--ink); }
 
   .cv-known {
     display: flex; align-items: center; gap: 10px; padding: 10px 14px;

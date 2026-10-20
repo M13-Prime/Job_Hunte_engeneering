@@ -5,7 +5,7 @@
 {% block extra_css %}
   main { max-width: 1400px; }
   .apps-head { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; flex-wrap: wrap; }
-  .apps-head h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.028em; margin: 0; }
+  .apps-head h1 { margin: 0; }
   .apps-head .count-badge {
     background: rgba(0,0,0,0.06); color: var(--text-3);
     padding: 4px 12px; border-radius: var(--r-full); font-size: 13px; font-weight: 600;
@@ -29,27 +29,27 @@
   .board { display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: 14px; overflow-x: auto; padding-bottom: 8px; }
   @media (max-width: 900px) { .board { grid-template-columns: repeat(5, 82vw); scroll-snap-type: x mandatory; } .col { scroll-snap-align: start; } }
   .col { background: rgba(0,0,0,0.03); border-radius: var(--r-lg); padding: 12px; min-height: 120px; }
-  .col-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); margin: 2px 4px 10px; }
-  .col-head .n { background: var(--surface); border-radius: var(--r-full); padding: 1px 8px; font-size: 11.5px; }
+  .col-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--text-3); margin: 2px 4px 10px; }
+  .col-head .n { background: var(--surface); border-radius: var(--r-full); padding: 1px 8px; font-size: 12.5px; }
   .col.applied .col-head { color: var(--blue); }
   .col.interview .col-head { color: var(--purple); }
   .col.offer .col-head { color: var(--green-deep); }
   .col.rejected .col-head { color: var(--text-4); }
 
   .app-card { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md); padding: 12px; margin-bottom: 10px; }
-  .app-card.due { border-color: #fdba74; box-shadow: 0 0 0 2px #ffedd5; }
+  .app-card.due { border-color: var(--accent); }
   .app-card .t { font-weight: 600; font-size: 14px; line-height: 1.3; }
   .app-card .t a { color: var(--text); }
   .app-card .c { font-size: 12.5px; color: var(--text-3); margin-top: 2px; }
   .app-card .dates { font-size: 12px; color: var(--text-3); margin-top: 6px; }
-  .app-card .due-badge { display: inline-block; background: #ffedd5; color: #9a3412; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: var(--r-full); margin-top: 6px; }
+  .app-card .due-badge { display: inline-block; background: #ffedd5; color: #9a3412; font-size: 12.5px; font-weight: 600; padding: 2px 8px; border-radius: var(--r-full); margin-top: 6px; }
   .app-card .row { display: flex; gap: 6px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
   .app-card .row form { margin: 0; }
   .app-card select { padding: 5px 8px; font-size: 12.5px; width: auto; }
   .app-card details { margin-top: 8px; }
   .app-card details summary { font-size: 12.5px; color: var(--blue); cursor: pointer; }
   .app-card .edit { display: grid; gap: 6px; margin-top: 8px; }
-  .app-card .edit label { font-size: 11.5px; color: var(--text-3); }
+  .app-card .edit label { font-size: 12.5px; color: var(--text-3); }
   .app-card .notes { font-size: 12.5px; color: var(--text-2); margin-top: 6px; white-space: pre-wrap; }
   .linkish { background: none; border: none; color: var(--blue); font: inherit; font-size: 12.5px; cursor: pointer; padding: 0; }
   .linkish.danger { color: var(--red); }
@@ -92,7 +92,7 @@
         {% if a.applied_at %}Postulée le {{ a.applied_at.strftime("%d/%m/%Y") }}{% else %}Ajoutée le {{ a.created_at.strftime("%d/%m/%Y") }}{% endif %}
         {% if a.next_followup_at and a.id not in due %} · relance le {{ a.next_followup_at.strftime("%d/%m") }}{% endif %}
       </div>
-      {% if a.id in due %}<span class="due-badge">⏰ Relance à faire</span>{% endif %}
+      {% if a.id in due %}<span class="due-badge">Relance à faire</span>{% endif %}
       {% if a.notes %}<div class="notes">{{ a.notes }}</div>{% endif %}
       <div class="row">
         <form method="post" action="/applications/{{ a.id }}/status">

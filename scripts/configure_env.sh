@@ -67,7 +67,7 @@ echo
 
 # --- LLM ---
 echo "--- LLM provider ---"
-default_model="anthropic/claude-sonnet-4-5"
+default_model="anthropic/claude-sonnet-5-5"
 model=$(prompt_plain "LLM_MODEL [$default_model]")
 model=${model:-$default_model}
 set_value LLM_MODEL "$model"
@@ -93,6 +93,20 @@ case "$model" in
         echo "Unknown provider in LLM_MODEL; skipping API key prompt."
         ;;
 esac
+
+# Phase 13 — cheap model for the bulk tasks when the provider is Anthropic.
+case "$model" in
+    anthropic/*)
+        set_value LLM_CHEAP_MODEL "anthropic/claude-haiku-5-5"
+        set_value LLM_MODEL_CLASSIFY "anthropic/claude-haiku-5-5"
+        ;;
+esac
+
+# A stable session secret keeps logins and newsletter unsubscribe links
+# valid across restarts.
+if ! grep -q "^SESSION_SECRET_KEY=." .env; then
+    set_value SESSION_SECRET_KEY "$(head -c 32 /dev/urandom | base64 | tr -d '/+=\n')"
+fi
 
 # Drop the openai fallback if the corresponding key isn't already set —
 # avoids the runtime warning that we'd otherwise log every classify().

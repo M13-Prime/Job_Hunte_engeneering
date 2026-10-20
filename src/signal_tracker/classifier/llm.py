@@ -31,7 +31,8 @@ from signal_tracker.classifier.prompts import (
     render_user_prompt,
 )
 from signal_tracker.classifier.schemas import ClassificationResult, ClassifierInput
-from signal_tracker.config import UserProfile, get_settings
+from signal_tracker.config import UserProfile, get_settings, model_for
+from signal_tracker.utils.llm_usage import record_usage
 from signal_tracker.utils.logging import get_logger
 
 # LiteLLM is chatty by default; one INFO line per call buries our own
@@ -158,7 +159,7 @@ async def classify(
     - Logs per call: model, latency, estimated cost, tokens in/out.
     """
     settings = get_settings()
-    model = settings.llm_model
+    model = model_for("classify", settings)
     fallbacks = _resolve_fallbacks(settings.llm_fallback_model)
 
     system_text = render_system_prompt(
@@ -195,6 +196,7 @@ async def classify(
 
         response = await litellm.acompletion(**kwargs)
         latency = time.perf_counter() - start
+        record_usage("classify", model, response)
 
         choices = response.choices
         text = choices[0].message.content
@@ -291,7 +293,7 @@ async def prefilter(
     cost saving for that one article, never a real signal.
     """
     settings = get_settings()
-    model = settings.llm_cheap_model
+    model = settings.llm_model_prefilter or settings.llm_cheap_model
     if not model:
         return "maybe"  # caller should check llm_prefilter_enabled first
     fallbacks = _resolve_fallbacks(settings.llm_fallback_model)
@@ -328,6 +330,7 @@ async def prefilter(
         start = time.perf_counter()
         response = await litellm.acompletion(**kwargs)
         latency = time.perf_counter() - start
+        record_usage("prefilter", model, response)
         text = response.choices[0].message.content
         if not isinstance(text, str) or not text.strip():
             return "maybe"
