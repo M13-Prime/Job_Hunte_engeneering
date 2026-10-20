@@ -37,21 +37,7 @@ jobs:
         run: uv run ruff check .
 
       - name: Mypy strict
-        continue-on-error: true
-        run: |
-          uv run mypy > mypy.txt 2>&1 || true
-          python3 - <<'PY'
-          t = open("mypy.txt").read()
-          for i in range(0, min(len(t), 30000), 3000):
-              print("::error title=mypy::" + t[i:i+3000].replace("%", "%25").replace("\n", "%0A"))
-          PY
+        run: uv run mypy
 
       - name: Pytest (skip live)
-        run: |
-          uv run pytest -q -m "not live" --tb=short > pytest.txt 2>&1 || true
-          python3 - <<'PY'
-          t = open("pytest.txt").read()
-          t = t[-27000:]
-          for i in range(0, len(t), 3000):
-              print("::error title=pytest::" + t[i:i+3000].replace("%", "%25").replace("\n", "%0A"))
-          PY
+        run: uv run pytest -q -m "not live"
