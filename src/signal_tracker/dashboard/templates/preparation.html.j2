@@ -15,12 +15,12 @@
   .prep-header .score.investigate { background: var(--blue-soft); color: var(--blue); }
   .prep-header .score.watch { background: var(--amber-soft); color: var(--amber); }
   .prep-header .meta { flex: 1; min-width: 0; }
-  .prep-header h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 6px; }
+  .prep-header h1 { margin: 0 0 6px; }
   .prep-header .sub { color: var(--text-3); font-size: 13.5px; }
   .prep-header .sub a { color: var(--blue); }
 
   .headline-card {
-    background: linear-gradient(135deg, rgba(52,199,89,0.08) 0%, rgba(0,113,227,0.06) 100%);
+    background: var(--accent-50);
     border: 1px solid rgba(52,199,89,0.18);
     border-radius: var(--r-lg);
     padding: 22px 26px; margin-bottom: 28px; font-size: 17px; color: var(--text);
@@ -31,13 +31,13 @@
   .section { margin-bottom: 28px; }
   .section .stitle {
     display: flex; align-items: center; gap: 10px;
-    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    font-size: 12px; font-weight: 700; letter-spacing: 0;
     color: var(--text-3); margin: 0 0 12px;
   }
   .section .stitle .num {
     display: inline-flex; align-items: center; justify-content: center;
     width: 22px; height: 22px; border-radius: 50%;
-    background: var(--text); color: white; font-size: 11px; font-weight: 700;
+    background: var(--text); color: white; font-size: 12.5px; font-weight: 700;
     letter-spacing: 0;
   }
 
@@ -49,10 +49,10 @@
     background: var(--surface-2); border: 1px solid var(--hairline);
   }
   .fit-score .n {
-    display: block; font-size: 48px; font-weight: 700;
+    display: block; font-family: var(--head); font-size: 34px; font-weight: 600;
     color: var(--green-deep); letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums;
   }
-  .fit-score .l { font-size: 12px; color: var(--text-3); margin-top: 6px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .fit-score .l { font-size: 12px; color: var(--text-3); margin-top: 6px; letter-spacing: 0; }
   .fit-rationale { font-size: 15px; color: var(--text-2); line-height: 1.55; }
 
   .duo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 18px; }
@@ -61,7 +61,7 @@
     padding: 18px; border-radius: var(--r-md); border: 1px solid var(--hairline);
     background: var(--surface);
   }
-  .points h4 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 12px; color: var(--text-3); display: flex; align-items: center; gap: 7px; }
+  .points h4 { font-size: 12px; font-weight: 700; letter-spacing: 0; margin: 0 0 12px; color: var(--text-3); display: flex; align-items: center; gap: 7px; }
   .points h4 .pip { width: 8px; height: 8px; border-radius: 50%; }
   .points.strong h4 .pip { background: var(--green); }
   .points.gaps h4 .pip { background: var(--amber); }
@@ -81,13 +81,13 @@
   .intel-card { padding: 22px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-lg); }
   .intel-card p { font-size: 14.5px; color: var(--text-2); line-height: 1.55; margin: 0 0 14px; }
   .intel-card p:last-child { margin-bottom: 0; }
-  .intel-card .micro-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin: 18px 0 8px; }
+  .intel-card .micro-label { font-size: 12.5px; font-weight: 700; letter-spacing: 0; color: var(--text-3); margin: 18px 0 8px; }
   .intel-card .micro-label:first-child { margin-top: 0; }
   .exec-row { display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid var(--hairline-2); }
   .exec-row:first-of-type { border-top: 0; padding-top: 0; }
   .exec-row .avatar {
     flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--green), var(--blue));
+    background: var(--accent);
     color: white; display: flex; align-items: center; justify-content: center;
     font-weight: 700; font-size: 14px;
   }
@@ -133,13 +133,13 @@
   }
   .msg-template .label {
     position: absolute; top: 10px; right: 14px;
-    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0;
     color: var(--text-4);
   }
   .msg-template .copy-btn {
     position: absolute; top: 30px; right: 14px;
     background: rgba(255,255,255,0.08); color: white; border: none;
-    padding: 5px 10px; border-radius: var(--r-sm); font-size: 11px; cursor: pointer;
+    padding: 5px 10px; border-radius: var(--r-sm); font-size: 12.5px; cursor: pointer;
     font-family: inherit;
   }
   .msg-template .copy-btn:hover { background: rgba(255,255,255,0.15); }
@@ -176,8 +176,7 @@
   }
   .contact-row:last-child { margin-bottom: 0; }
   .contact-row .conf {
-    flex-shrink: 0; font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: var(--r-full);
-    text-transform: uppercase; letter-spacing: 0.04em;
+    flex-shrink: 0; font-size: 12.5px; font-weight: 700; padding: 3px 9px; border-radius: var(--r-full); letter-spacing: 0;
   }
   .conf.high { background: var(--green-soft); color: var(--green-deep); }
   .conf.medium { background: var(--blue-soft); color: var(--blue); }
@@ -231,7 +230,7 @@
     display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
   .career-block .ico-careers svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .career-block .label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); }
+  .career-block .label { font-size: 12.5px; font-weight: 700; letter-spacing: 0; color: var(--text-3); }
   .career-block a.url {
     display: block; font-weight: 600; font-size: 14.5px; color: var(--blue);
     word-break: break-all; line-height: 1.35; margin-top: 2px;
@@ -239,8 +238,7 @@
   .career-block .fallback { font-size: 12.5px; color: var(--text-3); margin-top: 4px; }
   .career-block .fallback a { color: var(--blue); }
   .career-block .conf {
-    font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: var(--r-full);
-    text-transform: uppercase; letter-spacing: 0.04em; margin-left: auto;
+    font-size: 12.5px; font-weight: 700; padding: 3px 9px; border-radius: var(--r-full); letter-spacing: 0; margin-left: auto;
   }
 
   /* Failed state */
@@ -391,7 +389,7 @@
   </div>
 
   {% if report.approach_plan.talking_points %}
-  <div class="micro-label" style="margin-top:18px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3);">Talking points</div>
+  <div class="micro-label" style="margin-top:18px; font-size: 12.5px; font-weight: 700; letter-spacing: 0; color: var(--text-3);">Talking points</div>
   <div class="talking-points">
     {% for tp in report.approach_plan.talking_points %}<span class="chip">{{ tp }}</span>{% endfor %}
   </div>

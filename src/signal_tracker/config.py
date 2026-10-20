@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from dotenv import load_dotenv
@@ -73,6 +73,26 @@ class Settings(BaseSettings):
     # litellm.completion_cost() to estimate per turn).
     llm_agent_budget_usd: float = 0.5
     llm_agent_max_iterations: int = 30
+    # Phase 13 — one model per task. Each is optional; unset falls back to
+    # LLM_CHEAP_MODEL (prefilter / extract) or LLM_MODEL (the rest), so an
+    # existing .env keeps working unchanged. See model_for() and
+    # docs/LLM_COSTS.md for the recommended cheap-but-good routing.
+    #   classify : bulk news classification (hundreds of calls per search)
+    #   prefilter: yes/no/maybe gate before classify (tiny output)
+    #   extract  : structured extraction — CV profile, job match score,
+    #              source picker, prep research steps
+    #   write    : long-form writing — preparation report, tailored CV +
+    #              cover letter (quality-sensitive, few calls)
+    #   agent    : tool-using agent loops (research / jobs / prep agents)
+    llm_model_classify: str | None = None
+    llm_model_prefilter: str | None = None
+    llm_model_extract: str | None = None
+    llm_model_write: str | None = None
+    llm_model_agent: str | None = None
+    # Free, deterministic gate before any LLM call: an article that matches
+    # none of the user's keywords / profile terms / config/keywords.yaml is
+    # skipped without spending a token. Off = classify everything.
+    keyword_prefilter_enabled: bool = True
     # Phase 12 — job alerts. The daily run refreshes the ATS boards of the
     # user's watchlist + signal companies, then AI-scores at most
     # `jobs_auto_score_limit` new offers (cheap model, ~1 call each) whose
@@ -85,6 +105,11 @@ class Settings(BaseSettings):
     job_alert_threshold: float = 60.0
     # Days after "postulée" before the tracker suggests a follow-up.
     application_followup_days: int = 7
+    # Phase 13 — weekly newsletter to every approved, opted-in user.
+    # Sent by the scheduler on this weekday (0 = Monday ... 6 = Sunday),
+    # -1 disables the automatic send (the admin page can still send it).
+    newsletter_weekday: int = 0
+    newsletter_period_days: int = 7
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     gemini_api_key: str | None = None
@@ -179,6 +204,25 @@ def load_jobs_config(path: str | Path | None = None) -> dict[str, Any]:
     return _read_yaml(jobs_path)
 
 
+LLMTask = Literal["classify", "prefilter", "extract", "write", "agent"]
+LLM_TASKS: tuple[LLMTask, ...] = ("classify", "prefilter", "extract", "write", "agent")
+
+
+def model_for(task: LLMTask, settings: Settings | None = None) -> str:
+    """The model to use for `task`.
+
+    Priority: the task's own LLM_MODEL_<TASK> > LLM_CHEAP_MODEL for the
+    cheap tasks (prefilter, extract) > LLM_MODEL.
+    """
+    settings = settings or get_settings()
+    override = getattr(settings, f"llm_model_{task}", None)
+    if override:
+        return str(override)
+    if task in ("prefilter", "extract") and settings.llm_cheap_model:
+        return settings.llm_cheap_model
+    return settings.llm_model
+
+
 def resolve_db_url(settings: Settings | None = None) -> str:
     """Return the URL/path to hand to ``init_db``.
 
@@ -191,7 +235,9 @@ def resolve_db_url(settings: Settings | None = None) -> str:
 
 __all__ = [
     "CONFIG_DIR",
+    "LLM_TASKS",
     "REPO_ROOT",
+    "LLMTask",
     "Settings",
     "UserProfile",
     "get_settings",
@@ -199,6 +245,7 @@ __all__ = [
     "load_keywords",
     "load_sources",
     "load_user_profile",
+    "model_for",
     "resolve_db_url",
 ]
 

@@ -1,0 +1,75 @@
+{% extends "base.html.j2" %}
+{% block title %}Coût IA — Signal Tracker{% endblock %}
+{% block nav_usage %}active{% endblock %}
+
+{% block extra_css %}
+  .usage-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; margin-top: 20px; }
+  @media (max-width: 1100px) { .usage-grid { grid-template-columns: 1fr; } }
+  table.data { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.data th { text-align: left; font-weight: 600; color: var(--muted); font-size: 13px; padding: 0 10px 10px; }
+  table.data td { padding: 11px 10px; border-top: 1px solid var(--rule); }
+  table.data th.num, table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.data td.model { color: var(--muted); font-size: 13.5px; }
+  .share { display: block; height: 3px; border-radius: 2px; background: var(--accent); margin-top: 6px; }
+  .routing { list-style: none; margin: 0; padding: 0; }
+  .routing li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--rule); font-size: 14px; }
+  .routing li:first-child { border-top: 0; padding-top: 0; }
+  .routing .m { color: var(--muted); text-align: right; overflow-wrap: anywhere; }
+  .periods { display: flex; gap: 6px; }
+  .periods a { height: 32px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: 999px; background: var(--raised); font-size: 13.5px; }
+  .periods a.on { background: var(--ink); color: #fff; }
+  .periods a:hover { text-decoration: none; }
+{% endblock %}
+
+{% set task_labels = {"classify": "Classification des articles", "prefilter": "Préfiltre oui / non", "extract": "Extraction (CV, score des offres, sources)", "write": "Rédaction (préparations, CV adaptés)", "agent": "Agents autonomes"} %}
+
+{% block content %}
+<div class="page-head">
+  <div class="titles">
+    <h1>Coût IA</h1>
+    <p class="sub">
+      {% if total_calls %}{{ "%.2f"|format(total_cost) }} $ sur {{ days }} jours, {{ total_calls }} appels au total.
+      {% else %}Aucun appel enregistré sur {{ days }} jours.{% endif %}
+    </p>
+  </div>
+  <div class="actions periods">
+    {% for d in (7, 30, 90) %}<a href="/admin/usage?days={{ d }}" class="{{ 'on' if days == d }}">{{ d }} j</a>{% endfor %}
+  </div>
+</div>
+
+<div class="usage-grid">
+  <section class="card">
+    <h2 class="section-label">Par tâche et par modèle</h2>
+    {% if rows %}
+    <table class="data">
+      <thead><tr><th>Tâche</th><th>Modèle</th><th class="num">Appels</th><th class="num">Tokens entrée</th><th class="num">Tokens sortie</th><th class="num">Coût</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ task_labels.get(r.task, r.task) }}{% if total_cost > 0 %}<span class="share" style="width: {{ (r.cost_usd / total_cost * 100)|round(1) }}%;"></span>{% endif %}</td>
+          <td class="model">{{ r.model }}</td>
+          <td class="num">{{ "{:,}".format(r.calls).replace(",", " ") }}</td>
+          <td class="num">{{ "{:,}".format(r.input_tokens).replace(",", " ") }}</td>
+          <td class="num">{{ "{:,}".format(r.output_tokens).replace(",", " ") }}</td>
+          <td class="num">{{ "%.3f"|format(r.cost_usd) }} ${% if r.unknown_cost_calls %} <span class="muted" title="Prix inconnu pour {{ r.unknown_cost_calls }} appel(s)">*</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted" style="font-size: 13px; margin: 14px 0 0;">Coûts estimés à partir des prix publics des fournisseurs. * : modèle dont le prix n'est pas connu de l'outil, compté à 0.</p>
+    {% else %}
+    <p class="muted" style="margin:0;">Les appels s'afficheront ici après la prochaine recherche, le prochain score d'offre ou le prochain CV adapté.</p>
+    {% endif %}
+  </section>
+
+  <aside class="card">
+    <h2 class="section-label">Modèle utilisé par tâche</h2>
+    <ul class="routing">
+      {% for task, model in routing %}
+      <li><span>{{ task_labels.get(task, task) }}</span><span class="m">{{ model }}</span></li>
+      {% endfor %}
+    </ul>
+    <p class="muted" style="font-size: 13px; margin: 14px 0 0;">Se change dans <code>.env</code> avec <code>LLM_MODEL_CLASSIFY</code>, <code>LLM_MODEL_EXTRACT</code>, <code>LLM_MODEL_WRITE</code>… Voir <code>docs/LLM_COSTS.md</code>.</p>
+  </aside>
+</div>
+{% endblock %}

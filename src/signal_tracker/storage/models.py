@@ -443,6 +443,11 @@ class User(Base):
     approved_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
     )
+    # Phase 13 — weekly newsletter. Opt-out via the link in every email.
+    newsletter_opt_in: Mapped[bool] = mapped_column(default=True, nullable=False)
+    newsletter_last_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
 
 
 class SignalFeedback(Base):
@@ -469,3 +474,24 @@ class SignalFeedback(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
+
+
+class LlmUsage(Base):
+    """One LLM call: which task, which model, tokens and estimated cost.
+
+    Lets the owner check what each task really costs per day, and verify
+    that routing a task to a cheaper model saved money (Phase 13).
+    """
+
+    __tablename__ = "llm_usage"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False, index=True
+    )
+    task: Mapped[str] = mapped_column(String(32), index=True)
+    model: Mapped[str] = mapped_column(String(128))
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cached_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)

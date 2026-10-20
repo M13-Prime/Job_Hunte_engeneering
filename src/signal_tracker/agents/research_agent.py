@@ -24,7 +24,7 @@ from signal_tracker.agents.tools.base import ToolError, ToolRegistry, tool
 from signal_tracker.classifier.feedback import load_feedback_examples
 from signal_tracker.classifier.llm import classify, prefilter
 from signal_tracker.classifier.schemas import ClassifierInput
-from signal_tracker.config import UserProfile, get_settings
+from signal_tracker.config import UserProfile, get_settings, model_for
 from signal_tracker.pipeline import _store_signal
 from signal_tracker.storage import Database
 from signal_tracker.storage.models import RawItem, UserKeyword
@@ -75,7 +75,8 @@ def _build_tools(state: ResearchState) -> ToolRegistry:
     """Bind the research tools to a shared ResearchState."""
     settings = get_settings()
     prefilter_enabled = bool(
-        settings.llm_prefilter_enabled and settings.llm_cheap_model
+        settings.llm_prefilter_enabled
+        and (settings.llm_cheap_model or settings.llm_model_prefilter)
     )
     feedback_examples = load_feedback_examples(state.db)
 
@@ -212,7 +213,7 @@ async def run_research_agent(
         search_run_id=search_run_id, user_keywords=user_keywords,
     )
     tools = _build_tools(state)
-    model = settings.llm_model
+    model = model_for("agent", settings)
     agent = AgentLoop(
         model=model,
         system_prompt=SYSTEM_PROMPT,

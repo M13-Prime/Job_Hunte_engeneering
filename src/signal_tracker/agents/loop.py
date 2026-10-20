@@ -30,6 +30,7 @@ import litellm
 
 from signal_tracker.agents.tools.base import Tool, ToolRegistry, ToolResult
 from signal_tracker.classifier.llm import _resolve_fallbacks
+from signal_tracker.utils.llm_usage import record_usage
 from signal_tracker.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -140,6 +141,7 @@ class AgentLoop:
                 start = time.perf_counter()
                 response = await litellm.acompletion(**kwargs)
                 step_latency = time.perf_counter() - start
+                record_usage("agent", self.model, response)
             except Exception as exc:
                 logger.exception("agent.llm_call_failed iteration=%d", iteration)
                 return AgentResult(

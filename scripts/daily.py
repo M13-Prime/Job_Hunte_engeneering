@@ -19,7 +19,11 @@ from signal_tracker.notifier.email import (
     build_sender_from_settings,
 )
 from signal_tracker.notifier.render import render_digest
-from signal_tracker.pipeline import run_classification, run_collection
+from signal_tracker.pipeline import (
+    collectors_for_user,
+    run_classification,
+    run_collection,
+)
 from signal_tracker.storage import init_db
 from signal_tracker.utils.logging import setup_logging
 
@@ -31,10 +35,14 @@ async def _main(dry_run: bool) -> None:
     console.rule("[bold cyan]Signal Tracker — daily run")
 
     db = init_db(resolve_db_url(settings))
+    from signal_tracker.utils.llm_usage import set_usage_db
+
+    set_usage_db(db)
     profile = load_user_profile()
 
     console.print("[bold]1/4 collect[/bold]")
-    coll = await run_collection(db=db)
+    digest_user_id = resolve_digest_user_id(db, settings.digest_to_email)
+    coll = await run_collection(collectors=collectors_for_user(db, digest_user_id), db=db)
     console.print(
         f"  fetched={coll.fetched}  new={coll.new}  duplicates={coll.duplicates}"
     )
@@ -45,8 +53,6 @@ async def _main(dry_run: bool) -> None:
         f"  processed={clf.processed}  relevant={clf.relevant}  "
         f"signals={clf.signals_created}  errors={clf.errors}"
     )
-
-    digest_user_id = resolve_digest_user_id(db, settings.digest_to_email)
 
     console.print("[bold]3/4 jobs (refresh + AI match)[/bold]")
     if settings.jobs_daily_refresh_enabled and digest_user_id is not None:

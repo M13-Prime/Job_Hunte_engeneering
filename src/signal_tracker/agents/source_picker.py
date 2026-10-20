@@ -34,7 +34,8 @@ from signal_tracker.classifier.llm import (
 )
 from signal_tracker.collectors.gdelt import GdeltQuery
 from signal_tracker.collectors.rss import FeedConfig
-from signal_tracker.config import CONFIG_DIR, UserProfile, get_settings
+from signal_tracker.config import CONFIG_DIR, UserProfile, get_settings, model_for
+from signal_tracker.utils.llm_usage import record_usage
 from signal_tracker.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -218,7 +219,7 @@ async def pick_sources(
     if not settings.llm_source_picker_enabled:
         return _fallback_selection(registry)
 
-    model = settings.llm_cheap_model or settings.llm_model
+    model = model_for("extract", settings)
     fallbacks = _resolve_fallbacks(settings.llm_fallback_model)
     messages = [
         {
@@ -244,6 +245,7 @@ async def pick_sources(
         start = time.perf_counter()
         response = await litellm.acompletion(**kwargs)
         latency = time.perf_counter() - start
+        record_usage("extract", model, response)
         text = response.choices[0].message.content
         if not isinstance(text, str) or not text.strip():
             raise ValueError("empty response")

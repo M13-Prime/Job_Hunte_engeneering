@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ subject }}</title>
+</head>
+{# Email-safe: tables + inline styles only. Palette = the dashboard's
+   tokens (ink #2b2645, one yellow hue on small marks, pale tints on areas). #}
+{% set ink = "#2b2645" %}{% set muted = "#5c5870" %}{% set rule = "#ececf0" %}
+{% set accent = "#fca61f" %}{% set tint = "#fff4dc" %}{% set tint_ink = "#7a4600" %}
+{% set head = "'Poppins','Segoe UI',Helvetica,Arial,sans-serif" %}
+{% set body = "'Nunito Sans','Segoe UI',Helvetica,Arial,sans-serif" %}
+<body style="margin:0; padding:0; background:#f4f4f6; color:{{ ink }}; font-family:{{ body }};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;">
+<tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%; background:#ffffff; border-radius:16px;">
+
+  <tr><td style="padding:28px 32px 8px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="font-family:{{ head }}; font-weight:600; font-size:16px; color:{{ ink }};">
+        <span style="display:inline-block; width:22px; height:22px; line-height:22px; text-align:center; border-radius:6px; background:{{ accent }}; color:{{ ink }}; font-size:13px; margin-right:8px;">S</span>Signal Tracker
+      </td>
+      <td align="right" style="font-size:13px; color:{{ muted }};">Du {{ d.period_start.strftime("%d/%m") }} au {{ d.generated_at.strftime("%d/%m/%Y") }}</td>
+    </tr></table>
+  </td></tr>
+
+  <tr><td style="padding:16px 32px 4px;">
+    <h1 style="margin:0; font-family:{{ head }}; font-size:24px; line-height:1.25; font-weight:600; color:{{ ink }};">Ta semaine de recherche</h1>
+    <p style="margin:10px 0 0; font-size:15px; line-height:1.55; color:{{ ink }};">
+      {% if d.jobs_total or d.signals_total %}
+        {{ d.jobs_total }} offre{{ "s" if d.jobs_total != 1 }} correspond{{ "ent" if d.jobs_total != 1 else "" }} à ton CV et {{ d.signals_total }} {{ "signaux" if d.signals_total != 1 else "signal" }} de recrutement {{ "ont" if d.signals_total != 1 else "a" }} été détecté{{ "s" if d.signals_total != 1 }} ces {{ d.period_days }} derniers jours.
+      {% else %}
+        Rien de neuf côté offres et signaux ces {{ d.period_days }} derniers jours. Ajoute des mots-clés ou des entreprises à ta watchlist pour élargir la recherche.
+      {% endif %}
+    </p>
+    {% if d.app_url("/") %}
+    <p style="margin:18px 0 0;"><a href="{{ d.app_url('/') }}" style="display:inline-block; background:{{ ink }}; color:#ffffff; text-decoration:none; font-weight:600; font-size:14px; padding:10px 18px; border-radius:999px;">Ouvrir Signal Tracker</a></p>
+    {% endif %}
+  </td></tr>
+
+  {% if d.followups %}
+  <tr><td style="padding:24px 32px 0;">
+    <h2 style="margin:0 0 10px; font-family:{{ head }}; font-size:17px; font-weight:600; color:{{ ink }};">Relances à faire</h2>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{{ tint }}; border-radius:12px;">
+      {% for f in d.followups %}
+      <tr><td style="padding:12px 16px; font-size:14px; color:{{ ink }};{% if not loop.last %} border-bottom:1px solid #ffe5ad;{% endif %}">
+        <strong>{{ f.company }}</strong> · {{ f.title }}{% if f.applied_at %} <span style="color:{{ tint_ink }};">— postulé le {{ f.applied_at.strftime("%d/%m") }}</span>{% endif %}
+      </td></tr>
+      {% endfor %}
+    </table>
+    {% if d.app_url("/applications") %}<p style="margin:8px 0 0; font-size:13px;"><a href="{{ d.app_url('/applications') }}" style="color:{{ ink }};">Ouvrir le suivi des candidatures</a></p>{% endif %}
+  </td></tr>
+  {% endif %}
+
+  {% if d.jobs %}
+  <tr><td style="padding:28px 32px 0;">
+    <h2 style="margin:0 0 4px; font-family:{{ head }}; font-size:17px; font-weight:600; color:{{ ink }};">Offres qui te correspondent</h2>
+    <p style="margin:0 0 6px; font-size:13px; color:{{ muted }};">Score de match IA contre ton CV, sur 100.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      {% for j in d.jobs %}
+      <tr><td style="padding:14px 0; border-top:1px solid {{ rule }};">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td width="52" valign="top"><span style="display:inline-block; min-width:40px; text-align:center; background:{{ tint }}; color:{{ tint_ink }}; font-family:{{ head }}; font-weight:600; font-size:14px; padding:6px 0; border-radius:8px;">{{ "%.0f"|format(j.score) }}</span></td>
+          <td valign="top" style="font-size:14px; line-height:1.5;">
+            <a href="{{ d.app_url('/jobs/' ~ j.id) or j.url }}" style="color:{{ ink }}; font-weight:700; text-decoration:none;">{{ j.title }}</a><br>
+            <span style="color:{{ muted }};">{{ j.company }}{% if j.location %} · {{ j.location }}{% endif %}</span>
+            {% if j.angle %}<br><span style="color:{{ ink }};">{{ j.angle }}</span>{% endif %}
+            <br><a href="{{ j.url }}" style="color:{{ ink }}; font-size:13px;">Voir l'offre</a>
+            &nbsp;·&nbsp;<a href="{{ j.company_link.url }}" style="color:{{ ink }}; font-size:13px;">{{ j.company_link.label }}</a>
+            {% if d.app_url("/jobs/" ~ j.id) %}&nbsp;·&nbsp;<a href="{{ d.app_url('/jobs/' ~ j.id) }}" style="color:{{ ink }}; font-size:13px;">CV adapté + lettre</a>{% endif %}
+          </td>
+        </tr></table>
+      </td></tr>
+      {% endfor %}
+    </table>
+    {% if d.jobs_total > d.jobs|length and d.app_url("/jobs") %}<p style="margin:4px 0 0; font-size:13px;"><a href="{{ d.app_url('/jobs?min_score=60') }}" style="color:{{ ink }};">Voir les {{ d.jobs_total }} offres</a></p>{% endif %}
+  </td></tr>
+  {% endif %}
+
+  {% if d.signals %}
+  <tr><td style="padding:28px 32px 0;">
+    <h2 style="margin:0 0 4px; font-family:{{ head }}; font-size:17px; font-weight:600; color:{{ ink }};">Entreprises qui bougent</h2>
+    <p style="margin:0 0 6px; font-size:13px; color:{{ muted }};">Signaux qui annoncent souvent un recrutement avant que l'offre soit publiée. Ta watchlist en premier.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      {% for s in d.signals %}
+      <tr><td style="padding:14px 0; border-top:1px solid {{ rule }}; font-size:14px; line-height:1.5;">
+        <span style="font-weight:700;">{{ s.company }}</span>
+        <span style="color:{{ muted }};"> · {{ s.signal_type|replace("_", " ") }} · score {{ "%.0f"|format(s.score) }}</span><br>
+        <span>{{ s.summary }}</span>
+        {% if s.angle %}<br><span style="color:{{ muted }};">Angle : {{ s.angle }}</span>{% endif %}
+        <br>
+        <a href="{{ s.company_link.url }}" style="color:{{ ink }}; font-size:13px;">{{ s.company_link.label }}</a>
+        {% if s.source_url %}&nbsp;·&nbsp;<a href="{{ s.source_url }}" style="color:{{ ink }}; font-size:13px;">Article</a>{% endif %}
+        {% if d.app_url("/signals/" ~ s.id ~ "/prepare") %}&nbsp;·&nbsp;<a href="{{ d.app_url('/signals/' ~ s.id ~ '/prepare') }}" style="color:{{ ink }}; font-size:13px;">Préparer l'approche</a>{% endif %}
+      </td></tr>
+      {% endfor %}
+    </table>
+    {% if d.signals_total > d.signals|length and d.app_url("/results") %}<p style="margin:4px 0 0; font-size:13px;"><a href="{{ d.app_url('/results') }}" style="color:{{ ink }};">Voir les {{ d.signals_total }} signaux</a></p>{% endif %}
+  </td></tr>
+  {% endif %}
+
+  {% if d.pipeline and d.pipeline.values()|sum > 0 %}
+  <tr><td style="padding:28px 32px 0;">
+    <h2 style="margin:0 0 10px; font-family:{{ head }}; font-size:17px; font-weight:600; color:{{ ink }};">Tes candidatures</h2>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f9; border-radius:12px;"><tr>
+      {% for key, label in labels.items() %}
+      <td align="center" style="padding:14px 4px;">
+        <div style="font-family:{{ head }}; font-size:20px; font-weight:600; color:{{ ink }};">{{ d.pipeline.get(key, 0) }}</div>
+        <div style="font-size:12px; color:{{ muted }};">{{ label }}</div>
+      </td>
+      {% endfor %}
+    </tr></table>
+  </td></tr>
+  {% endif %}
+
+  <tr><td style="padding:28px 32px 28px; font-size:12px; line-height:1.6; color:{{ muted }};">
+    Tu reçois cet email parce que tu as un compte Signal Tracker ({{ d.user_email }}).
+    {% if d.unsubscribe_url %}<a href="{{ d.unsubscribe_url }}" style="color:{{ muted }};">Ne plus recevoir la newsletter</a>.{% endif %}
+    Les liens « Chercher le site » ouvrent une recherche web : le site officiel n'est pas encore connu de l'outil.
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>

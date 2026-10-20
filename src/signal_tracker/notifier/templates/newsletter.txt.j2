@@ -1,0 +1,55 @@
+{{ subject }}
+
+{% if d.jobs_total or d.signals_total %}
+{{ d.jobs_total }} offre(s) pour ton CV et {{ d.signals_total }} signal(s) de recrutement ces {{ d.period_days }} derniers jours.
+{% else %}
+Rien de neuf ces {{ d.period_days }} derniers jours.
+{% endif %}
+{% if d.app_url("/") %}
+Ouvrir Signal Tracker : {{ d.app_url("/") }}
+{% endif %}
+
+{% if d.followups %}
+RELANCES A FAIRE
+{% for f in d.followups %}
+- {{ f.company }} · {{ f.title }}{% if f.applied_at %} (postulé le {{ f.applied_at.strftime("%d/%m") }}){% endif %}
+
+{% endfor %}
+{% endif %}
+
+{% if d.jobs %}
+OFFRES QUI TE CORRESPONDENT
+{% for j in d.jobs %}
+[{{ "%.0f"|format(j.score) }}/100] {{ j.title }} — {{ j.company }}{% if j.location %} ({{ j.location }}){% endif %}
+
+{% if j.angle %}  {{ j.angle }}
+{% endif %}
+  Offre : {{ j.url }}
+  {{ j.company_link.label }} : {{ j.company_link.url }}
+{% if d.app_url("/jobs/" ~ j.id) %}  Dans l'outil : {{ d.app_url("/jobs/" ~ j.id) }}
+{% endif %}
+
+{% endfor %}
+{% endif %}
+
+{% if d.signals %}
+ENTREPRISES QUI BOUGENT
+{% for s in d.signals %}
+{{ s.company }} · {{ s.signal_type|replace("_", " ") }} · score {{ "%.0f"|format(s.score) }}
+  {{ s.summary }}
+  {{ s.company_link.label }} : {{ s.company_link.url }}
+{% if s.source_url %}  Article : {{ s.source_url }}
+{% endif %}
+
+{% endfor %}
+{% endif %}
+
+{% if d.pipeline and d.pipeline.values()|sum > 0 %}
+TES CANDIDATURES
+{% for key, label in labels.items() %}{{ label }} : {{ d.pipeline.get(key, 0) }}
+{% endfor %}
+{% endif %}
+
+--
+Compte : {{ d.user_email }}
+{% if d.unsubscribe_url %}Se désabonner : {{ d.unsubscribe_url }}{% endif %}

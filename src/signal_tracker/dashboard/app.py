@@ -29,7 +29,7 @@ from __future__ import annotations
 import asyncio
 import secrets
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -84,6 +84,7 @@ KEYWORD_CATEGORIES = ("field", "job_title", "other")
 PUBLIC_PATHS = {
     "/healthz", "/login", "/signup", "/logout", "/pending",
     "/manifest.webmanifest",
+    "/newsletter/unsubscribe",  # one-click opt-out from the email
 }
 
 # PWA manifest. Inline (no static files needed) — served verbatim by /manifest.webmanifest.
@@ -131,6 +132,10 @@ def build_app(db: Database | None = None) -> FastAPI:
     settings = get_settings()
     app_db = db or init_db(resolve_db_url(settings))
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+    # Phase 13 — per-task LLM cost accounting lands in this app's DB.
+    from signal_tracker.utils.llm_usage import set_usage_db
+
+    set_usage_db(app_db)
 
     def get_session_dep() -> Iterable[Session]:
         with app_db.session() as session:
@@ -219,6 +224,17 @@ def build_app(db: Database | None = None) -> FastAPI:
                 picker_collectors = build_default_collectors(
                     language_filter=lang_filter,
                 )
+            # Phase 13 — fetch news about the user's own keywords too, so
+            # the search is driven by them and not only re-ranked by them.
+            from signal_tracker.config import load_sources
+            from signal_tracker.utils.keywords import keyword_collectors
+
+            picker_collectors.extend(keyword_collectors(
+                user_keywords,
+                languages=lang_filter,
+                gdelt_enabled=bool((load_sources().get("gdelt") or {}).get("enabled")),
+                newsapi_key=get_settings().newsapi_key,
+            ))
             coll = await run_collection(
                 collectors=picker_collectors,
                 db=app_db,
@@ -263,6 +279,7 @@ def build_app(db: Database | None = None) -> FastAPI:
                     "signals_deduped": clf.signals_deduped,
                     "errors": clf.errors,
                     "prefiltered_out": clf.prefiltered_out,
+                    "keyword_filtered": getattr(clf, "keyword_filtered", 0),
                 }
             metrics = {
                 "collect": state["metrics"]["collect"],
@@ -532,6 +549,32 @@ def build_app(db: Database | None = None) -> FastAPI:
             )
         return target
 
+    @app.get("/admin/usage", response_class=HTMLResponse)
+    def admin_usage(
+        request: Request,
+        days: Annotated[int, Query(ge=1, le=365)] = 30,
+        user: User = Depends(require_admin),
+    ) -> HTMLResponse:
+        """What each LLM task costs, per model (Phase 13)."""
+        from signal_tracker.config import LLM_TASKS, model_for
+        from signal_tracker.utils.llm_usage import usage_summary
+
+        rows = usage_summary(app_db, days=days)
+        state = _state_for(user.id)
+        return templates.TemplateResponse(
+            request, "admin_usage.html.j2",
+            {
+                "rows": rows,
+                "days": days,
+                "total_cost": sum(r.cost_usd for r in rows),
+                "total_calls": sum(r.calls for r in rows),
+                "routing": [(t, model_for(t)) for t in LLM_TASKS],
+                "task_status": state["status"],
+                "current_run_id": state["current_run_id"],
+                "user": user,
+            },
+        )
+
     @app.post("/admin/users/{user_id}/approve")
     def admin_approve(
         user_id: int,
@@ -681,10 +724,40 @@ def build_app(db: Database | None = None) -> FastAPI:
                     deduped.append(cleaned)
                 suggested_keywords[cat] = deduped[:8]
 
+        # Phase 13 — overview figures for the redesigned landing.
+        from signal_tracker.applications.tracker import is_followup_due
+        from signal_tracker.storage.models import Application, JobAgentScore, JobOffer
+
+        strong_jobs = session.execute(
+            select(func.count(JobAgentScore.id))
+            .join(JobOffer, JobOffer.id == JobAgentScore.job_offer_id)
+            .where(JobAgentScore.user_id == user.id)
+            .where(JobAgentScore.agent_score >= 60)
+            .where(JobOffer.is_open.is_(True))
+        ).scalar_one()
+        apps = list(session.execute(
+            select(Application).where(Application.user_id == user.id)
+        ).scalars())
+        active_apps = sum(1 for a in apps if a.status in ("saved", "applied", "interview"))
+        due_followups = sum(1 for a in apps if is_followup_due(a))
+        me = session.get(User, user.id)
+        newsletter_opt_in = bool(me.newsletter_opt_in) if me is not None else False
+        week_ago = datetime.now(tz=UTC).replace(tzinfo=None) - timedelta(days=7)
+        week_signals = session.execute(
+            select(func.count(Signal.id))
+            .where(Signal.search_run_id.in_(run_ids))
+            .where(Signal.created_at >= week_ago)
+        ).scalar_one()
+
         state = _state_for(user.id)
         return templates.TemplateResponse(
             request, "search.html.j2",
             {
+                "strong_jobs": strong_jobs,
+                "active_apps": active_apps,
+                "due_followups": due_followups,
+                "newsletter_opt_in": newsletter_opt_in,
+                "week_signals": week_signals,
                 "keyword_categories": KEYWORD_CATEGORIES,
                 "keywords_by_cat": keywords_by_cat,
                 "suggested_keywords": suggested_keywords,
@@ -709,6 +782,7 @@ def build_app(db: Database | None = None) -> FastAPI:
         min_score: Annotated[float, Query(ge=0, le=100)] = 0.0,
         country: Annotated[list[str] | None, Query()] = None,
         country_scope: Annotated[str, Query()] = "any",
+        q: Annotated[str, Query(max_length=200)] = "",
         limit: Annotated[int, Query(ge=1, le=500)] = 200,
         user: User = Depends(require_user),
         session: Session = Depends(get_session_dep),
@@ -739,6 +813,18 @@ def build_app(db: Database | None = None) -> FastAPI:
         )
         if run is not None:
             stmt = stmt.where(Signal.search_run_id == run)
+        # Phase 13 — free-text keyword search: every word must appear in the
+        # company, the summary, the angle or the article title.
+        for word in q.split()[:6]:
+            from sqlalchemy import or_ as _or
+
+            pattern = f"%{word}%"
+            stmt = stmt.where(_or(
+                Signal.company_name.ilike(pattern),
+                Signal.summary_fr.ilike(pattern),
+                Signal.suggested_angle.ilike(pattern),
+                RawItem.title.ilike(pattern),
+            ))
         if feedback == "pending":
             stmt = stmt.where(~Signal.id.in_(
                 select(SignalFeedback.signal_id).where(SignalFeedback.user_id == user.id)
@@ -812,6 +898,7 @@ def build_app(db: Database | None = None) -> FastAPI:
                 "feedback_by_signal": feedback_by_signal,
                 "filter_feedback": feedback or "",
                 "min_score": min_score,
+                "q": q,
                 "valid_feedback": VALID_FEEDBACK,
                 "selected_countries": selected_countries,
                 "country_scope": valid_scope,
@@ -1087,6 +1174,33 @@ def build_app(db: Database | None = None) -> FastAPI:
         except IntegrityError:
             session.rollback()
         return RedirectResponse(url="/#suggested-keywords", status_code=303)
+
+    @app.post("/keywords/suggested/accept-all")
+    def accept_all_suggested_keywords(
+        user: User = Depends(require_user),
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        """Add every keyword the CV profile suggested, in one click (Phase 13)."""
+        cv = session.execute(
+            select(UserCV).where(UserCV.user_id == user.id).limit(1)
+        ).scalar_one_or_none()
+        suggested = ((cv.profile_json or {}).get("suggested_keywords") or {}) if cv else {}
+        existing = {
+            (k.category, k.value.lower())
+            for k in session.execute(
+                select(UserKeyword).where(UserKeyword.user_id == user.id)
+            ).scalars()
+        }
+        for category in KEYWORD_CATEGORIES:
+            items = suggested.get(category) or []
+            if not isinstance(items, list):
+                continue
+            for item in items[:8]:
+                value = str(item).strip()[:255]
+                if value and (category, value.lower()) not in existing:
+                    existing.add((category, value.lower()))
+                    session.add(UserKeyword(user_id=user.id, category=category, value=value))
+        return RedirectResponse(url="/#keywords", status_code=303)
 
     @app.post("/keywords/{keyword_id}/delete")
     def delete_keyword(
@@ -1459,6 +1573,20 @@ def build_app(db: Database | None = None) -> FastAPI:
         require_user=require_user,
         get_session_dep=get_session_dep,
         state_for=_state_for,
+    )
+
+    # Phase 13 — weekly newsletter (preview, opt-out, admin send).
+    from signal_tracker.dashboard.newsletter_routes import register_newsletter_routes
+
+    register_newsletter_routes(
+        app,
+        app_db=app_db,
+        templates=templates,
+        require_user=require_user,
+        require_admin=require_admin,
+        get_session_dep=get_session_dep,
+        state_for=_state_for,
+        secret=session_secret,
     )
 
     return app

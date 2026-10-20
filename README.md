@@ -235,6 +235,27 @@ Coût : un appel LLM léger par offre scorée (plafonné par
 `JOBS_AUTO_SCORE_LIMIT`), un appel par CV adapté. Rien n'est envoyé
 automatiquement aux recruteurs.
 
+## Coûts IA, recherche par mots-clés, newsletter, design (Phase 13)
+
+- **Un modèle par tâche** : `LLM_MODEL_CLASSIFY`, `_PREFILTER`, `_EXTRACT`, `_WRITE`, `_AGENT`
+  (via LiteLLM, n'importe quel fournisseur). Config conseillée : Claude Haiku 5.5 pour le
+  volume (classification, extraction, score des offres), Claude Sonnet 5.5 pour l'écriture
+  (préparations, CV adaptés). Environ 30 fois moins cher par recherche que l'ancien défaut.
+  Détails et alternatives : [`docs/LLM_COSTS.md`](docs/LLM_COSTS.md).
+- **Coût IA mesuré** : chaque appel est enregistré (tâche, modèle, tokens, coût estimé),
+  visible dans *Admin → Coût IA*.
+- **Recherche pilotée par les mots-clés** : tes mots-clés génèrent des requêtes GDELT
+  (et NewsAPI si la clé est configurée) à chaque recherche et chaque matin. Un filtre
+  gratuit écarte les articles qui n'en mentionnent aucun avant l'IA. Recherche texte sur
+  la page *Signaux*. Les suggestions issues du CV s'ajoutent en un clic.
+- **Newsletter hebdomadaire** par utilisateur : meilleures offres, entreprises qui bougent
+  (avec lien vers leur site ou leur page carrières), relances et état des candidatures.
+  Aperçu, envoi test et envoi à tous dans *Admin → Newsletter* ; désabonnement en un clic ;
+  `scripts/newsletter.py` en ligne de commande.
+- **Nouveau design** : barre latérale, typo Poppins + Nunito Sans, une seule teinte
+  d'accent (jaune), sans dégradés ni ombres, selon les règles « app screens » de
+  [taste-skill](https://github.com/Leonxlnx/taste-skill).
+
 ## Garde-fous
 
 - **Pas de scraping LinkedIn** ni de sites aux CGU strictes.
