@@ -44,7 +44,6 @@ from signal_tracker.applications.tracker import (
 from signal_tracker.config import get_settings, load_user_profile
 from signal_tracker.jobs.filters import (
     REASON_LABELS,
-    JobFilter,
     rejection_reason,
     user_default_filter,
 )
@@ -81,7 +80,10 @@ FLASH_MESSAGES: dict[str, str] = {
     "tracked": "Offre ajoutée à ton suivi de candidatures.",
     "refresh_started": "Actualisation lancée : scraping des pages carrières puis score IA.",
     "refresh_running": "Une actualisation est déjà en cours.",
-    "prefs_saved": "Préférences enregistrées : pays et expérience s'appliquent aussi au digest et à la newsletter.",
+    "prefs_saved": (
+        "Préférences enregistrées : pays et expérience s'appliquent aussi "
+        "au digest et à la newsletter."
+    ),
     "no_companies": "Ajoute des entreprises à ta watchlist ou lance une recherche d'abord.",
 }
 

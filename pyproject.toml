@@ -66,6 +66,9 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 "src/signal_tracker/dashboard/app.py" = ["B008"]
 "src/signal_tracker/dashboard/applications_routes.py" = ["B008"]
 "src/signal_tracker/dashboard/newsletter_routes.py" = ["B008"]
+# Country/synonym lookup tables are long literal lists; the en dash in the
+# years regex is intentional (postings write "5–10 ans").
+"src/signal_tracker/jobs/filters.py" = ["E501", "RUF001"]
 
 [tool.mypy]
 python_version = "3.11"

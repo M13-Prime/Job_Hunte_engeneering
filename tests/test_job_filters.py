@@ -95,7 +95,10 @@ def db_jobs(tmp_path: Path) -> Database:
         s.add(WatchlistEntry(user_id=u.id, company_name="Acme"))
         s.add(UserKeyword(user_id=u.id, category="field", value="sustainability"))
         offers = [
-            ("Sustainability & AI Manager", "Paris, France", "Build AI for ESG. 5-8 years of experience."),
+            (
+                "Sustainability & AI Manager", "Paris, France",
+                "Build AI for ESG. 5-8 years of experience.",
+            ),
             ("Sustainability Manager", "Paris, France", "ESG reporting. 6 years of experience."),
             ("Director of Sustainability", "Paris, France", "Lead everything."),
             ("Sustainability & AI Lead", "London, UK", "AI and ESG. 6 years of experience."),

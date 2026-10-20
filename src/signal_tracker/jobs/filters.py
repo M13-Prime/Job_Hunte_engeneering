@@ -240,7 +240,16 @@ REASON_LABELS = {
 }
 
 __all__ = [
-    "COUNTRY_ALIASES", "REASON_LABELS", "JobFilter", "is_exec_title",
-    "is_junior_title", "keyword_in_text", "offer_passes", "user_default_filter", "keywords_match",
-    "location_matches_country", "parse_years_required", "rejection_reason",
+    "COUNTRY_ALIASES",
+    "REASON_LABELS",
+    "JobFilter",
+    "is_exec_title",
+    "is_junior_title",
+    "keyword_in_text",
+    "keywords_match",
+    "location_matches_country",
+    "offer_passes",
+    "parse_years_required",
+    "rejection_reason",
+    "user_default_filter",
 ]
