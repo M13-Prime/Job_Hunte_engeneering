@@ -33,6 +33,7 @@ from signal_tracker.storage.models import (
     JobOffer,
     SearchRun,
     Signal,
+    User,
     UserCV,
     WatchlistEntry,
 )
@@ -78,9 +79,11 @@ async def score_job_for_user(
         s.expunge(job)
         if signal is not None:
             s.expunge(signal)
+    note = _preferences_note(db, user_id)
     try:
         verdict = await _semantic_score(
             job=job, recent_signal=signal, profile=profile, cv_text=cv,
+            preferences_note=note,
         )
     except ToolError as exc:
         raise MatchingError(str(exc)) from exc
@@ -99,6 +102,20 @@ async def score_job_for_user(
         missing_skills=verdict["missing_skills"],
     )
     return verdict
+
+
+def _preferences_note(db: Database, user_id: int) -> str:
+    """Country + experience range the user targets, for the scoring prompt."""
+    with db.session() as s:
+        u = s.get(User, user_id)
+        if u is None:
+            return ""
+        parts = [f"USER TARGET COUNTRY: {u.country or 'France'}"]
+        if u.exp_min is not None or u.exp_max is not None:
+            lo = "?" if u.exp_min is None else str(u.exp_min)
+            hi = "?" if u.exp_max is None else str(u.exp_max)
+            parts.append(f"USER TARGET EXPERIENCE: {lo} to {hi} years")
+        return "\n".join(parts) + "\n"
 
 
 def companies_for_user(

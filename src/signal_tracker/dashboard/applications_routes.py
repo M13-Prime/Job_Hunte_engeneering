@@ -42,6 +42,12 @@ from signal_tracker.applications.tracker import (
     utcnow,
 )
 from signal_tracker.config import get_settings, load_user_profile
+from signal_tracker.jobs.filters import (
+    REASON_LABELS,
+    JobFilter,
+    rejection_reason,
+    user_default_filter,
+)
 from signal_tracker.jobs.matching import (
     MatchingError,
     companies_for_user,
@@ -59,7 +65,9 @@ from signal_tracker.storage.models import (
     Signal,
     User,
     UserCV,
+    UserKeyword,
 )
+from signal_tracker.utils.geo import COUNTRY_CHOICES, normalize_country
 from signal_tracker.utils.logging import get_logger
 from signal_tracker.utils.normalize import normalize_company_name
 
@@ -73,6 +81,7 @@ FLASH_MESSAGES: dict[str, str] = {
     "tracked": "Offre ajoutée à ton suivi de candidatures.",
     "refresh_started": "Actualisation lancée : scraping des pages carrières puis score IA.",
     "refresh_running": "Une actualisation est déjà en cours.",
+    "prefs_saved": "Préférences enregistrées : pays et expérience s'appliquent aussi au digest et à la newsletter.",
     "no_companies": "Ajoute des entreprises à ta watchlist ou lance une recherche d'abord.",
 }
 
@@ -85,6 +94,14 @@ def _parse_date(value: str) -> datetime | None:
         return datetime.strptime(value, "%Y-%m-%d")
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Date invalide (AAAA-MM-JJ).") from exc
+
+
+def _to_int(value: str | None) -> int | None:
+    try:
+        n = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return n if 0 <= n <= 60 else None
 
 
 def register_application_routes(
@@ -150,6 +167,14 @@ def register_application_routes(
         request: Request,
         msg: Annotated[str, Query()] = "",
         min_score: Annotated[int, Query(ge=0, le=100)] = 0,
+        f: Annotated[int, Query()] = 0,
+        country: Annotated[str, Query(max_length=96)] = "",
+        unknown: Annotated[int, Query()] = 1,
+        kw: Annotated[list[str] | None, Query()] = None,
+        extra: Annotated[str, Query(max_length=200)] = "",
+        mode: Annotated[str, Query()] = "all",
+        exp_min: Annotated[str, Query(max_length=3)] = "",
+        exp_max: Annotated[str, Query(max_length=3)] = "",
         user: User = Depends(require_user),
         session: Session = Depends(get_session_dep),
     ) -> HTMLResponse:
@@ -157,8 +182,21 @@ def register_application_routes(
 
         An offer is listed iff the user has an AI score for it, or it
         belongs to one of the user's companies (watchlist + companies of
-        their recent signals) with a non-zero keyword score.
+        their recent signals) with a non-zero keyword score. On top of
+        that: country, keyword (AND / OR) and experience filters.
         """
+        me = session.get(User, user.id)
+        flt = user_default_filter(me)
+        if f:  # the filter form was submitted: its values replace the saved ones
+            flt.country = "" if country in ("", "all") else country
+            flt.include_unknown = bool(unknown)
+            flt.exp_min = _to_int(exp_min)
+            flt.exp_max = _to_int(exp_max)
+        flt.keyword_mode = "any" if mode == "any" else "all"
+        flt.keywords = [k.strip() for k in (kw or []) if k.strip()] + [
+            t.strip() for t in extra.split(",") if t.strip()
+        ]
+
         companies = companies_for_user(app_db, user.id)
         normalized = [normalize_company_name(c) for c in companies]
         score_join = and_(
@@ -180,14 +218,30 @@ def register_application_routes(
                 desc(JobOffer.relevance_score),
                 desc(JobOffer.collected_at),
             )
-            .limit(300)
+            .limit(600)
         )
-        rows = list(session.execute(stmt).all())
+        all_rows = list(session.execute(stmt).all())
         if min_score:
-            rows = [
-                r for r in rows
+            all_rows = [
+                r for r in all_rows
                 if r[1] is not None and r[1].agent_score >= min_score
             ]
+        rows = []
+        hidden: dict[str, int] = {}
+        for job, score_row in all_rows:
+            reason = rejection_reason(
+                title=job.title, location=job.location, department=job.department,
+                description=job.description, flt=flt,
+            )
+            if reason is None:
+                rows.append((job, score_row))
+            else:
+                hidden[reason] = hidden.get(reason, 0) + 1
+        keyword_choices = sorted({
+            v for (v,) in session.execute(
+                select(UserKeyword.value).where(UserKeyword.user_id == user.id)
+            ).all() if v
+        }, key=str.lower)
         tracked = {
             job_id: status
             for job_id, status in session.execute(
@@ -209,8 +263,32 @@ def register_application_routes(
                 refresh=refresh_states.get(user.id, {"status": "idle"}),
                 flash=_flash(msg),
                 min_score=min_score,
+                flt=flt,
+                keyword_choices=keyword_choices,
+                extra_terms=extra,
+                country_choices=COUNTRY_CHOICES,
+                hidden=[(REASON_LABELS[k], n) for k, n in hidden.items()],
+                hidden_total=sum(hidden.values()),
+                saved_country=normalize_country(me.country if me else None),
             ),
         )
+
+    @app.post("/jobs/prefs")
+    def save_job_prefs(
+        country: Annotated[str, Form()] = "France",
+        exp_min: Annotated[str, Form()] = "",
+        exp_max: Annotated[str, Form()] = "",
+        user: User = Depends(require_user),
+        session: Session = Depends(get_session_dep),
+    ) -> RedirectResponse:
+        row = session.get(User, user.id)
+        if row is not None:
+            row.country = normalize_country(country)
+            lo, hi = _to_int(exp_min), _to_int(exp_max)
+            if lo is not None and hi is not None and hi < lo:
+                lo, hi = hi, lo
+            row.exp_min, row.exp_max = lo, hi
+        return RedirectResponse(url="/jobs?msg=prefs_saved", status_code=303)
 
     @app.post("/jobs/refresh")
     async def refresh_jobs(user: User = Depends(require_user)) -> RedirectResponse:
