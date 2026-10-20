@@ -77,7 +77,6 @@ class AgentLoop:
         tools: ToolRegistry,
         budget_usd: float = 0.5,
         max_iterations: int = 30,
-        temperature: float = 0.2,
         fallback_model: str | None = None,
         should_continue: Callable[[], bool] | None = None,
     ) -> None:
@@ -86,7 +85,6 @@ class AgentLoop:
         self.tools = tools
         self.budget_usd = budget_usd
         self.max_iterations = max_iterations
-        self.temperature = temperature
         self.fallback_model = fallback_model
         # Optional cancellation hook: the dashboard's "Cancel" button
         # flips a flag the caller reads here. We check it at the top of
@@ -131,7 +129,6 @@ class AgentLoop:
                     *messages,
                 ],
                 "tools": self.tools.anthropic_specs(),
-                "temperature": self.temperature,
                 "max_tokens": 1500,
             }
             if fallbacks:

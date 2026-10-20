@@ -220,7 +220,6 @@ async def run_research_agent(
         tools=tools,
         budget_usd=budget_usd if budget_usd is not None else settings.llm_agent_budget_usd,
         max_iterations=settings.llm_agent_max_iterations,
-        temperature=0.0,
         fallback_model=settings.llm_fallback_model,
     )
     user_msg = (

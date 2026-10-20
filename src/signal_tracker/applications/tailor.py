@@ -158,7 +158,6 @@ async def generate_tailored_documents(
             "model": model,
             "messages": messages,
             "response_format": {"type": "json_object"},
-            "temperature": 0.3,
             "max_tokens": 4000,
         }
         if fallbacks:
