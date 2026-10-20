@@ -92,7 +92,7 @@ def db_jobs(tmp_path: Path) -> Database:
         )
         s.add(u)
         s.flush()
-        s.add(WatchlistEntry(user_id=u.id, company_name="Acme"))
+        s.add(WatchlistEntry(user_id=u.id, company_name="Acme", normalized_name="acme"))
         s.add(UserKeyword(user_id=u.id, category="field", value="sustainability"))
         offers = [
             (

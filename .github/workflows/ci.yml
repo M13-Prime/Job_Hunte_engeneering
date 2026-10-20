@@ -42,7 +42,7 @@ jobs:
       - name: Pytest (skip live)
         run: |
           set +e
-          uv run pytest -q -m "not live" --tb=short -x -p no:cacheprovider > /tmp/pt.txt 2>&1
+          uv run pytest -q -m "not live" --tb=short -p no:cacheprovider > /tmp/pt.txt 2>&1
           rc=$?
           tail -n 45 /tmp/pt.txt | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}' > /tmp/pt.enc
           if [ $rc -ne 0 ]; then echo "::error title=PYTEST::$(cat /tmp/pt.enc)"; fi
