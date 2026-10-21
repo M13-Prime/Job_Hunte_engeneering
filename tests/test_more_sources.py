@@ -27,7 +27,7 @@ def test_google_news_feeds_per_keyword_and_language() -> None:
     assert q["ceid"] == ["FR:fr"] and q["hl"] == ["fr"]
     assert '"Sustainability Manager"' in q["q"][0] and "when:7d" in q["q"][0]
     assert "recrute" in q["q"][0]
-    assert any(f.language == "en" and "ceid=US%3Aen" in f.url for f in feeds)
+    assert any(f.language == "en" and "ceid=US:en" in f.url for f in feeds)
 
 
 def test_google_news_respects_max_keywords_and_language_filter() -> None:
