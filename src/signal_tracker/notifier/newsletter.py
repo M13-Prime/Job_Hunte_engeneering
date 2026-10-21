@@ -46,6 +46,10 @@ ATS_BOARDS: dict[str, str] = {
     "lever": "https://jobs.lever.co/{slug}",
     "ashby": "https://jobs.ashbyhq.com/{slug}",
     "workable": "https://apply.workable.com/{slug}/",
+    "smartrecruiters": "https://jobs.smartrecruiters.com/{slug}",
+    "recruitee": "https://{slug}.recruitee.com/",
+    "teamtailor": "https://{slug}.teamtailor.com/jobs",
+    "personio": "https://{slug}.jobs.personio.de/",
 }
 
 STATUS_LABELS = {

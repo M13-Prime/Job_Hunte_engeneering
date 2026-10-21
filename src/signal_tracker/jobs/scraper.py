@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import get_args
 
 import httpx
 from sqlalchemy import select
@@ -120,6 +121,8 @@ class JobsScraper:
         # Brute-force slug x backend, hit-rate is usually high for tech.
         for slug in slug_candidates(company_name):
             for backend in self.backends:
+                if not backend.guessable:
+                    continue
                 try:
                     jobs = await backend.list_jobs(slug, client)
                 except Exception as exc:  # backend bug -> log + keep trying
@@ -176,7 +179,7 @@ class JobsScraper:
 
 def _as_ats_literal(name: str) -> ATS:
     """Narrow the runtime backend name to the Literal type without lying."""
-    if name in {"greenhouse", "lever", "workable", "ashby", "manual", "unknown"}:
+    if name in set(get_args(ATS)):
         return name  # type: ignore[return-value]
     return "unknown"
 
@@ -240,6 +243,9 @@ def persist_result(
             session.execute(
                 select(JobOffer).where(
                     JobOffer.company_normalized == result.company_normalized,
+                    # Only close offers from the same source: a JobSpy search
+                    # must not close the company's ATS offers (and vice versa).
+                    JobOffer.ats == result.ats,
                     JobOffer.is_open.is_(True),
                 )
             ).scalars()

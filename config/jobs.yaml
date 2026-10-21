@@ -13,6 +13,14 @@ overrides: []
   # - company: Mirakl
   #   ats: lever
   #   slug: mirakl
+  #
+  # Supported ats: greenhouse, lever, workable, ashby, smartrecruiters,
+  # recruitee, teamtailor, personio, workday.
+  # Workday can't be guessed: give slug = "tenant|wdN|site", read from the
+  # careers URL https://<tenant>.<wdN>.myworkdayjobs.com/<site>
+  # - company: TotalEnergies
+  #   ats: workday
+  #   slug: totalenergies|wd3|TotalEnergies_careers
 
 # Where to pull the list of companies to scrape from.
 sources:

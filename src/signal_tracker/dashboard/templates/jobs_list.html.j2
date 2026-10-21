@@ -99,6 +99,8 @@
   .empty-jobs strong { color: var(--text); font-weight: 600; }
 
   .filter-panel { padding: 16px 18px; margin-bottom: 14px; }
+  .score .grade { font-weight: 800; margin-right: 2px; }
+  .legit-warn { color: #b45309; font-weight: 600; font-size: 12.5px; }
   .fp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }
   .fp-wide { grid-column: 1 / -1; }
   .fp-field { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
@@ -212,7 +214,7 @@
       {% if score_row %}
         {% set score = score_row.agent_score %}
         {% set tier = "hot" if score >= 75 else ("investigate" if score >= 60 else ("watch" if score >= 40 else "none")) %}
-        <span class="score {{ tier }}" title="Score de match IA">{{ "%.0f"|format(score) }}</span>
+        <span class="score {{ tier }}" title="Score de match IA{% if score_row.grade %} · note {{ score_row.grade }}{% endif %}">{% if score_row.grade %}<b class="grade">{{ score_row.grade }}</b> {% endif %}{{ "%.0f"|format(score) }}</span>
       {% else %}
         <span class="score kw" title="Pas encore de score IA — score mots-clés">{{ "%.0f"|format(job.relevance_score) }}</span>
       {% endif %}
@@ -224,6 +226,7 @@
           <span class="sep">·</span><span class="ats">{{ job.ats }}</span>
           {% if job.posted_at %}<span class="sep">·</span><span>{{ job.posted_at.strftime("%d/%m/%Y") }}</span>{% endif %}
           {% if job.id in tracked %}<span class="tracked">{{ status_labels[tracked[job.id]] }}</span>{% endif %}
+          {% if score_row and score_row.legitimacy_flags %}<span class="legit-warn" title="{{ score_row.legitimacy_flags|join(' · ') }}">⚠ à vérifier</span>{% endif %}
         </div>
       </div>
       <div class="angle">

@@ -24,6 +24,12 @@ COPY src/ ./src/
 # Note: not using --frozen so we can deploy a pyproject.toml change without
 # round-tripping uv.lock through the GitHub API (push pipeline limitation).
 RUN uv sync --no-dev
+# Optional JobSpy collector (Indeed / LinkedIn / Google Jobs). Off by default:
+#   INSTALL_JOBSPY=1 docker compose -f docker-compose.lite.yml up -d --build
+ARG INSTALL_JOBSPY=0
+RUN if [ "$INSTALL_JOBSPY" = "1" ]; then \
+        uv pip install --python /app/.venv/bin/python python-jobspy; \
+    fi
 
 # ---------------------------------------------------------------------------
 # Runtime stage — slim image with only the venv + project source

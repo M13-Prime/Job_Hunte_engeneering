@@ -248,6 +248,11 @@ class JobAgentScore(Base):
     # for vs. requirements the CV doesn't evidence. NULL on legacy rows.
     matched_skills: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     missing_skills: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    # Five-criteria rubric (0..5 each), letter grade A-F and legitimacy
+    # warnings (jobs/rubric.py). NULL on rows scored before this existed.
+    criteria: Mapped[dict[str, int] | None] = mapped_column(JSON, nullable=True)
+    grade: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    legitimacy_flags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     processed_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False, index=True
     )

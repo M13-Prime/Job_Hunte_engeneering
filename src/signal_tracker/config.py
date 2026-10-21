@@ -152,6 +152,17 @@ class Settings(BaseSettings):
     # prod (.env) so user sessions survive container restarts.
     session_secret_key: str | None = None
 
+    # Second, cheap AI pass that removes anything the source CV doesn't
+    # support from a tailored CV / cover letter (~0.01 $ per document).
+    tailor_review_enabled: bool = True
+    # Optional JobSpy collector (Indeed, LinkedIn, Glassdoor, Google Jobs).
+    # Needs the image built with INSTALL_JOBSPY=1. Unofficial endpoints:
+    # they break without notice and LinkedIn rate-limits quickly.
+    jobspy_enabled: bool = False
+    jobspy_sites: str = "indeed,google"
+    jobspy_results_per_search: int = 30
+    jobspy_hours_old: int = 168
+
 
 class UserProfile(BaseModel):
     """The profile used to score relevance of signals to the user."""

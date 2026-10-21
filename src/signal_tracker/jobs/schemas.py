@@ -12,6 +12,12 @@ ATS = Literal[
     "lever",
     "workable",
     "ashby",
+    "smartrecruiters",
+    "recruitee",
+    "teamtailor",
+    "personio",
+    "workday",
+    "jobspy",
     "manual",
     "unknown",
 ]

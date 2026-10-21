@@ -20,6 +20,9 @@ class JobsBackend(abc.ABC):
 
     #: Short identifier of the provider, e.g. "greenhouse".
     name: str = ""
+    #: False when the slug cannot be derived from the company name (Workday):
+    #: the backend is then only used through config/jobs.yaml overrides.
+    guessable: bool = True
 
     @abc.abstractmethod
     async def list_jobs(
