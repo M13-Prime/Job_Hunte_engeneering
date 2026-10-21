@@ -55,6 +55,7 @@ from signal_tracker.jobs.matching import (
     refresh_and_score_for_user,
     score_job_for_user,
 )
+from signal_tracker.jobs.rubric import CRITERIA
 from signal_tracker.storage import Database
 from signal_tracker.storage.models import (
     APPLICATION_STATUSES,
@@ -399,7 +400,7 @@ def register_application_routes(
             _ctx(
                 user, job=job, score=score, application=application,
                 status_labels=STATUS_LABELS, has_cv=_has_cv(session, user.id),
-                flash=_flash(msg),
+                flash=_flash(msg), criteria_defs=CRITERIA,
             ),
         )
 

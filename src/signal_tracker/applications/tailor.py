@@ -92,6 +92,29 @@ Sortie : JSON strict, rien d'autre :
 """
 
 
+REVIEW_PROMPT = """\
+Tu es relecteur. On te donne un CV SOURCE et des documents adaptés (CV +
+lettre) générés à partir de lui. Ton seul travail : traquer les inventions.
+
+Est une invention tout fait absent du CV source : employeur, intitulé,
+date, diplôme, certification, langue, outil, compétence, chiffre, résultat,
+ou un niveau gonflé ("expert" alors que le CV dit "notions").
+La reformulation et le vocabulaire de l'offre sont permis quand le CV les
+justifie.
+
+Corrige chaque invention en la retirant ou en revenant à ce que dit le CV.
+Ne change rien d'autre (ni le style, ni l'ordre, ni la longueur).
+
+Sortie : JSON strict, rien d'autre :
+{
+  "issues": ["une phrase courte par correction : ce qui a été retiré ou ramené au CV"],
+  "cv": { même structure que le CV adapté reçu, corrigé },
+  "cover_letter": "lettre corrigée"
+}
+Si rien n'est inventé : "issues": [] et renvoie cv et cover_letter inchangés.
+"""
+
+
 def render_user_prompt(
     *,
     company: str,
@@ -180,16 +203,66 @@ async def generate_tailored_documents(
         return docs
 
     try:
-        return await _attempt()
+        docs = await _attempt()
     except TailoringError:
         raise
     except Exception as exc:
         raise TailoringError(f"La génération a échoué : {str(exc)[:300]}") from exc
+    if settings.tailor_review_enabled:
+        docs = await review_documents(docs, cv_text=cv_text)
+    return docs
+
+
+async def review_documents(docs: TailoredDocuments, *, cv_text: str) -> TailoredDocuments:
+    """Second pass (cheap model): remove anything the source CV doesn't support.
+
+    Never fails the generation: on any error the first draft is kept and
+    a note says the automatic review could not run.
+    """
+    settings = get_settings()
+    model = model_for("extract", settings)
+    draft = {"cv": docs.cv.model_dump(), "cover_letter": docs.cover_letter}
+    kwargs: dict[str, Any] = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": REVIEW_PROMPT},
+            {"role": "user", "content": (
+                f"CV SOURCE :\n{cv_text[:12000]}\n\n"
+                f"DOCUMENTS ADAPTÉS (JSON) :\n{json.dumps(draft, ensure_ascii=False)}"
+            )},
+        ],
+        "response_format": {"type": "json_object"},
+        "max_tokens": 4000,
+    }
+    try:
+        response = await litellm.acompletion(**kwargs)
+        record_usage("extract", model, response)
+        text = response.choices[0].message.content
+        data = json.loads(_extract_json(text if isinstance(text, str) else ""))
+        reviewed = TailoredDocuments.model_validate({
+            **docs.model_dump(),
+            "cv": data.get("cv") or draft["cv"],
+            "cover_letter": data.get("cover_letter") or docs.cover_letter,
+        })
+    except Exception as exc:
+        logger.warning("applications.review_failed error=%s", str(exc)[:200])
+        docs.changes = [*docs.changes, "Relecture automatique indisponible : relis le CV toi-même."]
+        return docs
+    issues = [str(i).strip() for i in (data.get("issues") or []) if str(i).strip()]
+    reviewed.changes = [
+        *docs.changes,
+        *(f"Relecture : {i}" for i in issues[:8]),
+        *([] if issues else ["Relecture : aucune invention repérée par rapport à ton CV."]),
+    ]
+    logger.info("applications.reviewed issues=%d", len(issues))
+    return reviewed
 
 
 __all__ = [
+    "REVIEW_PROMPT",
     "SYSTEM_PROMPT",
     "TailoringError",
     "generate_tailored_documents",
     "render_user_prompt",
+    "review_documents",
 ]

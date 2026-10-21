@@ -100,6 +100,9 @@ async def score_job_for_user(
         why_now=verdict["why_now"] or None,
         matched_skills=verdict["matched_skills"],
         missing_skills=verdict["missing_skills"],
+        criteria=verdict.get("criteria"),
+        grade=verdict.get("grade"),
+        flags=verdict.get("legitimacy_flags"),
     )
     return verdict
 
@@ -197,6 +200,47 @@ def unscored_job_ids(
         return [int(i) for i in s.execute(stmt).scalars()]
 
 
+async def _refresh_jobspy(
+    db: Database, profile: UserProfile, user_id: int, report: ScrapingReport,
+) -> list[str]:
+    """Keyword + country search on the job boards; returns the companies found."""
+    from signal_tracker.jobs.jobspy_source import pop_company_urls, search_jobspy
+    from signal_tracker.storage.models import Company, UserKeyword
+
+    settings = get_settings()
+    with db.session() as s:
+        user = s.get(User, user_id)
+        country = (user.country if user else None) or "France"
+        rows = list(s.execute(
+            select(UserKeyword.category, UserKeyword.value)
+            .where(UserKeyword.user_id == user_id)
+        ).all())
+    titles = [v for c, v in rows if c == "job_title"]
+    terms = titles or [v for _, v in rows]
+    sites = [x.strip() for x in settings.jobspy_sites.split(",") if x.strip()]
+    results = await search_jobspy(
+        terms, country=country, sites=sites,
+        results_per_search=settings.jobspy_results_per_search,
+        hours_old=settings.jobspy_hours_old,
+    )
+    for result in results:
+        persist_result(db, result, profile, report)
+    urls = pop_company_urls()
+    if urls:
+        with db.session() as s:
+            for normalized, url in urls.items():
+                row = s.execute(
+                    select(Company).where(Company.normalized_name == normalized)
+                ).scalar_one_or_none()
+                if row is None:
+                    name = next((r.company for r in results if r.company_normalized == normalized),
+                                normalized)
+                    s.add(Company(name=name, normalized_name=normalized, url=url))
+                elif not row.url:
+                    row.url = url
+    return [r.company for r in results]
+
+
 @dataclass(slots=True)
 class JobsRefreshResult:
     companies: int = 0
@@ -229,6 +273,10 @@ async def refresh_and_score_for_user(
     report = await refresh_jobs(db, profile, companies)
     out.companies_with_ats = report.companies_with_ats
     out.jobs_new = report.jobs_new
+    if settings.jobspy_enabled:
+        jobspy_companies = await _refresh_jobspy(db, profile, user_id, report)
+        out.jobs_new = report.jobs_new
+        companies = [*companies, *jobspy_companies]
 
     cv_text = load_cv_text(db, user_id)
     if not cv_text.strip():

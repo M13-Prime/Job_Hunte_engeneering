@@ -11,7 +11,10 @@
 
 services:
   dashboard:
-    build: .
+    build:
+      context: .
+      args:
+        INSTALL_JOBSPY: ${INSTALL_JOBSPY:-0}
     image: signal-tracker:local
     command: ["python", "scripts/dashboard.py", "--host", "0.0.0.0", "--port", "8000"]
     ports:
@@ -23,11 +26,12 @@ services:
       - signal-tracker-data:/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status == 200 else 1)\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=8).status == 200 else 1)\""]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
-      start_period: 15s
+      # The e2-micro takes 1-2 min to import everything when memory is tight.
+      start_period: 120s
 
   scheduler:
     image: signal-tracker:local

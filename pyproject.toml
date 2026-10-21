@@ -69,6 +69,8 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 # Country/synonym lookup tables are long literal lists; the en dash in the
 # years regex is intentional (postings write "5–10 ans").
 "src/signal_tracker/jobs/filters.py" = ["E501", "RUF001"]
+# Inline API fixtures (XML / RSS / JSON) are clearer unwrapped.
+"tests/test_jobs_v2.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -77,7 +79,7 @@ files = ["src", "scripts", "tests"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["feedparser.*", "apscheduler.*", "litellm.*"]
+module = ["feedparser.*", "apscheduler.*", "litellm.*", "jobspy", "jobspy.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

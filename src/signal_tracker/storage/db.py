@@ -68,6 +68,9 @@ _ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("users", "country", "VARCHAR(96) NOT NULL DEFAULT 'France'"),
     ("users", "exp_min", "INTEGER"),
     ("users", "exp_max", "INTEGER"),
+    ("job_agent_scores", "criteria", "JSON"),
+    ("job_agent_scores", "grade", "VARCHAR(2)"),
+    ("job_agent_scores", "legitimacy_flags", "JSON"),
     ("users", "newsletter_last_sent_at", "TIMESTAMP"),
 )
 

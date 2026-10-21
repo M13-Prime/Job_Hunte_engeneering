@@ -40,6 +40,12 @@ from signal_tracker.agents.loop import AgentLoop, AgentResult
 from signal_tracker.agents.tools.base import ToolError, ToolRegistry, tool
 from signal_tracker.classifier.llm import _extract_json, _resolve_fallbacks
 from signal_tracker.config import UserProfile, get_settings, model_for
+from signal_tracker.jobs.rubric import (
+    clean_criteria,
+    grade_for,
+    legitimacy_flags,
+    weighted_score,
+)
 from signal_tracker.jobs.scraper import JobsScraper, ScrapingReport, persist_result
 from signal_tracker.storage import Database
 from signal_tracker.storage.models import JobAgentScore, JobOffer, Signal, UserCV
@@ -85,22 +91,37 @@ _SCORE_SYSTEM_PROMPT = """\
 You rescore a job posting against a candidate's CV given a recent
 hiring signal at the company. Output strict JSON only:
 {
+  "criteria": {
+    "role": int 0..5,       // is this the kind of role the candidate targets?
+    "skills": int 0..5,     // how much of the required skill set the CV evidences
+    "seniority": int 0..5,  // years / level asked vs the candidate's experience
+    "location": int 0..5,   // country / city / remote vs the candidate's target
+    "timing": int 0..5      // company attractiveness + the recent signal
+  },
   "fit_score": int 0..100,
   "fit_reasoning": "1 short FR sentence",
   "killer_angle": "1 FR sentence: the single strongest CV → role link",
   "why_now": "1 FR sentence: why the recent signal makes the timing right",
   "matched_skills": ["<=6 short items: requirements of the posting the CV clearly evidences"],
-  "missing_skills": ["<=6 short items: requirements of the posting the CV does NOT evidence"]
+  "missing_skills": ["<=6 short items: requirements of the posting the CV does NOT evidence"],
+  "legitimacy_flags": ["<=3 short FR items, only if the posting looks dubious:
+                        vague or generic text, no real requirements,
+                        contradictions, signs of a pipeline / evergreen ad.
+                        Empty array otherwise."]
 }
+
+Criteria scale: 0 = no match, 1 = weak, 2 = partial, 3 = decent, 4 = strong,
+5 = textbook. Be strict on seniority: a posting asking far more or far less
+experience than the candidate's target range gets 0-1 there, and a role in
+another field gets 0-1 on "role" whatever the skills overlap.
 
 Only list skills that actually appear in the posting. Never claim the CV
 shows something it doesn't. If there is no recent signal, set why_now to
 an empty string.
 
-Score guide:
-  0-30  : not a match (sector, country or seniority mismatch; a posting
-          asking far more or far less experience than the candidate's
-          target range stays in this band)
+fit_score guide (kept for compatibility, the app recomputes it from the
+criteria):
+  0-30  : not a match (sector, country or seniority mismatch)
   31-60 : partial match (some skills relevant, key gaps)
   61-85 : strong match
   86-100: textbook match
@@ -181,7 +202,7 @@ async def _semantic_score(
             {"role": "user", "content": user},
         ],
         "response_format": {"type": "json_object"},
-        "max_tokens": 600,
+        "max_tokens": 800,
     }
     if fallbacks:
         kwargs["fallbacks"] = fallbacks
@@ -194,8 +215,19 @@ async def _semantic_score(
         data = json.loads(_extract_json(text))
     except json.JSONDecodeError as exc:
         raise ToolError(f"semantic-score returned invalid JSON: {exc}") from exc
+    criteria = clean_criteria(data.get("criteria"))
+    fit = (
+        weighted_score(criteria) if criteria
+        else float(max(0, min(100, int(data.get("fit_score", 0)))))
+    )
     return {
-        "fit_score": max(0, min(100, int(data.get("fit_score", 0)))),
+        "fit_score": fit,
+        "criteria": criteria,
+        "grade": grade_for(fit),
+        "legitimacy_flags": legitimacy_flags(
+            posted_at=job.posted_at, description=job.description,
+            location=job.location, ai_flags=data.get("legitimacy_flags"),
+        ),
         "fit_reasoning": str(data.get("fit_reasoning", ""))[:500],
         "killer_angle": str(data.get("killer_angle", ""))[:500],
         "why_now": str(data.get("why_now", ""))[:500],
@@ -224,6 +256,9 @@ def _upsert_score(
     killer_angle: str | None, why_now: str | None,
     matched_skills: list[str] | None = None,
     missing_skills: list[str] | None = None,
+    criteria: dict[str, int] | None = None,
+    grade: str | None = None,
+    flags: list[str] | None = None,
 ) -> None:
     """Insert-or-update one row in job_agent_scores."""
     with db.session() as s:
@@ -239,6 +274,7 @@ def _upsert_score(
                 agent_score=fit_score, agent_fit_reasoning=fit_reasoning,
                 agent_killer_angle=killer_angle, agent_why_now=why_now,
                 matched_skills=matched_skills, missing_skills=missing_skills,
+                criteria=criteria, grade=grade, legitimacy_flags=flags,
                 processed_at=datetime.now(UTC),
             ))
         else:
@@ -248,6 +284,9 @@ def _upsert_score(
             existing.agent_why_now = why_now
             existing.matched_skills = matched_skills
             existing.missing_skills = missing_skills
+            existing.criteria = criteria
+            existing.grade = grade
+            existing.legitimacy_flags = flags
             existing.processed_at = datetime.now(UTC)
 
 
@@ -448,6 +487,9 @@ def _build_tools(state: JobsState) -> ToolRegistry:
                     why_now=verdict["why_now"],
                     matched_skills=verdict["matched_skills"],
                     missing_skills=verdict["missing_skills"],
+                    criteria=verdict["criteria"],
+                    grade=verdict["grade"],
+                    flags=verdict["legitimacy_flags"],
                 )
                 state.jobs_scored += 1
                 return {"job_id": job.id, "status": "scored", **verdict}
