@@ -33,8 +33,12 @@ from sqlalchemy import ColumnElement, and_, desc, or_, select
 from sqlalchemy.orm import Session
 
 from signal_tracker.applications.render import cv_to_markdown, safe_filename, section_labels
-from signal_tracker.applications.schemas import TailoredCV
-from signal_tracker.applications.tailor import TailoringError, generate_tailored_documents
+from signal_tracker.applications.schemas import TailoredCV, TailoredDocuments
+from signal_tracker.applications.tailor import (
+    TailoringError,
+    generate_tailored_documents,
+    review_documents,
+)
 from signal_tracker.applications.tracker import (
     STATUS_LABELS,
     apply_status,
@@ -351,14 +355,24 @@ def register_application_routes(
             return RedirectResponse(url="/jobs?msg=refresh_running", status_code=303)
         if not companies_for_user(app_db, user.id):
             return RedirectResponse(url="/jobs?msg=no_companies", status_code=303)
-        refresh_states[user.id] = {"status": "running", "started_at": utcnow().isoformat()}
+        refresh_states[user.id] = {
+            "status": "running", "started_at": utcnow().isoformat(),
+            "percent": 0.0, "label": "Démarrage…", "phase": "start",
+        }
         uid = user.id
+
+        def _progress(p: dict[str, Any]) -> None:
+            state = refresh_states.get(uid)
+            if state is not None and state.get("status") == "running":
+                state.update(p)
 
         async def _run() -> None:
             try:
-                res = await refresh_and_score_for_user(app_db, load_user_profile(), uid)
+                res = await refresh_and_score_for_user(
+                    app_db, load_user_profile(), uid, on_progress=_progress,
+                )
                 refresh_states[uid] = {
-                    "status": "done",
+                    "status": "done", "percent": 100.0,
                     "companies": res.companies,
                     "companies_with_ats": res.companies_with_ats,
                     "jobs_new": res.jobs_new,
@@ -656,6 +670,34 @@ def register_application_routes(
             return RedirectResponse(url="/applications?msg=tailor_failed", status_code=303)
         return RedirectResponse(url=f"/applications/{app_id}/documents", status_code=303)
 
+    @app.post("/applications/{app_id}/review")
+    async def review_application(
+        app_id: int,
+        user: User = Depends(require_user),
+    ) -> RedirectResponse:
+        """2nd agent, on demand: strip claims the source CV doesn't support."""
+        with app_db.session() as session:
+            row = _own_application(session, app_id, user.id)
+            cv, language, changes, gaps = _docs(row)
+            letter = row.cover_letter or ""
+        docs = TailoredDocuments(
+            language="en" if language == "en" else "fr",
+            cv=cv, cover_letter=letter, changes=changes, gaps=gaps,
+        )
+        reviewed = await review_documents(docs, cv_text=load_cv_text(app_db, user.id))
+        with app_db.session() as session:
+            row = _own_application(session, app_id, user.id)
+            row.tailored_cv = {
+                **reviewed.cv.model_dump(),
+                "_language": reviewed.language,
+                "_changes": reviewed.changes,
+                "_gaps": reviewed.gaps,
+                "_reviewed_at": utcnow().isoformat(timespec="minutes"),
+            }
+            row.cover_letter = reviewed.cover_letter
+            row.updated_at = utcnow()
+        return RedirectResponse(url=f"/applications/{app_id}/documents", status_code=303)
+
     def _docs(row: Application) -> tuple[TailoredCV, str, list[str], list[str]]:
         if not row.tailored_cv:
             raise HTTPException(status_code=404, detail="Pas encore de CV adapté.")
@@ -663,6 +705,7 @@ def register_application_routes(
         language = str(data.pop("_language", "fr"))
         changes = [str(c) for c in data.pop("_changes", []) or []]
         gaps = [str(g) for g in data.pop("_gaps", []) or []]
+        data.pop("_reviewed_at", None)
         return TailoredCV.model_validate(data), language, changes, gaps
 
     @app.get("/applications/{app_id}/documents", response_class=HTMLResponse)
@@ -680,6 +723,7 @@ def register_application_routes(
                 user, application=row, cv=cv, language=language,
                 labels=section_labels(language), changes=changes, gaps=gaps,
                 letter=row.cover_letter or "", status_labels=STATUS_LABELS,
+                reviewed_at=(row.tailored_cv or {}).get("_reviewed_at"),
             ),
         )
 

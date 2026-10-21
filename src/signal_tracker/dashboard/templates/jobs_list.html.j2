@@ -116,6 +116,13 @@
   .fp-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px; }
   .fp-hidden { color: var(--muted); font-size: 12.5px; margin-left: auto; }
   @media (max-width: 720px) { .fp-grid { grid-template-columns: 1fr; } }
+  .refresh-progress { padding: 16px 18px; margin-bottom: 14px; }
+  .rp-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .rp-pct { font-weight: 800; font-size: 18px; }
+  .rp-bar { height: 10px; background: rgba(0,0,0,0.07); border-radius: 999px; overflow: hidden; }
+  .rp-bar span { display: block; height: 100%; background: var(--accent, #fca61f); transition: width 400ms ease; }
+  .rp-label { margin-top: 8px; font-size: 13.5px; color: var(--text-2); }
+  .rp-note { margin-top: 2px; font-size: 12.5px; color: var(--muted); }
 {% endblock %}
 
 {% block content %}
@@ -123,8 +130,7 @@
   <h1>Offres ouvertes</h1>
   <span class="count-badge mono">{{ rows|length }}</span>
   <span class="spacer"></span>
-  <form method="post" action="/jobs/refresh"
-        onsubmit="window.showLoader && window.showLoader('Actualisation lancée', 'Les offres arrivent en arrière-plan.');">
+  <form method="post" action="/jobs/refresh">
     <button type="submit" class="btn btn-primary btn-sm" {% if refresh.status == "running" %}disabled{% endif %}>
       {% if refresh.status == "running" %}Actualisation…{% else %}Actualiser les offres{% endif %}
     </button>
@@ -138,6 +144,17 @@
 {% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
 {% if not has_cv %}
 <div class="flash warn">Pas de CV enregistré : ajoute-le depuis la page <a href="/">Recherche</a> pour activer le score IA et le CV adapté.</div>
+{% endif %}
+{% if refresh.status == "running" %}
+<div class="card refresh-progress" id="refresh-progress" role="status" aria-live="polite">
+  <div class="rp-head">
+    <strong>Actualisation des offres</strong>
+    <span class="rp-pct mono" id="rp-pct">{{ "%.0f"|format(refresh.percent or 0) }} %</span>
+  </div>
+  <div class="rp-bar"><span id="rp-fill" style="width: {{ refresh.percent or 0 }}%"></span></div>
+  <div class="rp-label" id="rp-label">{{ refresh.label or "Démarrage…" }}</div>
+  <div class="rp-note">Tu peux quitter la page : l'actualisation continue en arrière-plan.</div>
+</div>
 {% endif %}
 {% if refresh.status == "done" %}
 <div class="flash">Dernière actualisation : {{ refresh.jobs_new }} nouvelle(s) offre(s) sur {{ refresh.companies_with_ats }}/{{ refresh.companies }} entreprise(s) trouvée(s), {{ refresh.jobs_scored }} scorée(s) par l'IA.</div>
@@ -255,4 +272,30 @@
     {% endfor %}
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if refresh.status == "running" %}
+<script>
+(function () {
+  var fill = document.getElementById('rp-fill');
+  var pct = document.getElementById('rp-pct');
+  var label = document.getElementById('rp-label');
+  function tick() {
+    fetch('/jobs/refresh/status', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (s) {
+        var p = Math.max(0, Math.min(100, Number(s.percent) || 0));
+        fill.style.width = p + '%';
+        pct.textContent = Math.round(p) + ' %';
+        if (s.label) label.textContent = s.label;
+        if (s.status === 'running') { setTimeout(tick, 2000); }
+        else { window.location.href = '/jobs'; }
+      })
+      .catch(function () { setTimeout(tick, 4000); });
+  }
+  setTimeout(tick, 1500);
+})();
+</script>
+{% endif %}
 {% endblock %}

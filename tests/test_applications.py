@@ -416,3 +416,33 @@ def test_cv_markdown_and_filename() -> None:
     assert "## Experience" in md
     assert "- Pipelines" in md
     assert safe_filename("cv", "L'Oréal", "Chef de projet") == "cv-l-or-al-chef-de-projet"
+
+
+def test_review_runs_only_on_button(
+    client: TestClient, db: Database, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import litellm
+
+    calls: list[int] = []
+    fake = _fake_llm(TAILOR_PAYLOAD)
+
+    async def counting(**kw: Any) -> SimpleNamespace:
+        calls.append(1)
+        return await fake(**kw)  # type: ignore[no-any-return]
+
+    _add_cv(db, _uid(db))
+    job_id = _make_job(db)
+    monkeypatch.setattr(litellm, "acompletion", counting)
+    client.post(f"/jobs/{job_id}/tailor", follow_redirects=False)
+    assert len(calls) == 1                      # generation only, no automatic review
+    with db.session() as s:
+        app_id = s.execute(select(Application)).scalar_one().id
+    page = client.get(f"/applications/{app_id}/documents").text
+    assert "Relecture anti-invention" in page and "pas encore relu" in page
+
+    resp = client.post(f"/applications/{app_id}/review", follow_redirects=False)
+    assert resp.status_code == 303 and len(calls) == 2
+    with db.session() as s:
+        row = s.execute(select(Application)).scalar_one()
+        assert row.tailored_cv and row.tailored_cv.get("_reviewed_at")
+    assert "relu par le 2e agent" in client.get(f"/applications/{app_id}/documents").text

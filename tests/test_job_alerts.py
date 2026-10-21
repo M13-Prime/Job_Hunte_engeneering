@@ -144,7 +144,7 @@ async def test_refresh_and_score_respects_limit_and_scope(
     scraped: list[list[str]] = []
 
     async def fake_refresh(
-        _db: Database, _profile: UserProfile, companies: list[str],
+        _db: Database, _profile: UserProfile, companies: list[str], **__: Any,
     ) -> ScrapingReport:
         scraped.append(companies)
         return ScrapingReport(companies_attempted=len(companies), jobs_new=3)
@@ -182,7 +182,7 @@ async def test_refresh_without_cv_scrapes_but_does_not_score(
         s.add(WatchlistEntry(user_id=me, company_name="Acme", normalized_name="acme"))
     _job(tmp_db, "Acme", heuristic=60)
 
-    async def fake_refresh(*_: Any) -> ScrapingReport:
+    async def fake_refresh(*_: Any, **__: Any) -> ScrapingReport:
         return ScrapingReport()
 
     async def no_llm(**_: Any) -> Any:

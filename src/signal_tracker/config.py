@@ -164,7 +164,8 @@ class Settings(BaseSettings):
 
     # Second, cheap AI pass that removes anything the source CV doesn't
     # support from a tailored CV / cover letter (~0.01 $ per document).
-    tailor_review_enabled: bool = True
+    # False = only when the user clicks "Relecture" on the documents page.
+    tailor_review_enabled: bool = False
     # Optional JobSpy collector (Indeed, LinkedIn, Glassdoor, Google Jobs).
     # Needs the image built with INSTALL_JOBSPY=1. Unofficial endpoints:
     # they break without notice and LinkedIn rate-limits quickly.
