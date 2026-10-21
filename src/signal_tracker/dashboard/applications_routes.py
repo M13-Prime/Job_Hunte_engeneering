@@ -44,6 +44,7 @@ from signal_tracker.applications.tracker import (
 from signal_tracker.config import get_settings, load_user_profile
 from signal_tracker.jobs.filters import (
     REASON_LABELS,
+    profile_title_terms,
     rejection_reason,
     user_default_filter,
 )
@@ -104,6 +105,30 @@ def _to_int(value: str | None) -> int | None:
     except (TypeError, ValueError):
         return None
     return n if 0 <= n <= 60 else None
+
+
+def _profile_terms_and_years(session: Session, user_id: int) -> tuple[list[str], int | None]:
+    """Distinctive words of the user's keywords + CV headline/roles, and CV years."""
+    phrases = [
+        v for (v,) in session.execute(
+            select(UserKeyword.value).where(UserKeyword.user_id == user_id)
+        ).all() if v
+    ]
+    cv = session.execute(
+        select(UserCV).where(UserCV.user_id == user_id).limit(1)
+    ).scalar_one_or_none()
+    years: int | None = None
+    profile = (cv.profile_json or {}) if cv is not None else {}
+    if isinstance(profile, dict):
+        if isinstance(profile.get("headline"), str):
+            phrases.append(profile["headline"])
+        for role in profile.get("top_roles") or []:
+            if isinstance(role, dict) and isinstance(role.get("title"), str):
+                phrases.append(role["title"])
+        raw_years = profile.get("years_experience")
+        if isinstance(raw_years, int) and 0 <= raw_years <= 60:
+            years = raw_years
+    return profile_title_terms(phrases), years
 
 
 def register_application_routes(
@@ -171,12 +196,13 @@ def register_application_routes(
         min_score: Annotated[int, Query(ge=0, le=100)] = 0,
         f: Annotated[int, Query()] = 0,
         country: Annotated[str, Query(max_length=96)] = "",
-        unknown: Annotated[int, Query()] = 1,
+        unknown: Annotated[int, Query()] = 0,
         kw: Annotated[list[str] | None, Query()] = None,
         extra: Annotated[str, Query(max_length=200)] = "",
         mode: Annotated[str, Query()] = "all",
         exp_min: Annotated[str, Query(max_length=3)] = "",
         exp_max: Annotated[str, Query(max_length=3)] = "",
+        rel: Annotated[int, Query()] = 0,
         user: User = Depends(require_user),
         session: Session = Depends(get_session_dep),
     ) -> HTMLResponse:
@@ -194,6 +220,16 @@ def register_application_routes(
             flt.include_unknown = bool(unknown)
             flt.exp_min = _to_int(exp_min)
             flt.exp_max = _to_int(exp_max)
+        terms, cv_years = _profile_terms_and_years(session, user.id)
+        exp_from_cv = False
+        if not f and flt.exp_min is None and flt.exp_max is None and cv_years is not None:
+            # Nothing saved yet: start from the experience read in the CV.
+            flt.exp_min, flt.exp_max = max(0, cv_years - 3), cv_years + 3
+            exp_from_cv = True
+        # Checkboxes send nothing when unticked: only trust them on a submitted form.
+        title_gate = bool(rel) if f else True
+        if title_gate:
+            flt.title_terms = terms
         flt.keyword_mode = "any" if mode == "any" else "all"
         flt.keywords = [k.strip() for k in (kw or []) if k.strip()] + [
             t.strip() for t in extra.split(",") if t.strip()
@@ -234,6 +270,7 @@ def register_application_routes(
             reason = rejection_reason(
                 title=job.title, location=job.location, department=job.department,
                 description=job.description, flt=flt,
+                ai_score=score_row.agent_score if score_row is not None else None,
             )
             if reason is None:
                 rows.append((job, score_row))
@@ -272,6 +309,10 @@ def register_application_routes(
                 hidden=[(REASON_LABELS[k], n) for k, n in hidden.items()],
                 hidden_total=sum(hidden.values()),
                 saved_country=normalize_country(me.country if me else None),
+                title_gate=title_gate,
+                title_terms=terms,
+                exp_from_cv=exp_from_cv,
+                cv_years=cv_years,
             ),
         )
 

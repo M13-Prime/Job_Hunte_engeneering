@@ -57,7 +57,7 @@ STATUS_LABELS = {
 @dataclass(slots=True)
 class CompanyLink:
     url: str
-    label: str  # "Site", "Page carrières" or "Chercher le site"
+    label: str  # "Site", "Page carrières" or "Site web" (first search result)
     verified: bool
 
 
@@ -151,12 +151,22 @@ def read_unsubscribe_token(token: str, secret: str) -> int | None:
 # Company links
 # ---------------------------------------------------------------------------
 
-def company_link(db: Database, company_name: str, company_normalized: str) -> CompanyLink:
+def website_search_url(company_name: str) -> str:
+    """DuckDuckGo "\\" query: jumps straight to the first result, which for a
+    company name + "site officiel" is almost always its own website."""
+    return f"https://duckduckgo.com/?q={quote_plus(chr(92) + company_name + ' site officiel')}"
+
+
+def company_link(
+    db: Database, company_name: str, company_normalized: str,
+    *, prefer_website: bool = False,
+) -> CompanyLink:
     """Best real link for a company, never an invented URL.
 
     Order: the company's known website > a careers board proven by a scraped
     posting > a careers page the preparation report gave with high/medium
-    confidence > a web search for the company (labelled as a search).
+    confidence > the first web result for the company's official site.
+    With ``prefer_website`` the careers pages are skipped.
     """
     with db.session() as s:
         company = s.execute(
@@ -164,6 +174,8 @@ def company_link(db: Database, company_name: str, company_normalized: str) -> Co
         ).scalar_one_or_none()
         if company is not None and company.url:
             return CompanyLink(company.url, "Site", True)
+        if prefer_website:
+            return CompanyLink(website_search_url(company_name), "Site web", False)
         job = s.execute(
             select(JobOffer)
             .where(JobOffer.company_normalized == company_normalized)
@@ -190,10 +202,7 @@ def company_link(db: Database, company_name: str, company_normalized: str) -> Co
                 and intel.get("career_page_confidence") in ("high", "medium")
             ):
                 return CompanyLink(url, "Page carrières", True)
-    return CompanyLink(
-        f"https://www.google.com/search?q={quote_plus(company_name + ' site officiel')}",
-        "Chercher le site", False,
-    )
+    return CompanyLink(website_search_url(company_name), "Site web", False)
 
 
 # ---------------------------------------------------------------------------
@@ -430,4 +439,5 @@ __all__ = [
     "render_newsletter",
     "send_newsletters",
     "unsubscribe_token",
+    "website_search_url",
 ]

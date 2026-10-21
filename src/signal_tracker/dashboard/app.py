@@ -793,10 +793,18 @@ def build_app(db: Database | None = None) -> FastAPI:
         country: Annotated[list[str] | None, Query()] = None,
         country_scope: Annotated[str, Query()] = "any",
         q: Annotated[str, Query(max_length=200)] = "",
+        kw: Annotated[list[str] | None, Query()] = None,
+        kmode: Annotated[str, Query()] = "all",
+        extra: Annotated[str, Query(max_length=200)] = "",
         limit: Annotated[int, Query(ge=1, le=500)] = 200,
         user: User = Depends(require_user),
         session: Session = Depends(get_session_dep),
     ) -> HTMLResponse:
+        # Keyword filter (AND / OR, with synonyms) applied after the SQL query.
+        selected_kw = [k.strip() for k in (kw or []) if k.strip()]
+        extra_terms = [t.strip() for t in extra.split(",") if t.strip()]
+        keyword_terms = selected_kw + extra_terms
+        keyword_mode = "any" if kmode == "any" else "all"
         # User's runs only.
         user_run_ids = [
             r for (r,) in session.execute(
@@ -819,7 +827,7 @@ def build_app(db: Database | None = None) -> FastAPI:
             .where(Signal.total_score >= min_score)
             .where(Signal.search_run_id.in_(user_run_ids))
             .order_by(desc(Signal.total_score))
-            .limit(limit)
+            .limit(min(2000, limit * 8) if keyword_terms else limit)
         )
         if run is not None:
             stmt = stmt.where(Signal.search_run_id == run)
@@ -880,6 +888,43 @@ def build_app(db: Database | None = None) -> FastAPI:
                 stmt = stmt.where(or_(*conds))
 
         rows = list(session.execute(stmt))
+        if keyword_terms:
+            from signal_tracker.jobs.filters import keywords_match
+
+            rows = [
+                r for r in rows
+                if keywords_match(
+                    keyword_terms,
+                    " ".join([
+                        r[0].company_name or "", r[0].summary_fr or "",
+                        r[0].suggested_angle or "", r[1].title or "",
+                        (r[1].content or "")[:4000],
+                    ]),
+                    mode=keyword_mode,
+                )
+            ][:limit]
+
+        # Company name links to the company's website (known URL, else the
+        # first search result for its official site), not to the article.
+        from signal_tracker.notifier.newsletter import website_search_url
+        from signal_tracker.storage.models import Company
+
+        names = {r[0].company_normalized: r[0].company_name for r in rows}
+        known_urls = {
+            n: u for n, u in session.execute(
+                select(Company.normalized_name, Company.url)
+                .where(Company.normalized_name.in_(list(names)))
+            ).all() if u
+        } if names else {}
+        company_urls = {
+            n: known_urls.get(n) or website_search_url(name or n)
+            for n, name in names.items()
+        }
+        keyword_choices = sorted({
+            v for (v,) in session.execute(
+                select(UserKeyword.value).where(UserKeyword.user_id == user.id)
+            ).all() if v
+        }, key=str.lower)
 
         # Build the list of countries present in this user's data — drives
         # the multi-select in the UI.
@@ -925,6 +970,12 @@ def build_app(db: Database | None = None) -> FastAPI:
                 "valid_feedback": VALID_FEEDBACK,
                 "selected_countries": selected_countries,
                 "country_scope": valid_scope,
+                "company_urls": company_urls,
+                "keyword_choices": keyword_choices,
+                "selected_kw": selected_kw,
+                "extra_terms": extra,
+                "keyword_mode": keyword_mode,
+                "keyword_active": bool(keyword_terms),
                 "available_countries": available_countries,
                 "run_id": run,
                 "focus_run_id": focus_run_id,

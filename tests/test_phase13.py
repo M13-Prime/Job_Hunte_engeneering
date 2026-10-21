@@ -281,7 +281,7 @@ def test_company_link_prefers_proven_careers_board(tmp_db: Database) -> None:
     link = company_link(tmp_db, "Sweep", "sweep")
     assert link.url == "https://jobs.lever.co/sweep" and link.verified
     fallback = company_link(tmp_db, "Unknown Co", "unknown co")
-    assert not fallback.verified and fallback.url.startswith("https://www.google.com/search?q=")
+    assert not fallback.verified and fallback.url.startswith("https://duckduckgo.com/?q=")
 
 
 def test_newsletter_content_and_unsubscribe_flow(db: Database) -> None:
