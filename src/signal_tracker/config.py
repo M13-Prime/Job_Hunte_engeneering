@@ -108,8 +108,18 @@ class Settings(BaseSettings):
     # Phase 13 — weekly newsletter to every approved, opted-in user.
     # Sent by the scheduler on this weekday (0 = Monday ... 6 = Sunday),
     # -1 disables the automatic send (the admin page can still send it).
-    newsletter_weekday: int = 0
+    newsletter_weekday: int = 6
+    # Own trigger, independent from the daily digest (Europe/Paris time).
+    newsletter_hour: int = 9
+    newsletter_minute: int = 0
     newsletter_period_days: int = 7
+    # Top N of the week in each section.
+    newsletter_max_signals: int = 10
+    newsletter_max_jobs: int = 10
+    # Minimum AI match score for an offer to be listed, and whether offers
+    # with ghost-job hints are left out.
+    newsletter_job_min_score: float = 50.0
+    newsletter_hide_ghost: bool = True
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     gemini_api_key: str | None = None

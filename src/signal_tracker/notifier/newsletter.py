@@ -19,8 +19,9 @@ from urllib.parse import quote_plus
 
 from itsdangerous import BadSignature, URLSafeSerializer
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from sqlalchemy import and_, desc, func, select
+from sqlalchemy import and_, desc, func, or_, select
 
+from signal_tracker.config import get_settings
 from signal_tracker.jobs.filters import offer_passes, user_default_filter
 from signal_tracker.notifier.email import EmailSenderProtocol
 from signal_tracker.storage import Database
@@ -221,15 +222,22 @@ class NewsletterBuilder:
         base_url: str | None,
         secret: str | None,
         period_days: int = 7,
-        job_threshold: float = 60.0,
-        max_items: int = 6,
+        job_threshold: float | None = None,
+        max_signals: int | None = None,
+        max_jobs: int | None = None,
+        hide_ghost: bool | None = None,
     ) -> None:
+        settings = get_settings()
         self.db = db
         self.base_url = base_url.rstrip("/") if base_url else None
         self.secret = secret
         self.period_days = period_days
-        self.job_threshold = job_threshold
-        self.max_items = max_items
+        self.job_threshold = (
+            settings.newsletter_job_min_score if job_threshold is None else job_threshold
+        )
+        self.max_signals = settings.newsletter_max_signals if max_signals is None else max_signals
+        self.max_jobs = settings.newsletter_max_jobs if max_jobs is None else max_jobs
+        self.hide_ghost = settings.newsletter_hide_ghost if hide_ghost is None else hide_ghost
 
     def build(self, user_id: int) -> NewsletterData:
         now = datetime.now(UTC).replace(tzinfo=None)
@@ -284,10 +292,13 @@ class NewsletterBuilder:
                 angle=sig.suggested_angle, source_url=raw.url if raw else None,
                 company_link=company_link(self.db, sig.company_name, sig.company_normalized),
             ))
-            if len(data.signals) >= self.max_items:
+            if len(data.signals) >= self.max_signals:
                 break
 
     def _jobs(self, data: NewsletterData, user_id: int, since: datetime) -> None:
+        """Best-matching open offers found OR scored this week, one per title."""
+        from signal_tracker.jobs.ghost import ghost_flags, title_key
+
         with self.db.session() as s:
             rows = list(s.execute(
                 select(JobOffer, JobAgentScore)
@@ -296,14 +307,25 @@ class NewsletterBuilder:
                     JobAgentScore.user_id == user_id,
                     JobAgentScore.agent_score >= self.job_threshold,
                     JobOffer.is_open.is_(True),
-                    JobOffer.collected_at >= since,
+                    or_(JobOffer.collected_at >= since, JobAgentScore.processed_at >= since),
                 ))
                 .order_by(desc(JobAgentScore.agent_score))
             ).all())
             flt = user_default_filter(s.get(User, user_id))
-        rows = [r for r in rows if offer_passes(r[0], flt)]
+            rows = [r for r in rows if offer_passes(r[0], flt)]
+            if self.hide_ghost and rows:
+                ghosts = ghost_flags(s, [j for j, _ in rows])
+                rows = [r for r in rows if not ghosts.get(r[0].id)]
+        seen: set[tuple[str, str]] = set()
+        unique = []
+        for job, score in rows:
+            key = (job.company_normalized, title_key(job.title))
+            if key not in seen:
+                seen.add(key)
+                unique.append((job, score))
+        rows = unique
         data.jobs_total = len(rows)
-        for job, score in rows[: self.max_items]:
+        for job, score in rows[: self.max_jobs]:
             data.jobs.append(NewsJob(
                 id=job.id, title=job.title, company=job.company_name,
                 location=job.location, score=float(score.agent_score),
@@ -401,7 +423,7 @@ async def send_newsletters(
     base_url: str | None,
     secret: str | None,
     period_days: int = 7,
-    job_threshold: float = 60.0,
+    job_threshold: float | None = None,
     only_user_id: int | None = None,
     skip_empty: bool = True,
 ) -> dict[str, int]:

@@ -23,7 +23,7 @@
 <div class="page-head">
   <div class="titles">
     <h1>Newsletter</h1>
-    <p class="sub">{{ recipients|length }} abonné{{ "s" if recipients|length != 1 }}. Envoi automatique {% if weekday >= 0 %}chaque {{ days[weekday] }} avec le digest du matin{% else %}désactivé{% endif %}, sur les {{ period_days }} derniers jours.</p>
+    <p class="sub">{{ recipients|length }} abonné{{ "s" if recipients|length != 1 }}. Envoi automatique {% if weekday >= 0 %}chaque {{ days[weekday] }} à {{ '%02d'|format(hour) }}h{{ '%02d'|format(minute) if minute else '' }}{% else %}désactivé{% endif %}, sur les {{ period_days }} derniers jours.</p>
   </div>
 </div>
 {% if flash %}<div class="flash{% if 'vide' in flash or 'Aucun' in flash %} warn{% endif %}">{{ flash }}</div>{% endif %}

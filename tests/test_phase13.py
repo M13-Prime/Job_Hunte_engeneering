@@ -351,3 +351,26 @@ def test_newsletter_routes(db: Database) -> None:
     # is random per boot in tests: a forged token is refused.
     anon = TestClient(build_app(db=db))
     assert anon.get("/newsletter/unsubscribe?t=forged").status_code == 400
+
+
+def test_newsletter_top10_jobs_dedup_and_min_score(db: Database) -> None:
+    uid = _uid(db)
+    with db.session() as s:
+        specs = [(f"ESG Role {i}", 90 - i) for i in range(12)]
+        specs += [("ESG Role 0 (H/F)", 95), ("Low Match Role", 30)]
+        for i, (title, score) in enumerate(specs):
+            job = JobOffer(
+                company_normalized="acme", company_name="Acme", ats="greenhouse",
+                ats_company_slug="acme", external_id=str(i), title=title,
+                url=f"https://example.com/{i}", location="Paris, France",
+                relevance_score=40, is_open=True, dedup_key=f"acme|gh|{i}",
+            )
+            s.add(job)
+            s.flush()
+            s.add(JobAgentScore(user_id=uid, job_offer_id=job.id, agent_score=score))
+    data = NewsletterBuilder(db, base_url=None, secret=None).build(uid)
+    titles = [j.title for j in data.jobs]
+    assert len(titles) == 10
+    assert titles[0] == "ESG Role 0 (H/F)"          # best score wins the duplicate
+    assert "ESG Role 0" not in titles               # same title, second copy dropped
+    assert "Low Match Role" not in titles           # under NEWSLETTER_JOB_MIN_SCORE

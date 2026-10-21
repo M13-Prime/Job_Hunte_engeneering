@@ -24,7 +24,7 @@ from signal_tracker.pipeline import (
     run_classification,
     run_collection,
 )
-from signal_tracker.storage import Database, init_db
+from signal_tracker.storage import init_db
 from signal_tracker.utils.logging import setup_logging
 
 
@@ -74,21 +74,22 @@ async def _job() -> None:
         sender=settings.digest_from_email,
     )
     record_digest_sent(db, recipient=settings.digest_to_email, data=data)
-    await _maybe_send_newsletter(db, sender)
 
 
-async def _maybe_send_newsletter(db: Database, sender: EmailSenderProtocol) -> None:
-    """Weekly newsletter on NEWSLETTER_WEEKDAY (Phase 13)."""
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-
+async def _newsletter_job() -> None:
+    """Weekly newsletter, own trigger (NEWSLETTER_WEEKDAY at NEWSLETTER_HOUR)."""
     from signal_tracker.notifier.newsletter import send_newsletters
 
     settings = get_settings()
-    today = datetime.now(ZoneInfo(settings.digest_timezone)).weekday()
-    if settings.newsletter_weekday < 0 or today != settings.newsletter_weekday:
-        return
+    console = Console()
     if not settings.digest_from_email:
+        console.print("[yellow]newsletter: DIGEST_FROM_EMAIL is empty, nothing sent[/yellow]")
+        return
+    db = init_db(resolve_db_url(settings))
+    try:
+        sender: EmailSenderProtocol = build_sender_from_settings(settings)
+    except RuntimeError as exc:
+        console.print(f"[yellow]newsletter: {exc}[/yellow]")
         return
     stats = await send_newsletters(
         db,
@@ -97,9 +98,8 @@ async def _maybe_send_newsletter(db: Database, sender: EmailSenderProtocol) -> N
         base_url=settings.dashboard_base_url,
         secret=settings.session_secret_key,
         period_days=settings.newsletter_period_days,
-        job_threshold=settings.job_alert_threshold,
     )
-    Console().print(f"newsletter: {stats}")
+    console.print(f"newsletter: {stats}")
 
 
 def main() -> None:
@@ -111,7 +111,20 @@ def main() -> None:
         f"Will run daily at [bold]{settings.digest_send_hour:02d}:00[/bold] "
         f"({settings.digest_timezone}). Ctrl+C to stop."
     )
-    asyncio.run(run_forever(_job, timezone=settings.digest_timezone))
+    days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+    weekly = 0 <= settings.newsletter_weekday <= 6
+    if weekly:
+        console.print(
+            f"Newsletter: every [bold]{days[settings.newsletter_weekday]}[/bold] at "
+            f"[bold]{settings.newsletter_hour:02d}:{settings.newsletter_minute:02d}[/bold]."
+        )
+    asyncio.run(run_forever(
+        _job, timezone=settings.digest_timezone,
+        weekly_job=_newsletter_job if weekly else None,
+        weekly_day=settings.newsletter_weekday,
+        weekly_hour=settings.newsletter_hour,
+        weekly_minute=settings.newsletter_minute,
+    ))
 
 
 if __name__ == "__main__":
