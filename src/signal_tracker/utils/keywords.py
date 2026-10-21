@@ -18,10 +18,12 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
+from urllib.parse import quote_plus
 
 from signal_tracker.collectors.base import BaseCollector
 from signal_tracker.collectors.gdelt import GdeltCollector, GdeltQuery
 from signal_tracker.collectors.newsapi import NewsApiCollector, NewsApiQuery
+from signal_tracker.collectors.rss import FeedConfig, RSSCollector
 
 # Event words appended to a keyword group so GDELT returns hiring signals
 # about it, not every article that mentions it.
@@ -148,17 +150,79 @@ def newsapi_queries_from_keywords(
     return queries[:max_queries]
 
 
+# Google News editions per target country: (hl, gl, ceid) for the local
+# language; English always uses the US edition (largest coverage).
+_GNEWS_LOCAL: dict[str, tuple[str, str, str]] = {
+    "France": ("fr", "FR", "FR:fr"), "Belgique": ("fr", "BE", "BE:fr"),
+    "Suisse": ("fr", "CH", "CH:fr"), "Luxembourg": ("fr", "FR", "FR:fr"),
+    "Canada": ("fr", "CA", "CA:fr"), "Allemagne": ("de", "DE", "DE:de"),
+    "Espagne": ("es", "ES", "ES:es"), "Italie": ("it", "IT", "IT:it"),
+    "Pays-Bas": ("nl", "NL", "NL:nl"),
+}
+_GNEWS_EVENTS = {
+    "fr": "(recrute OR recrutement OR nomme OR nomination OR lève OR levée OR rachète "
+          "OR acquisition OR lance OR implantation)",
+    "en": "(hiring OR appoints OR appointed OR raises OR funding OR acquires "
+          "OR acquisition OR launches OR expands)",
+}
+
+
+def google_news_feeds(
+    user_keywords: Mapping[str, Sequence[str]],
+    *,
+    country: str = "France",
+    languages: set[str] | None = None,
+    max_keywords: int = 10,
+    days: int = 7,
+) -> list[FeedConfig]:
+    """Google News RSS search feeds for the user's keywords (free, no key).
+
+    One feed per keyword and language, restricted to the last `days` days
+    and to hiring / leadership / funding events so the classifier gets
+    relevant articles instead of every mention of the keyword.
+    """
+    ordered: list[str] = []
+    for cat in ("job_title", "field", "other"):
+        for kw in user_keywords.get(cat) or []:
+            if kw and kw.strip() and kw.strip() not in ordered:
+                ordered.append(kw.strip())
+    editions: list[tuple[str, str, str]] = []
+    local = _GNEWS_LOCAL.get(country)
+    if local and (not languages or local[0] in languages):
+        editions.append(local)
+    if not languages or "en" in languages:
+        editions.append(("en", "US", "US:en"))
+    feeds: list[FeedConfig] = []
+    for kw in ordered[:max_keywords]:
+        for hl, gl, ceid in editions:
+            events = _GNEWS_EVENTS.get(hl, _GNEWS_EVENTS["en"])
+            q = quote_plus(f'"{kw}" {events} when:{days}d')
+            feeds.append(FeedConfig(
+                id=f"gnews_{hl}_{fold(kw).replace(' ', '_')[:40]}",
+                name=f"Google News ({hl}) : {kw}",
+                url=f"https://news.google.com/rss/search?q={q}&hl={hl}&gl={gl}&ceid={ceid}",
+                language=hl,
+            ))
+    return feeds
+
+
 def keyword_collectors(
     user_keywords: Mapping[str, Sequence[str]],
     *,
     languages: set[str] | None = None,
     gdelt_enabled: bool = True,
     newsapi_key: str | None = None,
+    country: str = "France",
+    google_news: bool = True,
 ) -> list[BaseCollector]:
     """Collectors that fetch news about the user's own keywords."""
     if not any(user_keywords.values()):
         return []
     collectors: list[BaseCollector] = []
+    if google_news:
+        feeds = google_news_feeds(user_keywords, country=country, languages=languages)
+        if feeds:
+            collectors.append(RSSCollector(feeds, cache_ttl_seconds=3 * 3600))
     if gdelt_enabled:
         from signal_tracker.pipeline import _augment_gdelt_queries
 
@@ -178,6 +242,7 @@ __all__ = [
     "KeywordMatcher",
     "fold",
     "gdelt_queries_from_keywords",
+    "google_news_feeds",
     "keyword_collectors",
     "newsapi_queries_from_keywords",
     "prefilter_terms",

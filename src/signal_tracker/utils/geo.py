@@ -124,6 +124,19 @@ def geographies_to_languages(geographies: list[str]) -> set[str]:
     return langs if saw_known else set()
 
 
+def collection_languages(country: str | None) -> set[str]:
+    """Languages kept at collect time for a target country.
+
+    English is always kept next to the local language: most business and
+    tech press is in English, including news about French companies (an
+    English-only filter-out left ~10 feeds out of 30). The classifier then
+    checks the company's country on each article. An open target
+    (Europe / Monde) keeps everything (empty set = no filter).
+    """
+    langs = geographies_to_languages([country or "France"])
+    return langs | {"en"} if langs else set()
+
+
 def languages_to_gdelt_clause(languages: set[str]) -> str:
     """Build a GDELT 2.0 `sourcelang:` clause for a set of languages.
 
