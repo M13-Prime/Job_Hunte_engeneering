@@ -44,7 +44,7 @@ def parse_teamtailor_rss(text: str, slug: str) -> list[JobPosting]:
         elif isinstance(entry.get("tags"), list) and entry["tags"]:
             loc = as_str(entry["tags"][0].get("term"))
         published = entry.get("published_parsed")
-        posted = datetime(*published[:6], tzinfo=UTC) if published else None
+        posted = datetime(*published[:6]).replace(tzinfo=UTC) if published else None
         out.append(JobPosting(
             ats="teamtailor",
             ats_company_slug=slug,

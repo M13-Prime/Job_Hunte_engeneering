@@ -229,7 +229,7 @@ async def test_review_failure_keeps_draft(monkeypatch: pytest.MonkeyPatch) -> No
 def test_jobspy_rows_grouped_by_company() -> None:
     from signal_tracker.jobs.jobspy_source import pop_company_urls
 
-    rows = [
+    rows: list[dict[str, Any]] = [
         {"id": "in-1", "site": "indeed", "job_url": "https://fr.indeed.com/1", "title": "ESG Analyst",
          "company": "Acme", "location": "Paris, FR", "description": "**ESG**",
          "company_url_direct": "https://acme.example"},
