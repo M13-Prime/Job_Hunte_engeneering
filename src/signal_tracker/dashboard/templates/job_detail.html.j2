@@ -90,6 +90,11 @@
             {% endif %}{% endfor %}
           </div></div>
         {% endif %}
+        {% if ghost %}
+        <div class="kv"><div class="k">👻 Offre fantôme ? (indices, pas une preuve)</div>
+          <ul class="legit-list">{% for f in ghost %}<li>{{ f }}</li>{% endfor %}</ul>
+          <div class="v" style="font-size:12.5px;">Avant d'y passer du temps : cherche un recruteur ou un manager de l'équipe sur LinkedIn et demande si le poste est vraiment ouvert.</div></div>
+        {% endif %}
         {% if score.legitimacy_flags %}
         <div class="kv"><div class="k">Légitimité de l'annonce : à vérifier</div>
           <ul class="legit-list">{% for f in score.legitimacy_flags %}<li>{{ f }}</li>{% endfor %}</ul></div>
@@ -111,6 +116,10 @@
           <button type="submit" class="btn btn-link btn-sm" {% if not has_cv %}disabled{% endif %}>Recalculer</button>
         </form>
       {% else %}
+        {% if ghost %}
+        <div class="kv"><div class="k">👻 Offre fantôme ? (indices, pas une preuve)</div>
+          <ul class="legit-list">{% for f in ghost %}<li>{{ f }}</li>{% endfor %}</ul></div>
+        {% endif %}
         <p class="muted" style="margin: 0 0 14px;">Pas encore de score IA pour cette offre (score mots-clés : {{ "%.0f"|format(job.relevance_score) }}).</p>
         <form method="post" action="/jobs/{{ job.id }}/score"
               onsubmit="window.showLoader && window.showLoader('Score IA en cours', 'Comparaison de l\'offre avec ton CV…');">

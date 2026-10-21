@@ -48,6 +48,7 @@ from signal_tracker.jobs.filters import (
     rejection_reason,
     user_default_filter,
 )
+from signal_tracker.jobs.ghost import ghost_flags
 from signal_tracker.jobs.matching import (
     MatchingError,
     companies_for_user,
@@ -204,6 +205,7 @@ def register_application_routes(
         exp_min: Annotated[str, Query(max_length=3)] = "",
         exp_max: Annotated[str, Query(max_length=3)] = "",
         rel: Annotated[int, Query()] = 0,
+        hide_ghost: Annotated[int, Query()] = 0,
         user: User = Depends(require_user),
         session: Session = Depends(get_session_dep),
     ) -> HTMLResponse:
@@ -277,6 +279,12 @@ def register_application_routes(
                 rows.append((job, score_row))
             else:
                 hidden[reason] = hidden.get(reason, 0) + 1
+        ghost = ghost_flags(session, [j for j, _ in rows])
+        if hide_ghost:
+            kept = [(j, sc) for j, sc in rows if not ghost.get(j.id)]
+            if len(kept) < len(rows):
+                hidden["ghost"] = len(rows) - len(kept)
+            rows = kept
         keyword_choices = sorted({
             v for (v,) in session.execute(
                 select(UserKeyword.value).where(UserKeyword.user_id == user.id)
@@ -311,6 +319,8 @@ def register_application_routes(
                 hidden_total=sum(hidden.values()),
                 saved_country=normalize_country(me.country if me else None),
                 title_gate=title_gate,
+                ghost=ghost,
+                hide_ghost=bool(hide_ghost),
                 title_terms=terms,
                 exp_from_cv=exp_from_cv,
                 cv_years=cv_years,
@@ -401,6 +411,7 @@ def register_application_routes(
                 user, job=job, score=score, application=application,
                 status_labels=STATUS_LABELS, has_cv=_has_cv(session, user.id),
                 flash=_flash(msg), criteria_defs=CRITERIA,
+                ghost=ghost_flags(session, [job]).get(job.id, []),
             ),
         )
 

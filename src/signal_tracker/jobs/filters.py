@@ -309,6 +309,7 @@ REASON_LABELS = {
     "too_senior": "trop seniors pour ton expérience",
     "too_junior": "trop juniors pour ton expérience",
     "off_profile": "sans rapport avec ton profil",
+    "ghost": "possiblement fantômes",
 }
 
 __all__ = [
