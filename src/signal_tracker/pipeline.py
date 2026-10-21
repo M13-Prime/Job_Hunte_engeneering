@@ -277,14 +277,21 @@ def collectors_for_user(db: Database, user_id: int | None) -> list[BaseCollector
     Used by the daily run so the morning collection also covers what the
     user searches for, not only the static config.
     """
-    from signal_tracker.utils.geo import geographies_to_languages
+    from signal_tracker.storage.models import User
+    from signal_tracker.utils.geo import collection_languages, normalize_country
     from signal_tracker.utils.keywords import keyword_collectors
 
-    languages = geographies_to_languages(load_user_profile().geographies)
+    country = "France"
+    if user_id is not None:
+        with db.session() as s:
+            row = s.get(User, user_id)
+            country = normalize_country(row.country if row is not None else None)
+    languages = collection_languages(country)
     collectors = build_default_collectors(language_filter=languages)
     collectors.extend(keyword_collectors(
         load_user_keywords(db, user_id),
         languages=languages,
+        country=country,
         gdelt_enabled=bool((load_sources().get("gdelt") or {}).get("enabled")),
         newsapi_key=get_settings().newsapi_key,
     ))

@@ -211,8 +211,8 @@ def build_app(db: Database | None = None) -> FastAPI:
             # targets France only, we drop English RSS feeds and add
             # `sourcelang:french` to GDELT — saves the network round-trip
             # and reduces the LLM classify backlog.
-            from signal_tracker.utils.geo import geographies_to_languages
-            lang_filter = geographies_to_languages(profile.geographies)
+            from signal_tracker.utils.geo import collection_languages
+            lang_filter = collection_languages(user_country)
             picker_collectors = (
                 build_collectors_for_selection(
                     selection, language_filter=lang_filter,
@@ -240,6 +240,7 @@ def build_app(db: Database | None = None) -> FastAPI:
             picker_collectors.extend(keyword_collectors(
                 user_keywords,
                 languages=lang_filter,
+                country=user_country,
                 gdelt_enabled=bool((load_sources().get("gdelt") or {}).get("enabled")),
                 newsapi_key=get_settings().newsapi_key,
             ))
