@@ -159,6 +159,7 @@
       </select>
       <label class="fp-check"><input type="checkbox" name="unknown" value="1" {% if flt.include_unknown %}checked{% endif %}> garder les lieux non précisés / remote</label>
       <label class="fp-check" title="{% if title_terms %}Termes : {{ title_terms|join(', ') }}{% else %}Ajoute des mots-clés ou ton CV pour activer ce filtre{% endif %}"><input type="checkbox" name="rel" value="1" {% if title_gate %}checked{% endif %}> seulement les titres liés à mon profil (sauf score IA ≥ 60)</label>
+      <label class="fp-check" title="Annonce recyclée, copiée en série, en ligne depuis longtemps ou entreprise qui licencie"><input type="checkbox" name="hide_ghost" value="1" {% if hide_ghost %}checked{% endif %}> masquer les offres possiblement fantômes</label>
     </label>
     <div class="fp-field">
       <span>Expérience visée (années)</span>
@@ -226,7 +227,9 @@
           <span class="sep">·</span><span class="ats">{{ job.ats }}</span>
           {% if job.posted_at %}<span class="sep">·</span><span>{{ job.posted_at.strftime("%d/%m/%Y") }}</span>{% endif %}
           {% if job.id in tracked %}<span class="tracked">{{ status_labels[tracked[job.id]] }}</span>{% endif %}
-          {% if score_row and score_row.legitimacy_flags %}<span class="legit-warn" title="{{ score_row.legitimacy_flags|join(' · ') }}">⚠ à vérifier</span>{% endif %}
+          {% set warn = (ghost.get(job.id) or []) + ((score_row.legitimacy_flags or []) if score_row else []) %}
+          {% if ghost.get(job.id) %}<span class="legit-warn ghost" title="{{ warn|join(' · ') }}">👻 offre fantôme ?</span>
+          {% elif warn %}<span class="legit-warn" title="{{ warn|join(' · ') }}">⚠ à vérifier</span>{% endif %}
         </div>
       </div>
       <div class="angle">
