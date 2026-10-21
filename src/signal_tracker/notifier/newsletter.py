@@ -317,15 +317,14 @@ class NewsletterBuilder:
                 ghosts = ghost_flags(s, [j for j, _ in rows])
                 rows = [r for r in rows if not ghosts.get(r[0].id)]
         seen: set[tuple[str, str]] = set()
-        unique = []
+        unique: list[tuple[JobOffer, JobAgentScore]] = []
         for job, score in rows:
             key = (job.company_normalized, title_key(job.title))
             if key not in seen:
                 seen.add(key)
                 unique.append((job, score))
-        rows = unique
-        data.jobs_total = len(rows)
-        for job, score in rows[: self.max_jobs]:
+        data.jobs_total = len(unique)
+        for job, score in unique[: self.max_jobs]:
             data.jobs.append(NewsJob(
                 id=job.id, title=job.title, company=job.company_name,
                 location=job.location, score=float(score.agent_score),
