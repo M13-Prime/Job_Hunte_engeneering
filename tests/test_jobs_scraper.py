@@ -189,3 +189,21 @@ async def test_persist_result_inserts_and_closes(tmp_path: Path) -> None:
         closed_count = s.query(JobOffer).filter_by(is_open=False).count()
     assert open_count == 1
     assert closed_count == 1
+
+
+async def test_scrape_companies_reports_progress() -> None:
+    import httpx
+
+    from signal_tracker.jobs.backends import GreenhouseBackend
+    from signal_tracker.jobs.scraper import JobsScraper
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(lambda _: httpx.Response(404)))
+    seen: list[tuple[int, int, str]] = []
+    try:
+        scraper = JobsScraper(backends=[GreenhouseBackend()], rate_limit_seconds=0, client=client)
+        await scraper.scrape_companies(
+            ["Acme", "Beta"], on_progress=lambda d, t, n: seen.append((d, t, n)),
+        )
+    finally:
+        await client.aclose()
+    assert seen == [(1, 2, "Acme"), (2, 2, "Beta")]

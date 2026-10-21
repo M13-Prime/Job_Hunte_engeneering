@@ -55,7 +55,7 @@
 <div class="docs-head">
   <div>
     <h1>{{ application.title }} — {{ application.company_name }}</h1>
-    <div class="sub">Généré le {{ application.tailored_at.strftime("%d/%m/%Y à %H:%M") if application.tailored_at else "—" }} · statut : {{ status_labels[application.status] }}</div>
+    <div class="sub">Généré le {{ application.tailored_at.strftime("%d/%m/%Y à %H:%M") if application.tailored_at else "—" }} · statut : {{ status_labels[application.status] }}{% if reviewed_at %} · relu par le 2e agent le {{ reviewed_at[8:10] }}/{{ reviewed_at[5:7] }} à {{ reviewed_at[11:16] }}{% else %} · <strong>pas encore relu</strong>{% endif %}</div>
   </div>
   <span class="spacer"></span>
   <div class="toolbar">
@@ -63,6 +63,13 @@
     <button type="button" class="btn btn-ghost btn-sm" id="copy-btn">Copier</button>
     <a class="btn btn-ghost btn-sm" href="/applications/{{ application.id }}/cv.md">CV .md</a>
     <a class="btn btn-ghost btn-sm" href="/applications/{{ application.id }}/letter.txt">Lettre .txt</a>
+    <form method="post" action="/applications/{{ application.id }}/review"
+          onsubmit="window.showLoader && window.showLoader('Relecture en cours', 'Le 2e agent compare au CV d\'origine (~20 s)…');">
+      <button type="submit" class="btn btn-secondary btn-sm"
+              title="Un 2e agent IA compare le CV adapté et la lettre à ton CV d'origine et retire tout ce qui n'y figure pas (~0,01 $)">
+        {% if reviewed_at %}Relire à nouveau{% else %}Relecture anti-invention (2e agent){% endif %}
+      </button>
+    </form>
     <form method="post" action="/applications/{{ application.id }}/tailor"
           onsubmit="window.showLoader && window.showLoader('Rédaction en cours', 'CV adapté + lettre de motivation (~30 s)…');">
       <button type="submit" class="btn btn-link btn-sm">Régénérer</button>

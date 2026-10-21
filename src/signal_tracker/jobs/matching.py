@@ -12,6 +12,7 @@ Nothing here is called in a loop without an explicit `limit`.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -152,8 +153,24 @@ def companies_for_user(
     return out
 
 
+ProgressFn = Callable[[dict[str, Any]], None]
+
+# Share of the progress bar given to each phase (scraping is the long one).
+_SCRAPE_SHARE, _JOBSPY_SHARE = 75.0, 5.0
+
+
+def _emit(on_progress: ProgressFn | None, phase: str, percent: float, label: str,
+          **extra: Any) -> None:
+    if on_progress is not None:
+        on_progress({
+            "phase": phase, "percent": round(max(0.0, min(100.0, percent)), 1),
+            "label": label, **extra,
+        })
+
+
 async def refresh_jobs(
     db: Database, profile: UserProfile, companies: list[str],
+    on_progress: ProgressFn | None = None,
 ) -> ScrapingReport:
     """Scrape the ATS boards of `companies` and upsert the offers."""
     report = ScrapingReport(companies_attempted=len(companies))
@@ -165,7 +182,15 @@ async def refresh_jobs(
         rate_limit_seconds=float(jobs_cfg.get("rate_limit_seconds", 1.0)),
         timeout_seconds=float(jobs_cfg.get("timeout_seconds", 20.0)),
     )
-    for result in await scraper.scrape_companies(companies):
+    def _scraped(done: int, total: int, name: str) -> None:
+        _emit(
+            on_progress, "scrape", _SCRAPE_SHARE * done / max(1, total),
+            f"Pages carrières : {done}/{total} ({name})", done=done, total=total,
+        )
+
+    _emit(on_progress, "scrape", 0, f"Pages carrières : 0/{len(companies)}",
+          done=0, total=len(companies))
+    for result in await scraper.scrape_companies(companies, on_progress=_scraped):
         if result.found:
             report.companies_with_ats += 1
         persist_result(db, result, profile, report)
@@ -257,6 +282,7 @@ async def refresh_and_score_for_user(
     *,
     score_limit: int | None = None,
     min_heuristic: float | None = None,
+    on_progress: ProgressFn | None = None,
 ) -> JobsRefreshResult:
     """Daily job-alert step: refresh the user's companies, score new offers.
 
@@ -270,20 +296,30 @@ async def refresh_and_score_for_user(
     out = JobsRefreshResult()
     companies = companies_for_user(db, user_id)
     out.companies = len(companies)
-    report = await refresh_jobs(db, profile, companies)
+    report = await refresh_jobs(db, profile, companies, on_progress=on_progress)
     out.companies_with_ats = report.companies_with_ats
     out.jobs_new = report.jobs_new
     if settings.jobspy_enabled:
+        _emit(on_progress, "jobspy", _SCRAPE_SHARE, "Recherche Indeed / Google Jobs…")
         jobspy_companies = await _refresh_jobspy(db, profile, user_id, report)
         out.jobs_new = report.jobs_new
         companies = [*companies, *jobspy_companies]
 
+    base = _SCRAPE_SHARE + _JOBSPY_SHARE
     cv_text = load_cv_text(db, user_id)
     if not cv_text.strip():
+        _emit(on_progress, "done", 100, "Terminé (pas de CV : offres non notées)")
         return out
-    for job_id in unscored_job_ids(
+    to_score = unscored_job_ids(
         db, user_id, min_heuristic=floor, limit=limit, companies=companies,
-    ):
+    )
+    _emit(on_progress, "score", base, f"Notation IA : 0/{len(to_score)}",
+          done=0, total=len(to_score))
+    for i, job_id in enumerate(to_score):
+        _emit(
+            on_progress, "score", base + (100 - base) * i / max(1, len(to_score)),
+            f"Notation IA : {i + 1}/{len(to_score)}", done=i, total=len(to_score),
+        )
         try:
             await score_job_for_user(
                 db, user_id=user_id, job_offer_id=job_id,
@@ -292,6 +328,7 @@ async def refresh_and_score_for_user(
             out.jobs_scored += 1
         except MatchingError as exc:
             out.errors.append(str(exc)[:200])
+    _emit(on_progress, "done", 100, "Terminé")
     logger.info(
         "jobs.refresh_and_score user=%s companies=%d new=%d scored=%d errors=%d",
         user_id, out.companies, out.jobs_new, out.jobs_scored, len(out.errors),

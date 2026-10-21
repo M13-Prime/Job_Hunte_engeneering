@@ -12,7 +12,7 @@ For each company name:
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import get_args
 
@@ -158,7 +158,11 @@ class JobsScraper:
             company=company_name, company_normalized=normalized
         )
 
-    async def scrape_companies(self, company_names: Sequence[str]) -> list[CompanyJobsResult]:
+    async def scrape_companies(
+        self,
+        company_names: Sequence[str],
+        on_progress: Callable[[int, int, str], None] | None = None,
+    ) -> list[CompanyJobsResult]:
         client = self._client or httpx.AsyncClient(
             timeout=self.timeout_seconds,
             headers={"User-Agent": "signal-tracker/0.1 (+jobs scraper)"},
@@ -171,6 +175,8 @@ class JobsScraper:
                     await asyncio.sleep(self.rate_limit_seconds)
                 result = await self.scrape_company(client, name)
                 results.append(result)
+                if on_progress is not None:
+                    on_progress(index + 1, len(company_names), name)
             return results
         finally:
             if self._owns_client:
