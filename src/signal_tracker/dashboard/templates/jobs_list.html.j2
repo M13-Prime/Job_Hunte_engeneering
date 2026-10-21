@@ -156,6 +156,7 @@
         {% endif %}{% endfor %}
       </select>
       <label class="fp-check"><input type="checkbox" name="unknown" value="1" {% if flt.include_unknown %}checked{% endif %}> garder les lieux non précisés / remote</label>
+      <label class="fp-check" title="{% if title_terms %}Termes : {{ title_terms|join(', ') }}{% else %}Ajoute des mots-clés ou ton CV pour activer ce filtre{% endif %}"><input type="checkbox" name="rel" value="1" {% if title_gate %}checked{% endif %}> seulement les titres liés à mon profil (sauf score IA ≥ 60)</label>
     </label>
     <div class="fp-field">
       <span>Expérience visée (années)</span>
@@ -164,7 +165,7 @@
         <span>à</span>
         <input type="number" name="exp_max" min="0" max="60" placeholder="max" value="{{ flt.exp_max if flt.exp_max is not none else '' }}">
       </div>
-      <small>Masque les postes de direction si tu vises moins de 12 ans, et les postes juniors si tu vises 4 ans ou plus.</small>
+      <small>{% if exp_from_cv %}Déduit de ton CV ({{ cv_years }} ans) : ajuste et enregistre. {% endif %}Masque les postes de direction si tu vises moins de 12 ans, et les postes juniors si tu vises 4 ans ou plus.</small>
     </div>
     <div class="fp-field fp-wide">
       <span>Mots-clés

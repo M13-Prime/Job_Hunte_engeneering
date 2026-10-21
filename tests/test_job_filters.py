@@ -155,3 +155,52 @@ def test_save_prefs_applies_experience_everywhere(
     body = client.get("/jobs").text
     assert "Director of Sustainability" not in body
     assert "masquée" in body
+
+
+def test_us_state_codes_are_not_france() -> None:
+    assert location_matches_country("Pittsburgh, PA", "France") is False
+    assert location_matches_country("Austin, TX", "États-Unis") is True
+    assert location_matches_country("Toronto, ON", "Canada") is True
+
+
+def test_title_relevance_terms() -> None:
+    from signal_tracker.jobs.filters import profile_title_terms, title_relevant
+
+    terms = profile_title_terms(["Sustainability Manager", "ESG Data Analyst"])
+    assert "manager" not in terms and "analyst" not in terms
+    assert title_relevant("Head of Sustainability", terms)
+    assert title_relevant("Responsable RSE", terms)          # synonym of ESG/sustainability
+    assert not title_relevant("IT Desktop Support Administrator", terms)
+
+
+def test_off_profile_titles_hidden_unless_high_ai_score() -> None:
+    flt = JobFilter(title_terms=["sustainability"])
+    assert _reason("IT Desktop Support", "Paris", "", flt) == "off_profile"
+    assert rejection_reason(
+        title="IT Desktop Support", location="Paris", department=None,
+        description="", flt=flt, ai_score=72.0,
+    ) is None
+
+
+def test_jobs_page_hides_off_profile_and_us_offers(
+    client: TestClient, db_jobs: Database,
+) -> None:
+    with db_jobs.session() as s:
+        for i, (title, loc) in enumerate(
+            [("IT Desktop Support Administrator", "Paris, France"),
+             ("Sustainability Analyst", "Pittsburgh, PA")], start=10,
+        ):
+            s.add(JobOffer(
+                company_normalized="acme", company_name="Acme", ats="greenhouse",
+                ats_company_slug="acme", external_id=str(i), title=title,
+                url=f"https://example.com/{i}", location=loc, description="",
+                relevance_score=50.0, is_open=True, dedup_key=f"k{i}",
+                collected_at=datetime.now(tz=UTC),
+            ))
+    body = client.get("/jobs").text
+    assert "IT Desktop Support Administrator" not in body
+    assert "Pittsburgh" not in body
+    assert "sans rapport avec ton profil" in body
+    # Unticking the relevance box on a submitted form shows it again.
+    body = client.get("/jobs?f=1&country=France&unknown=1").text
+    assert "IT Desktop Support Administrator" in body

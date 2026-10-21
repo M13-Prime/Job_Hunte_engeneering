@@ -185,3 +185,23 @@ def test_search_page_shows_country_selector(client: TestClient) -> None:
 def test_ticking_nothing_shows_all_countries(client: TestClient) -> None:
     body = client.get("/results?country_scope=any").text
     assert "Munich Co" in body and "Greenly" in body
+
+
+# ---------------------------------------------------------------------------
+# Keyword filter (AND / OR) and company website links
+# ---------------------------------------------------------------------------
+
+
+def test_keyword_filter_and_vs_or(client: TestClient) -> None:
+    body = client.get("/results?country_scope=any&extra=Greenly,Summary&kmode=all").text
+    assert "Greenly" in body and "Munich Co" not in body
+    body = client.get("/results?country_scope=any&extra=Greenly,Munich&kmode=all").text
+    assert "Summary 0" not in body and "Summary 2" not in body
+    body = client.get("/results?country_scope=any&extra=Greenly,Munich&kmode=any").text
+    assert "Summary 0" in body and "Summary 2" in body
+
+
+def test_company_name_links_to_website_not_article(client: TestClient) -> None:
+    body = client.get("/results?country_scope=any").text
+    assert 'class="name" href="https://duckduckgo.com/?q=' in body
+    assert 'class="name" href="https://example.com/' not in body

@@ -325,6 +325,9 @@
     {# Preserve country selections across filter changes #}
     {% for c in selected_countries %}<input type="hidden" name="country" value="{{ c }}">{% endfor %}
     <input type="hidden" name="country_scope" value="{{ country_scope }}">
+    {% for k in selected_kw %}<input type="hidden" name="kw" value="{{ k }}">{% endfor %}
+    {% if extra_terms %}<input type="hidden" name="extra" value="{{ extra_terms }}">{% endif %}
+    {% if keyword_active %}<input type="hidden" name="kmode" value="{{ keyword_mode }}">{% endif %}
     <input type="search" name="q" value="{{ q }}" placeholder="Mot-clé, entreprise…" aria-label="Rechercher dans les signaux" class="q-input">
     <span class="filter-label">Feedback</span>
     <select name="feedback" onchange="this.form.submit()">
@@ -344,6 +347,9 @@
   {% if filter_feedback %}<input type="hidden" name="feedback" value="{{ filter_feedback }}">{% endif %}
   {% if min_score %}<input type="hidden" name="min_score" value="{{ min_score }}">{% endif %}
   {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+  {% for k in selected_kw %}<input type="hidden" name="kw" value="{{ k }}">{% endfor %}
+  {% if extra_terms %}<input type="hidden" name="extra" value="{{ extra_terms }}">{% endif %}
+  {% if keyword_active %}<input type="hidden" name="kmode" value="{{ keyword_mode }}">{% endif %}
   <details class="cf-details" {% if selected_countries %}open{% endif %}>
     <summary>
       <span class="cf-icon" aria-hidden="true">
@@ -377,6 +383,53 @@
         <a href="/results{% if run_id %}?run={{ run_id }}{% endif %}" class="btn btn-sm btn-ghost">Réinitialiser</a>
         {% endif %}
       </div>
+    </div>
+  </details>
+</form>
+
+<form class="country-filter" method="get" action="/results">
+  {% if run_id %}<input type="hidden" name="run" value="{{ run_id }}">{% endif %}
+  {% if filter_feedback %}<input type="hidden" name="feedback" value="{{ filter_feedback }}">{% endif %}
+  {% if min_score %}<input type="hidden" name="min_score" value="{{ min_score }}">{% endif %}
+  {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+  {% for c in selected_countries %}<input type="hidden" name="country" value="{{ c }}">{% endfor %}
+  <input type="hidden" name="country_scope" value="{{ country_scope }}">
+  <details class="cf-details" {% if keyword_active %}open{% endif %}>
+    <summary>
+      <span class="cf-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </span>
+      <span>Mots-clés{% if keyword_active %} · <strong>{{ (selected_kw|length) + (1 if extra_terms else 0) }} actif{{ 's' if (selected_kw|length) + (1 if extra_terms else 0) > 1 }} ({{ "ET" if keyword_mode == "all" else "OU" }})</strong>{% endif %}</span>
+      <span class="cf-chev" aria-hidden="true">▾</span>
+    </summary>
+    <div class="cf-body">
+      <div class="cf-scope" role="radiogroup" aria-label="Combinaison des mots-clés">
+        <label class="cf-radio">
+          <input type="radio" name="kmode" value="all" {% if keyword_mode == 'all' %}checked{% endif %}>
+          <span>Tous les mots-clés (<em>ET</em>)</span>
+        </label>
+        <label class="cf-radio">
+          <input type="radio" name="kmode" value="any" {% if keyword_mode == 'any' %}checked{% endif %}>
+          <span>Au moins un (<em>OU</em>)</span>
+        </label>
+      </div>
+      <div class="cf-chips">
+        {% for k in keyword_choices %}
+        <label class="cf-chip {{ 'selected' if k in selected_kw }}">
+          <input type="checkbox" name="kw" value="{{ k }}" {% if k in selected_kw %}checked{% endif %}>
+          <span>{{ k }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <input type="text" name="extra" value="{{ extra_terms }}" class="q-input" style="width:100%; margin-top:10px;"
+             placeholder="Autres termes, séparés par des virgules (ex : sustainability, AI)">
+      <div class="cf-actions">
+        <button type="submit" class="btn btn-sm btn-primary">Appliquer</button>
+        {% if keyword_active %}
+        <a href="/results{% if run_id %}?run={{ run_id }}{% endif %}" class="btn btn-sm btn-ghost">Réinitialiser</a>
+        {% endif %}
+      </div>
+      <p style="font-size:12.5px; color:var(--text-3); margin:8px 0 0;">Synonymes inclus : « AI » trouve aussi « intelligence artificielle », « sustainability » trouve « RSE », « ESG ».</p>
     </div>
   </details>
 </form>
@@ -431,8 +484,9 @@
         <td class="col-score"><span class="score-badge {{ tier }}">{{ "%.0f"|format(signal.total_score) }}</span></td>
         <td class="company-cell">
           <div class="name-row">
-            {% if raw.url %}
-            <a class="name" href="{{ raw.url }}" target="_blank" rel="noopener noreferrer">
+            {% set site = company_urls.get(signal.company_normalized) %}
+            {% if site %}
+            <a class="name" href="{{ site }}" target="_blank" rel="noopener noreferrer" title="Site de l'entreprise">
               {{ signal.company_name or "(sans nom)" }}
               <svg class="external" viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8"/></svg>
             </a>
