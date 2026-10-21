@@ -63,7 +63,6 @@ def register_newsletter_routes(
         return NewsletterBuilder(
             app_db, base_url=_base_url(request), secret=secret,
             period_days=settings.newsletter_period_days,
-            job_threshold=settings.job_alert_threshold,
         )
 
     @app.get("/newsletter/preview", response_class=HTMLResponse)
@@ -114,6 +113,8 @@ def register_newsletter_routes(
             {
                 "recipients": recipients(app_db),
                 "weekday": settings.newsletter_weekday,
+                "hour": settings.newsletter_hour,
+                "minute": settings.newsletter_minute,
                 "period_days": settings.newsletter_period_days,
                 "from_email": settings.digest_from_email,
                 "base_url": settings.dashboard_base_url,
@@ -146,7 +147,6 @@ def register_newsletter_routes(
             base_url=_base_url(request),
             secret=secret,
             period_days=settings.newsletter_period_days,
-            job_threshold=settings.job_alert_threshold,
             only_user_id=user.id if scope != "all" else None,
             skip_empty=scope == "all",
         )

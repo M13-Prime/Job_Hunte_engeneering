@@ -58,7 +58,6 @@ async def _main(dry_run: bool, preview_out: Path | None, user_email: str | None)
         data = NewsletterBuilder(
             db, base_url=settings.dashboard_base_url, secret=settings.session_secret_key,
             period_days=settings.newsletter_period_days,
-            job_threshold=settings.job_alert_threshold,
         ).build(uid)
         preview_out.write_text(render_newsletter(data).html, encoding="utf-8")
         console.print(f"[green]Preview written to[/green] {preview_out}")
@@ -79,7 +78,6 @@ async def _main(dry_run: bool, preview_out: Path | None, user_email: str | None)
         base_url=settings.dashboard_base_url,
         secret=settings.session_secret_key,
         period_days=settings.newsletter_period_days,
-        job_threshold=settings.job_alert_threshold,
         only_user_id=only_user_id,
     )
     console.print(f"newsletter: {stats}")
