@@ -8,6 +8,7 @@ in the articles merged and de-duplicated.
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -98,13 +99,14 @@ def merge_people(people: list[Person], limit: int = 6) -> list[Person]:
 
 
 def group_by_company(
-    rows: list[tuple[Any, Any]], focus_run_id: int | None = None
+    rows: Sequence[Any], focus_run_id: int | None = None
 ) -> list[CompanyGroup]:
     """One group per company, best score first; signals sorted by score inside."""
     groups: dict[str, CompanyGroup] = {}
     people: dict[str, list[Person]] = {}
     hq_votes: dict[str, Counter[str]] = {}
-    for signal, raw in rows:
+    for row in rows:
+        signal, raw = row[0], row[1]
         key = signal.company_normalized or (signal.company_name or "").casefold() or "?"
         group = groups.get(key)
         if group is None:
