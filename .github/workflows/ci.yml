@@ -40,4 +40,5 @@ jobs:
         run: uv run mypy
 
       - name: Pytest (skip live)
-        run: uv run pytest -q -m "not live"
+        run: |
+          uv run pytest -q -m "not live" --tb=line -x > /tmp/out.txt 2>&1 || { tail -25 /tmp/out.txt | while IFS= read -r l; do echo "::error::$l"; done; exit 1; }
