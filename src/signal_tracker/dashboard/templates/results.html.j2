@@ -11,31 +11,13 @@
     
     letter-spacing: -0.028em; margin: 0;
   }
-  .results-head .count-badge {
+  .toolbar-top .count-badge {
     background: rgba(0,0,0,0.06); color: var(--text-3);
     padding: 4px 12px; border-radius: var(--r-full);
     font-size: 13px; font-weight: 600;
   }
-  .results-head .spacer { flex: 1; }
   .q-input { width: 220px; height: 34px; border-radius: 999px !important; padding: 0 14px !important; }
   @media (max-width: 640px) { .q-input { width: 100%; } }
-
-  .filters {
-    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-    background: var(--surface); border: 1px solid var(--hairline);
-    padding: 6px; border-radius: var(--r-full);
-  }
-  .filters .filter-label {
-    font-size: 12.5px; font-weight: 600; color: var(--text-3); letter-spacing: 0; padding: 0 10px 0 12px;
-  }
-  .filters select, .filters input[type="number"] {
-    padding: 7px 12px; border: none; background: transparent;
-    font-size: 13.5px; font-family: inherit; color: var(--text);
-    border-radius: var(--r-full); outline: none;
-    transition: background 140ms ease;
-  }
-  .filters select:hover, .filters input[type="number"]:hover { background: rgba(0,0,0,0.04); }
-  .filters input[type="number"] { width: 72px; text-align: center; font-variant-numeric: tabular-nums; }
 
   /* ---------------- Country filter ---------------- */
   .country-filter { margin-bottom: 18px; }
@@ -107,86 +89,6 @@
   .running-banner .body { font-size: 13px; color: var(--text-3); }
   .running-banner .body strong { color: var(--text-2); font-weight: 600; }
 
-  /* ---------------- Table ---------------- */
-  .signals-card {
-    padding: 0;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  table.signals {
-    width: 100%; min-width: 720px;
-    border-collapse: collapse; font-size: 14px;
-  }
-  table.signals thead th {
-    text-align: left; font-size: 12.5px; font-weight: 700; letter-spacing: 0;
-    color: var(--text-3);
-    padding: 14px 18px 12px;
-    border-bottom: 1px solid var(--hairline);
-    background: transparent; font-weight: 600;
-  }
-  table.signals tbody td {
-    padding: 18px 18px;
-    border-bottom: 1px solid var(--hairline-2);
-    vertical-align: top;
-    background: var(--surface);
-    transition: background 140ms ease;
-  }
-  @media (max-width: 720px) {
-    table.signals { min-width: 560px; font-size: 13px; }
-    table.signals thead th { padding: 12px 12px 10px; }
-    table.signals tbody td { padding: 14px 12px; }
-    .col-source { width: 130px; }
-  }
-
-  /* ---------------- Mobile: table → stacked cards ---------------- */
-  @media (max-width: 640px) {
-    .signals-card { overflow-x: visible; }
-    table.signals, table.signals tbody, table.signals tr { display: block; min-width: 0; }
-    table.signals thead { display: none; }
-    table.signals tbody td { display: block; padding: 0; border: 0; background: transparent; }
-    table.signals tbody tr {
-      display: block;
-      padding: 16px 16px 14px;
-      border-bottom: 1px solid var(--hairline-2);
-      background: var(--surface);
-    }
-    table.signals tbody tr:last-child { border-bottom: 0; }
-    table.signals tbody tr:hover td,
-    table.signals tbody tr:hover { background: var(--surface); }
-    .col-score { display: inline-block !important; margin-right: 10px; vertical-align: middle; }
-    .col-source {
-      width: auto; margin-top: 12px;
-      padding-top: 10px !important; border-top: 1px solid var(--hairline-2) !important;
-      font-size: 12.5px;
-    }
-    .col-actions {
-      width: auto !important; padding-right: 0 !important;
-      margin-top: 12px; padding-top: 12px;
-      border-top: 1px solid var(--hairline-2);
-    }
-    .row-actions {
-      opacity: 1; flex-direction: row; flex-wrap: wrap; gap: 6px;
-    }
-    .row-actions .mini { flex: 1 1 calc(50% - 3px); min-width: 0; }
-    .row-actions .mini.prepare { flex-basis: 100%; padding: 11px 14px; }
-    .summary { max-width: none; }
-    .angle, .contact { max-width: none; }
-    /* Filters row goes full width and wraps neatly. */
-    .results-head { gap: 10px; }
-    .results-head h1 { font-size: 26px; }
-    .filters { width: 100%; flex-wrap: wrap; }
-  }
-  table.signals tbody tr:last-child td { border-bottom: 0; }
-  table.signals tbody tr:hover td { background: rgba(0,0,0,0.018); }
-  table.signals tbody tr.is-new td {
-    background: var(--accent-50);
-  }
-  table.signals tbody tr.is-new:hover td { background: rgba(52,199,89,0.06); }
-
-  .col-score { width: 78px; }
-  .col-source { width: 170px; }
-  .col-actions { width: 1%; white-space: nowrap; padding-right: 18px !important; }
-
   /* Score badge — Apple-tinted */
   .score-badge {
     display: inline-flex; align-items: center; justify-content: center;
@@ -198,59 +100,6 @@
   .score-badge.hot { background: var(--accent-200); color: var(--accent-ink); }
   .score-badge.investigate { background: var(--accent-100); color: var(--accent-ink); }
   .score-badge.watch { background: var(--raised); color: var(--muted); }
-
-  /* Company cell */
-  .company-cell .name-row {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    margin-bottom: 4px;
-  }
-  .company-cell .name {
-    font-weight: 600; font-size: 15.5px; color: var(--text);
-    letter-spacing: -0.012em; display: inline-flex; align-items: center; gap: 6px;
-    transition: color 160ms ease;
-  }
-  .company-cell .name:hover { color: var(--blue); text-decoration: none; }
-  .company-cell .name .external {
-    width: 13px; height: 13px; stroke: currentColor; fill: none;
-    stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
-    opacity: 0; transition: opacity 160ms ease;
-  }
-  .company-cell .name:hover .external { opacity: 1; }
-
-  .company-cell .type {
-    color: var(--text-3); font-size: 12.5px; margin-bottom: 8px;
-    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  }
-  .company-cell .type .sep { color: var(--text-4); }
-  .company-cell .type .action-tag {
-    background: rgba(0,0,0,0.05); color: var(--text-2);
-    padding: 1px 8px; border-radius: var(--r-sm); font-weight: 500;
-  }
-  .company-cell .type .country-tag {
-    background: var(--blue-soft); color: var(--blue);
-    padding: 1px 8px; border-radius: var(--r-sm); font-weight: 500;
-    display: inline-flex; align-items: center; gap: 4px;
-  }
-  .company-cell .type .country-tag .country-extra {
-    background: rgba(0,113,227,0.15); color: var(--blue);
-    padding: 0 5px; border-radius: var(--r-sm);
-    font-size: 12.5px; font-weight: 700;
-  }
-  .summary {
-    color: var(--text-2); margin: 0 0 8px; max-width: 580px; line-height: 1.5;
-    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
-    overflow: hidden; overflow-wrap: anywhere;
-  }
-  .angle {
-    background: var(--green-soft); border-radius: var(--r-sm);
-    padding: 9px 14px; margin: 8px 0; font-size: 13px; max-width: 580px;
-    color: var(--green-deep); border-left: 3px solid var(--green);
-  }
-  .angle strong { color: var(--green-deep); font-weight: 600; }
-  .contact {
-    font-size: 13px; color: var(--text-3); margin-top: 6px;
-  }
-  .contact strong { color: var(--text-2); font-weight: 600; }
 
   /* Source cell — clickable with favicon */
   .source-link {
@@ -270,30 +119,34 @@
   }
   .source-link:hover .external { opacity: 1; }
 
-  /* Row actions — reveal on hover, Apple-quiet */
-  .row-actions {
-    display: flex; flex-direction: column; gap: 4px;
+  /* ---------------- Toolbar ---------------- */
+  .toolbar { margin-bottom: 18px; display: grid; gap: 10px; }
+  .toolbar-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .toolbar-top .q-input { flex: 1 1 240px; width: auto; max-width: 420px; }
+  .toolbar-top .btn { flex-shrink: 0; }
+  .fl-row { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; font-size: 13.5px; color: var(--text-2); }
+  .fl-row label { display: inline-flex; align-items: center; gap: 8px; }
+  .fl-row select, .fl-row input[type="number"] {
+    padding: 6px 10px; border: 1px solid var(--control); border-radius: var(--r-full);
+    background: var(--surface); font: inherit; color: var(--text);
   }
-  .row-actions form { margin: 0; }
+  .fl-row input[type="number"] { width: 76px; }
+  .cf-sub { font-size: 12.5px; font-weight: 600; color: var(--text-3); margin: 4px 0 -4px; }
+
+  .country-tag {
+    background: var(--raised); color: var(--text-2); padding: 1px 9px;
+    border-radius: var(--r-full); font-size: 12px;
+  }
+  .country-tag .country-extra { color: var(--text-3); font-weight: 600; }
+
   .mini {
-    width: 100%; padding: 6px 14px;
-    border: 1px solid var(--hairline);
-    border-color: var(--control); border-radius: var(--r-full); background: var(--surface);
-    font-size: 13px; font-weight: 700; color: var(--ink);
-    font-family: inherit; cursor: pointer;
-    transition: all 140ms ease; white-space: nowrap;
-    min-width: 96px;
+    padding: 5px 14px; border: 1px solid var(--control); border-radius: var(--r-full);
+    background: var(--surface); font-size: 12.5px; font-weight: 700; color: var(--ink);
+    font-family: inherit; cursor: pointer; transition: all 140ms ease; white-space: nowrap;
   }
-  .mini:hover { border-color: var(--text-3); color: var(--text); }
-  .mini.contacted:hover { border-color: var(--accent-strong); color: var(--accent-ink); background: var(--accent-100); }
+  .mini:hover { border-color: var(--text-3); }
   .mini.relevant:hover { border-color: var(--positive); color: var(--pill-positive-ink); background: var(--pill-positive-bg); }
-  .mini.not_relevant:hover { border-color: var(--text-3); color: var(--text-3); background: rgba(0,0,0,0.04); }
-  .mini.prepare {
-    background: var(--text); color: white; border-color: var(--text);
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    text-decoration: none;
-  }
-  .mini.prepare:hover { background: #000; color: white; text-decoration: none; }
+  .mini.not_relevant:hover { color: var(--text-3); background: var(--raised); }
 
   /* Empty state */
   .empty-results {
@@ -315,12 +168,20 @@
          stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
   /* ---------------- Company cards ---------------- */
-  .company-list { display: grid; gap: 14px; padding: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); }
+  .company-list { display: grid; gap: 14px; padding: 0; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); }
   .co-card {
     background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md);
     padding: 18px; display: flex; flex-direction: column; gap: 12px;
   }
-  .co-card.is-new { background: var(--accent-50); }
+  .co-card { transition: border-color 140ms ease; }
+  .co-card:hover { border-color: var(--control); }
+  .co-card.is-new { background: var(--accent-50); border-color: var(--accent-200); }
+  .co-summary { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  @media (max-width: 640px) {
+    .company-list { gap: 10px; }
+    .co-card { padding: 14px; }
+    .toolbar-top .q-input { max-width: none; }
+  }
   .co-head { display: flex; gap: 12px; align-items: center; }
   .co-title { min-width: 0; }
   .co-name { font-weight: 600; font-size: 17px; color: var(--text); letter-spacing: -0.01em; }
@@ -350,58 +211,38 @@
 {% endblock %}
 
 {% block content %}
-<div class="results-head">
-  <h1>Signaux</h1>
-  <span class="count-badge mono" title="{{ rows|length }} signaux">{{ groups|length }} entreprise{{ "s" if groups|length > 1 }}</span>
-  <div class="spacer"></div>
-  <form class="filters" method="get" action="/results" id="results-filters">
-    {% if run_id %}<input type="hidden" name="run" value="{{ run_id }}">{% endif %}
-    {# Preserve country selections across filter changes #}
-    {% for c in selected_countries %}<input type="hidden" name="country" value="{{ c }}">{% endfor %}
-    <input type="hidden" name="country_scope" value="{{ country_scope }}">
-    {% for k in selected_kw %}<input type="hidden" name="kw" value="{{ k }}">{% endfor %}
-    {% if extra_terms %}<input type="hidden" name="extra" value="{{ extra_terms }}">{% endif %}
-    {% if keyword_active %}<input type="hidden" name="kmode" value="{{ keyword_mode }}">{% endif %}
-    <input type="search" name="q" value="{{ q }}" placeholder="Mot-clé, entreprise…" aria-label="Rechercher dans les signaux" class="q-input">
-    <span class="filter-label">Feedback</span>
-    <select name="feedback" onchange="this.form.submit()">
-      <option value="" {% if filter_feedback == "" %}selected{% endif %}>Tous</option>
-      <option value="pending" {% if filter_feedback == "pending" %}selected{% endif %}>Sans feedback</option>
-      {% for f in valid_feedback %}
-      <option value="{{ f }}" {% if filter_feedback == f %}selected{% endif %}>{{ f }}</option>
-      {% endfor %}
-    </select>
-    <span class="filter-label">Score ≥</span>
-    <input type="number" name="min_score" value="{{ min_score }}" min="0" max="100" step="5" onchange="this.form.submit()">
-  </form>
-</div>
-
-<form class="country-filter" method="get" action="/results">
+{% set n_active = (1 if selected_countries else 0) + (1 if keyword_active else 0) + (1 if filter_feedback else 0) + (1 if min_score else 0) %}
+<form class="toolbar" method="get" action="/results" id="results-filters">
   {% if run_id %}<input type="hidden" name="run" value="{{ run_id }}">{% endif %}
-  {% if filter_feedback %}<input type="hidden" name="feedback" value="{{ filter_feedback }}">{% endif %}
-  {% if min_score %}<input type="hidden" name="min_score" value="{{ min_score }}">{% endif %}
-  {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
-  {% for k in selected_kw %}<input type="hidden" name="kw" value="{{ k }}">{% endfor %}
-  {% if extra_terms %}<input type="hidden" name="extra" value="{{ extra_terms }}">{% endif %}
-  {% if keyword_active %}<input type="hidden" name="kmode" value="{{ keyword_mode }}">{% endif %}
-  <details class="cf-details" {% if selected_countries %}open{% endif %}>
+  <div class="toolbar-top">
+    <h1 style="margin:0; letter-spacing:-0.028em;">Signaux</h1>
+    <span class="count-badge mono" title="{{ rows|length }} signaux">{{ groups|length }} entreprise{{ "s" if groups|length > 1 }}</span>
+    <input type="search" name="q" value="{{ q }}" placeholder="Entreprise, mot-clé…" aria-label="Rechercher dans les signaux" class="q-input">
+    <button type="submit" class="btn btn-primary btn-sm">Rechercher</button>
+  </div>
+  <details class="cf-details" {% if n_active %}open{% endif %}>
     <summary>
-      <span class="cf-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-      </span>
-      <span>Pays{% if selected_countries %} · <strong>{{ selected_countries|length }} sélectionné{{ 's' if selected_countries|length > 1 else '' }}</strong>{% endif %}</span>
+      <span>Filtres{% if n_active %} · <strong>{{ n_active }} actif{{ 's' if n_active > 1 }}</strong>{% endif %}</span>
       <span class="cf-chev" aria-hidden="true">▾</span>
     </summary>
     <div class="cf-body">
+      <div class="fl-row">
+        <label>Feedback
+          <select name="feedback">
+            <option value="" {% if filter_feedback == "" %}selected{% endif %}>Tous</option>
+            <option value="pending" {% if filter_feedback == "pending" %}selected{% endif %}>Sans feedback</option>
+            {% for f in valid_feedback %}
+            <option value="{{ f }}" {% if filter_feedback == f %}selected{% endif %}>{{ f }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Score ≥ <input type="number" name="min_score" value="{{ min_score }}" min="0" max="100" step="5"></label>
+      </div>
+
+      <div class="cf-sub">Pays</div>
       <div class="cf-scope" role="radiogroup" aria-label="Portée du filtre pays">
-        <label class="cf-radio">
-          <input type="radio" name="country_scope" value="any" {% if country_scope == 'any' %}checked{% endif %}>
-          <span>HQ <em>ou</em> activités dans le pays</span>
-        </label>
-        <label class="cf-radio">
-          <input type="radio" name="country_scope" value="hq" {% if country_scope == 'hq' %}checked{% endif %}>
-          <span>HQ uniquement</span>
-        </label>
+        <label class="cf-radio"><input type="radio" name="country_scope" value="any" {% if country_scope == 'any' %}checked{% endif %}><span>HQ <em>ou</em> activités dans le pays</span></label>
+        <label class="cf-radio"><input type="radio" name="country_scope" value="hq" {% if country_scope == 'hq' %}checked{% endif %}><span>HQ uniquement</span></label>
       </div>
       <div class="cf-chips">
         {% for c in available_countries %}
@@ -411,41 +252,11 @@
         </label>
         {% endfor %}
       </div>
-      <div class="cf-actions">
-        <button type="submit" class="btn btn-sm btn-primary">Appliquer</button>
-        {% if selected_countries or country_scope == 'hq' %}
-        <a href="/results{% if run_id %}?run={{ run_id }}{% endif %}" class="btn btn-sm btn-ghost">Réinitialiser</a>
-        {% endif %}
-      </div>
-    </div>
-  </details>
-</form>
 
-<form class="country-filter" method="get" action="/results">
-  {% if run_id %}<input type="hidden" name="run" value="{{ run_id }}">{% endif %}
-  {% if filter_feedback %}<input type="hidden" name="feedback" value="{{ filter_feedback }}">{% endif %}
-  {% if min_score %}<input type="hidden" name="min_score" value="{{ min_score }}">{% endif %}
-  {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
-  {% for c in selected_countries %}<input type="hidden" name="country" value="{{ c }}">{% endfor %}
-  <input type="hidden" name="country_scope" value="{{ country_scope }}">
-  <details class="cf-details" {% if keyword_active %}open{% endif %}>
-    <summary>
-      <span class="cf-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-      </span>
-      <span>Mots-clés{% if keyword_active %} · <strong>{{ (selected_kw|length) + (1 if extra_terms else 0) }} actif{{ 's' if (selected_kw|length) + (1 if extra_terms else 0) > 1 }} ({{ "ET" if keyword_mode == "all" else "OU" }})</strong>{% endif %}</span>
-      <span class="cf-chev" aria-hidden="true">▾</span>
-    </summary>
-    <div class="cf-body">
+      <div class="cf-sub">Mots-clés</div>
       <div class="cf-scope" role="radiogroup" aria-label="Combinaison des mots-clés">
-        <label class="cf-radio">
-          <input type="radio" name="kmode" value="all" {% if keyword_mode == 'all' %}checked{% endif %}>
-          <span>Tous les mots-clés (<em>ET</em>)</span>
-        </label>
-        <label class="cf-radio">
-          <input type="radio" name="kmode" value="any" {% if keyword_mode == 'any' %}checked{% endif %}>
-          <span>Au moins un (<em>OU</em>)</span>
-        </label>
+        <label class="cf-radio"><input type="radio" name="kmode" value="all" {% if keyword_mode == 'all' %}checked{% endif %}><span>Tous (<em>ET</em>)</span></label>
+        <label class="cf-radio"><input type="radio" name="kmode" value="any" {% if keyword_mode == 'any' %}checked{% endif %}><span>Au moins un (<em>OU</em>)</span></label>
       </div>
       <div class="cf-chips">
         {% for k in keyword_choices %}
@@ -455,15 +266,16 @@
         </label>
         {% endfor %}
       </div>
-      <input type="text" name="extra" value="{{ extra_terms }}" class="q-input" style="width:100%; margin-top:10px;"
+      <input type="text" name="extra" value="{{ extra_terms }}" class="q-input" style="width:100%; max-width:none;"
              placeholder="Autres termes, séparés par des virgules (ex : sustainability, AI)">
+      <p style="font-size:12.5px; color:var(--text-3); margin:0;">Synonymes inclus : « AI » trouve aussi « intelligence artificielle », « sustainability » trouve « RSE », « ESG ».</p>
+
       <div class="cf-actions">
         <button type="submit" class="btn btn-sm btn-primary">Appliquer</button>
-        {% if keyword_active %}
+        {% if n_active or country_scope == 'hq' %}
         <a href="/results{% if run_id %}?run={{ run_id }}{% endif %}" class="btn btn-sm btn-ghost">Réinitialiser</a>
         {% endif %}
       </div>
-      <p style="font-size:12.5px; color:var(--text-3); margin:8px 0 0;">Synonymes inclus : « AI » trouve aussi « intelligence artificielle », « sustainability » trouve « RSE », « ESG ».</p>
     </div>
   </details>
 </form>
@@ -489,7 +301,7 @@
 </div>
 {% endif %}
 
-<div class="card signals-card">
+<div class="signals-card">
   {% if not rows %}
   <div class="empty-results">
     <div class="empty-icon">
