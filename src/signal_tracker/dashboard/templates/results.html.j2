@@ -517,7 +517,7 @@
             {% if g.has_new %}<span class="badge new">Nouveau</span>{% endif %}
             <span>{{ g.count }} signal{{ 'x' if g.count > 1 }}</span>
             {% for t in g.types[:3] %}<span class="co-type">{{ t }}</span>{% endfor %}
-            {% if g.hq_country %}<span class="country-tag" title="{% if g.countries %}Activités : {{ g.countries|join(', ') }}{% endif %}">{{ g.hq_country }}</span>{% endif %}
+            {% if g.hq_country %}<span class="country-tag" title="{% if g.countries %}Activités : {{ g.countries|join(', ') }}{% endif %}">{{ g.hq_country }}{% if g.countries|length > 1 %} <span class="country-extra">+{{ g.countries|length - 1 }}</span>{% endif %}</span>{% endif %}
           </div>
         </div>
       </header>
