@@ -959,11 +959,15 @@ def build_app(db: Database | None = None) -> FastAPI:
             if focus_run_id and focus_run_id in user_run_ids else None
         )
 
+        from signal_tracker.dashboard.company_groups import group_by_company
+
+        groups = group_by_company(rows, focus_run_id)
         state = _state_for(user.id)
         return templates.TemplateResponse(
             request, "results.html.j2",
             {
                 "rows": rows,
+                "groups": groups,
                 "feedback_by_signal": feedback_by_signal,
                 "filter_feedback": feedback or "",
                 "min_score": min_score,
