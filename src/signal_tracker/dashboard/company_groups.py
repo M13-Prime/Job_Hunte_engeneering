@@ -119,8 +119,6 @@ def group_by_company(
             hq_votes[key] = Counter()
         group.signals.append((signal, raw))
         group.best_score = max(group.best_score, signal.total_score)
-        if signal.signal_type and signal.signal_type not in group.types:
-            group.types.append(signal.signal_type)
         if signal.hq_country:
             hq_votes[key][signal.hq_country] += 1
         for c in signal.active_countries or []:
@@ -132,6 +130,10 @@ def group_by_company(
 
     for key, group in groups.items():
         group.signals.sort(key=lambda sr: sr[0].total_score, reverse=True)
+        # Types ordered by the score of their best signal.
+        for sig, _raw in group.signals:
+            if sig.signal_type and sig.signal_type not in group.types:
+                group.types.append(sig.signal_type)
         group.people = merge_people(people[key])
         if hq_votes[key]:
             group.hq_country = hq_votes[key].most_common(1)[0][0]
