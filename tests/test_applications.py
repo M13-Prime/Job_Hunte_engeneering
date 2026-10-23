@@ -157,6 +157,17 @@ def test_jobs_page_lists_offers_from_watchlist_only(client: TestClient, db: Data
     assert "Scorer" in resp.text
 
 
+def test_jobs_page_has_prepare_and_listing_link(client: TestClient, db: Database) -> None:
+    uid = _uid(db)
+    _watch(db, uid, "Acme")
+    job_id = _make_job(db, company="Acme", title="Climate Data Scientist")
+    html = client.get("/jobs").text
+    assert f'href="/jobs/{job_id}#candidater"' in html
+    assert "Préparer" in html
+    assert "Voir l'annonce" in html
+    assert 'id="candidater"' in client.get(f"/jobs/{job_id}").text
+
+
 def test_score_without_cv_redirects_with_message(client: TestClient, db: Database) -> None:
     job_id = _make_job(db)
     resp = client.post(
