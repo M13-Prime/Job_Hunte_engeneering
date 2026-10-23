@@ -266,7 +266,8 @@
           <button type="submit" class="btn btn-ghost btn-sm" {% if not has_cv %}disabled title="Ajoute ton CV d'abord"{% endif %}>Scorer</button>
         </form>
         {% endif %}
-        <a class="btn btn-link btn-sm" href="/jobs/{{ job.id }}">Détails</a>
+        <a class="btn btn-primary btn-sm" href="/jobs/{{ job.id }}#candidater">Préparer</a>
+        <a class="btn btn-ghost btn-sm" href="{{ job.url }}" target="_blank" rel="noopener noreferrer">Voir l'annonce ↗</a>
       </div>
     </div>
     {% endfor %}
