@@ -256,6 +256,14 @@ automatiquement aux recruteurs.
   d'accent (jaune), sans dégradés ni ombres, selon les règles « app screens » de
   [taste-skill](https://github.com/Leonxlnx/taste-skill).
 
+## Personnalisation
+
+`config/user_profile.yaml` porte aussi les compétences (`core_skills`,
+`bonus_skills`), les `dealbreakers` (score 0 immédiat, avant tout appel LLM)
+et les garde-fous CV (`required_employers`, `cv_headline`).
+`python scripts/add_job.py URL` ajoute une offre venue de n'importe quel site
+via Jina Reader. Détails : [docs/PERSONNALISATION.md](docs/PERSONNALISATION.md).
+
 ## Garde-fous
 
 - **Pas de scraping LinkedIn** ni de sites aux CGU strictes.

@@ -24,7 +24,7 @@ from tenacity import (
 
 from signal_tracker.applications.schemas import TailoredDocuments
 from signal_tracker.classifier.llm import _extract_json, _resolve_fallbacks
-from signal_tracker.config import get_settings, model_for
+from signal_tracker.config import get_settings, load_user_profile, model_for
 from signal_tracker.utils.llm_usage import record_usage
 from signal_tracker.utils.logging import get_logger
 
@@ -53,6 +53,7 @@ RÈGLE ABSOLUE — zéro invention :
 
 CV adapté (format ATS, une colonne, pas de tableau) :
 - headline : intitulé visé, aligné sur l'offre si le parcours le justifie.
+  Si une HEADLINE IMPOSÉE est fournie, recopie-la telle quelle.
 - summary : 3-4 lignes, les 2-3 arguments les plus forts pour CE poste.
 - skills : 8-14 compétences du CV, les plus pertinentes pour l'offre d'abord.
 - experiences : les expériences du CV (les plus pertinentes détaillées,
@@ -123,6 +124,8 @@ def render_user_prompt(
     description: str | None,
     cv_text: str,
     signal_summary: str | None = None,
+    required_employers: list[str] | None = None,
+    cv_headline: str | None = None,
 ) -> str:
     parts = [
         f"ENTREPRISE : {company}",
@@ -133,6 +136,16 @@ def render_user_prompt(
         parts.append(f"SIGNAL RÉCENT SUR L'ENTREPRISE : {signal_summary}")
     parts.append(f"\nOFFRE (texte) :\n{(description or '(pas de description)')[:6000]}")
     parts.append(f"\nCV SOURCE (seule source de faits autorisée) :\n{cv_text[:12000]}")
+    if required_employers:
+        parts.append(
+            "\nEMPLOYEURS OBLIGATOIRES (doivent tous apparaître dans "
+            "experiences, même condensés en 1 bullet) : "
+            + ", ".join(required_employers)
+        )
+    if cv_headline:
+        parts.append(
+            f"\nHEADLINE IMPOSÉE (recopie-la telle quelle) : {cv_headline}"
+        )
     parts.append("\nProduis le JSON.")
     return "\n".join(parts)
 
@@ -154,10 +167,23 @@ async def generate_tailored_documents(
     description: str | None,
     cv_text: str,
     signal_summary: str | None = None,
+    required_employers: list[str] | None = None,
+    cv_headline: str | None = None,
 ) -> TailoredDocuments:
-    """One LLM call (main model — this is writing, not extraction)."""
+    """One LLM call (main model — this is writing, not extraction).
+
+    ``required_employers`` / ``cv_headline`` default to the user profile
+    (config/user_profile.yaml), so trimming can never drop an employer and
+    the headline stays stable across applications.
+    """
     if not cv_text.strip():
         raise TailoringError("Aucun CV enregistré : ajoute ton CV d'abord.")
+    if required_employers is None or cv_headline is None:
+        profile = load_user_profile()
+        if required_employers is None:
+            required_employers = list(profile.required_employers)
+        if cv_headline is None:
+            cv_headline = profile.cv_headline
     settings = get_settings()
     model = model_for("write", settings)
     fallbacks = _resolve_fallbacks(settings.llm_fallback_model)
@@ -167,6 +193,7 @@ async def generate_tailored_documents(
             company=company, title=title, location=location,
             description=description, cv_text=cv_text,
             signal_summary=signal_summary,
+            required_employers=required_employers, cv_headline=cv_headline,
         )},
     ]
 

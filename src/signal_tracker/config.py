@@ -185,6 +185,21 @@ class UserProfile(BaseModel):
     target_company_types: list[str] = Field(default_factory=list)
     notes: str | None = None
 
+    # Skills / hard filters used by the free, deterministic prefilter
+    # (jobs/relevance.py) so the LLM only sees plausible offers.
+    core_skills: list[str] = Field(default_factory=list)
+    bonus_skills: list[str] = Field(default_factory=list)
+    # Any match in title/department/description => relevance 0, so the
+    # offer never reaches a paid scoring call.
+    dealbreakers: list[str] = Field(default_factory=list)
+
+    # CV tailoring guardrails (applications/tailor.py).
+    # Employers that must never be dropped when trimming a tailored CV.
+    required_employers: list[str] = Field(default_factory=list)
+    # When set, the tailored CV keeps this headline instead of mirroring
+    # each job title.
+    cv_headline: str | None = None
+
 
 def _read_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():

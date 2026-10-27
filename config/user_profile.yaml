@@ -1,7 +1,7 @@
 # Profil utilisé pour scorer la pertinence des signaux.
 # Modifiable sans toucher au code.
 
-name: null  # ex: "Prénom Nom"
+name: Malek Houamel  # vérifie l'orthographe : déduite de l'adresse e-mail
 
 domains:
   - Sustainability
@@ -42,6 +42,48 @@ target_roles:
   - AI Governance Lead
   - AI Act Specialist
 
+# Compétences cœur : +15 points chacune dans le préfiltre gratuit
+# (jobs/relevance.py). Ce sont elles qui décident quelles offres atteignent
+# la notation IA payante — ajuste-les avant tout le reste.
+core_skills:
+  - Databricks
+  - PySpark
+  - Python
+  - SQL
+  - data engineering
+  - ESG
+  - CSRD
+  - RSE
+  - méthodologie de scoring
+  - LLM
+  - RAG
+  - extraction de documents
+
+# Compétences secondaires : +5 points chacune.
+bonus_skills:
+  - Spark
+  - Delta Lake
+  - Airflow
+  - dbt
+  - Power BI
+  - analyse carbone
+  - ACV
+  - taxonomie européenne
+  - prompt engineering
+  - MLOps
+
+# Un seul de ces termes dans l'offre => score 0, l'offre n'atteint jamais
+# un appel LLM payant. Liste de départ : à relire et compléter.
+dealbreakers:
+  - stage
+  - alternance
+  - apprentissage
+  - internship
+  - bénévolat
+  - unpaid
+  - security clearance
+  - habilitation défense
+
 geographies:
   - France
   - Europe
@@ -63,6 +105,17 @@ target_company_types:
   # --- Mix ---
   - Grands groupes en transformation durable + IA
   - Scale-ups AI avec angle sustainability
+
+# --- Garde-fous CV (applications/tailor.py) ---
+
+# Employeurs qui doivent toujours figurer dans un CV adapté, même condensés.
+required_employers:
+  - EcoVadis
+  - Alethio
+
+# Headline imposée sur tous les CV adaptés. null = la headline suit l'offre
+# (comportement actuel). Renseigne-la si tu veux une identité stable.
+cv_headline: null
 
 notes: |
   Priorité : signaux français et européens. Le remote international est
