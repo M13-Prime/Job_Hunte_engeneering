@@ -19,6 +19,7 @@ from signal_tracker.classifier.schemas import ClassificationResult, ClassifierIn
 from signal_tracker.collectors.base import BaseCollector, CollectedItem
 from signal_tracker.collectors.france_travail import FranceTravailCollector
 from signal_tracker.collectors.gdelt import GdeltCollector, GdeltQuery
+from signal_tracker.collectors.linkedin_posts import LinkedInPostsCollector
 from signal_tracker.collectors.newsapi import NewsApiCollector
 from signal_tracker.collectors.pappers import PappersCollector
 from signal_tracker.collectors.rss import FeedConfig, RSSCollector
@@ -162,6 +163,18 @@ def build_default_collectors(
                         config=ft_config,
                     )
                 )
+
+    li_cfg = sources.get("linkedin") or {}
+    if li_cfg.get("enabled"):
+        from signal_tracker.linkedin.client import LinkedInClient
+
+        li_client = LinkedInClient(settings)
+        if not li_client.available():
+            logger.warning("pipeline.linkedin_skipped reason=disabled_or_no_mcporter")
+        else:
+            li_watch = LinkedInPostsCollector.watchlist_from_yaml(li_cfg)
+            if li_watch:
+                collectors.append(LinkedInPostsCollector(li_client, li_watch))
 
     return collectors
 

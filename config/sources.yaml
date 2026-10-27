@@ -201,3 +201,12 @@ france_travail:
   surge_min_count: 3
   surge_z_threshold: 1.5
   history_window_days: 30
+
+# LinkedIn (opt-in) : publications récentes des pages entreprise listées.
+# Nécessite LINKEDIN_ENABLED=true et mcporter + serveur linkedin (docs/LINKEDIN.md).
+# Une page = 1 appel espacé de LINKEDIN_MIN_INTERVAL_SECONDS : restez à < 15.
+linkedin:
+  enabled: false
+  companies: []
+  # - name: Exemple SA
+  #   slug: exemple-sa        # linkedin.com/company/<slug>

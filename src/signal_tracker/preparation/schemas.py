@@ -26,6 +26,7 @@ class ContactSuggestion(BaseModel):
     role: str | None = None
     rationale: str | None = None
     confidence: Literal["high", "medium", "low", "unknown"] = "unknown"
+    linkedin_url: str | None = None
 
 
 class ProfileFit(BaseModel):

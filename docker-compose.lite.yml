@@ -15,6 +15,7 @@ services:
       context: .
       args:
         INSTALL_JOBSPY: ${INSTALL_JOBSPY:-0}
+        INSTALL_LINKEDIN: ${INSTALL_LINKEDIN:-0}
     image: signal-tracker:local
     command: ["python", "scripts/dashboard.py", "--host", "0.0.0.0", "--port", "8000"]
     ports:
@@ -24,6 +25,8 @@ services:
       DB_PATH: /data/signals.db
     volumes:
       - signal-tracker-data:/data
+      - mcporter-config:/home/app/.mcporter
+      - linkedin-profile:/home/app/.linkedin-mcp
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=8).status == 200 else 1)\""]
@@ -41,10 +44,14 @@ services:
       DB_PATH: /data/signals.db
     volumes:
       - signal-tracker-data:/data
+      - mcporter-config:/home/app/.mcporter
+      - linkedin-profile:/home/app/.linkedin-mcp
     depends_on:
       dashboard:
         condition: service_started
     restart: unless-stopped
 
 volumes:
+  linkedin-profile:
+  mcporter-config:
   signal-tracker-data:
