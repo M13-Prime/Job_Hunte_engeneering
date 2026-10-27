@@ -121,6 +121,17 @@ def main() -> None:
         else (f"SMTP {settings.smtp_host}" if settings.smtp_host else "dry-run only"),
     )
 
+    if settings.linkedin_enabled:
+        from signal_tracker.linkedin.client import LinkedInClient
+
+        _row(
+            table,
+            "LinkedIn (mcporter)",
+            LinkedInClient(settings).available(),
+            f"{settings.linkedin_mcporter_bin} in PATH; limit "
+            f"{settings.linkedin_daily_limit}/day",
+        )
+
     console.print(table)
 
     if os.environ.get("DOCTOR_SKIP_LLM"):

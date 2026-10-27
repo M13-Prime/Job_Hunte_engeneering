@@ -258,7 +258,9 @@ automatiquement aux recruteurs.
 
 ## Garde-fous
 
-- **Pas de scraping LinkedIn** ni de sites aux CGU strictes.
+- **Pas de scraping de sites aux CGU strictes.** Seule exception, explicite et
+  **désactivée par défaut** : le canal LinkedIn optionnel (`LINKEDIN_ENABLED`,
+  voir [docs/LINKEDIN.md](docs/LINKEDIN.md)), limité en débit, à vos risques.
 - `robots.txt` respecté ; rate limiting (1 req/s par défaut).
 - Cache HTTP local de 6h sur les RSS.
 - Tous les secrets dans `.env` — jamais en dur.

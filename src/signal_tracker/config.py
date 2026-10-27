@@ -174,6 +174,16 @@ class Settings(BaseSettings):
     jobspy_results_per_search: int = 30
     jobspy_hours_old: int = 168
 
+    # Optional LinkedIn channel (agent-reach / mcporter). OFF by default.
+    # Uses an authenticated LinkedIn session through the `mcporter` CLI,
+    # which goes against LinkedIn's ToS: your account can be restricted.
+    # Use a throwaway/secondary account, keep the limits low.
+    linkedin_enabled: bool = False
+    linkedin_mcporter_bin: str = "mcporter"
+    linkedin_min_interval_seconds: float = 20.0
+    linkedin_daily_limit: int = 30
+    linkedin_timeout_seconds: float = 60.0
+
 
 class UserProfile(BaseModel):
     """The profile used to score relevance of signals to the user."""

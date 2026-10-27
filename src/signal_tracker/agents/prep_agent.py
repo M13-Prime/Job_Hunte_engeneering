@@ -22,6 +22,8 @@ from signal_tracker.agents.loop import AgentLoop, AgentResult
 from signal_tracker.agents.tools.base import ToolError, ToolRegistry, tool
 from signal_tracker.classifier.llm import _extract_json
 from signal_tracker.config import UserProfile, get_settings, model_for
+from signal_tracker.linkedin.client import LinkedInClient
+from signal_tracker.linkedin.tools import build_linkedin_tools
 from signal_tracker.preparation.llm import generate_preparation
 from signal_tracker.preparation.schemas import PreparationReport
 from signal_tracker.utils.llm_usage import record_usage
@@ -51,6 +53,12 @@ Flow:
 1. Call get_signal_context to see what you're working with.
 2. Call assess_fit. If score < 35, call give_up.
 3. Otherwise call generate_full_report, then save_report with its output.
+
+If LinkedIn tools are listed (linkedin_search_people, linkedin_get_profile,
+keep_contact): after generate_full_report and before save_report, run at
+most 2 searches for the right decision-maker at the company, open at most
+1 profile, and call keep_contact for each verified person (max 3). Never
+invent people. If a LinkedIn tool errors, stop using LinkedIn and continue.
 
 Be concise. No commentary. Output JSON-strict tool inputs.
 """
@@ -94,6 +102,7 @@ class PrepContext:
     final_status: str = "pending"  # 'done' | 'no_fit' | 'pending'
     bailed_reason: str | None = None
     history: list[str] = field(default_factory=list)
+    linkedin_contacts: list[dict[str, Any]] = field(default_factory=list)
 
 
 async def _quick_fit_assessment(ctx: PrepContext) -> tuple[int, str]:
@@ -198,7 +207,12 @@ def _build_tools(ctx: PrepContext) -> ToolRegistry:
             validated = PreparationReport.model_validate(report_json)
         except Exception as exc:
             raise ToolError(f"report JSON does not validate: {exc}") from exc
-        ctx.final_report = validated.model_dump()
+        report = validated.model_dump()
+        known = {(c.get("linkedin_url") or c.get("name")) for c in report["contacts"]}
+        for contact in ctx.linkedin_contacts[:3]:
+            if (contact["linkedin_url"] or contact["name"]) not in known:
+                report["contacts"].append(contact)
+        ctx.final_report = report
         ctx.final_status = "done"
         ctx.history.append("save_report → done")
         return {"saved": True}
@@ -219,6 +233,9 @@ def _build_tools(ctx: PrepContext) -> ToolRegistry:
         get_signal_context, assess_fit,
         generate_full_report, save_report, give_up,
     ])
+    li_client = LinkedInClient()
+    if li_client.available():
+        reg.extend(build_linkedin_tools(li_client, ctx.linkedin_contacts))
     return reg
 
 

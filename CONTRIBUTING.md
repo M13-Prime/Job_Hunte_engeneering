@@ -54,4 +54,6 @@ make test            # pytest (skip live)
 
 - Never commit a real `.env`. The example template is `.env.example`.
 - Don't log API keys. Use `extra={"redacted": True}` if a value is sensitive.
-- Don't scrape sites with restrictive ToS. LinkedIn is a hard "no".
+- Don't scrape sites with restrictive ToS. The only exception is the opt-in
+  LinkedIn channel (`LINKEDIN_ENABLED`, off by default, rate-limited, see
+  docs/LINKEDIN.md). Never enable it in CI or ship it on by default.
