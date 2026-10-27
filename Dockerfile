@@ -48,6 +48,19 @@ RUN apt-get update \
     && groupadd --gid 1000 app \
     && useradd  --uid 1000 --gid app --shell /bin/bash --create-home app
 
+# Optional LinkedIn channel (agent-reach / mcporter). Off by default; adds
+# Node.js (~150 MB), so only enable it if you set LINKEDIN_ENABLED=true:
+#   INSTALL_LINKEDIN=1 docker compose -f docker-compose.lite.yml up -d --build
+# The `linkedin` server itself must still be configured in the mcporter
+# config volume (see docs/LINKEDIN.md).
+ARG INSTALL_LINKEDIN=0
+RUN if [ "$INSTALL_LINKEDIN" = "1" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends nodejs npm \
+        && npm install -g mcporter \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
+
 WORKDIR /app
 
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
@@ -59,7 +72,8 @@ COPY --chown=app:app Makefile pyproject.toml README.md ./
 # /data is a mounted volume (SQLite file, scraping caches, snapshots, etc.).
 # /app/data is also created and chown'd so legacy relative cache paths like
 # "data/cache/rss" written from WORKDIR=/app still resolve to a writable dir.
-RUN mkdir -p /data /app/data && chown -R app:app /data /app/data
+RUN mkdir -p /data /app/data /home/app/.mcporter \
+    && chown -R app:app /data /app/data /home/app/.mcporter
 VOLUME ["/data"]
 
 USER app

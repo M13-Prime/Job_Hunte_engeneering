@@ -14,9 +14,11 @@ premier blocage/login.
 
 ## Activer
 
-1. Installer `mcporter` et configurer le serveur `linkedin` (cookies) sur la
-   machine qui exécute l'agent — voir le README d'agent-reach. L'image Docker
-   ne l'inclut pas.
+1. Construire l'image avec `INSTALL_LINKEDIN=1` (installe Node + `mcporter`) :
+   `INSTALL_LINKEDIN=1 docker compose -f docker-compose.lite.yml up -d --build`.
+   Puis configurer le serveur `linkedin` (cookies) dans le volume
+   `mcporter-config` (monté sur `/home/app/.mcporter`) — voir le README
+   d'agent-reach. Non testé de bout en bout : vérifier avec `scripts/doctor.py`.
 2. Dans `.env` : `LINKEDIN_ENABLED=true` (+ `LINKEDIN_DAILY_LIMIT`,
    `LINKEDIN_MIN_INTERVAL_SECONDS`).
 3. `python scripts/doctor.py` doit afficher `LinkedIn (mcporter)` en OK.
