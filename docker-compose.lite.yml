@@ -26,6 +26,7 @@ services:
     volumes:
       - signal-tracker-data:/data
       - mcporter-config:/home/app/.mcporter
+      - linkedin-profile:/home/app/.linkedin-mcp
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=8).status == 200 else 1)\""]
@@ -44,11 +45,13 @@ services:
     volumes:
       - signal-tracker-data:/data
       - mcporter-config:/home/app/.mcporter
+      - linkedin-profile:/home/app/.linkedin-mcp
     depends_on:
       dashboard:
         condition: service_started
     restart: unless-stopped
 
 volumes:
+  linkedin-profile:
   mcporter-config:
   signal-tracker-data:

@@ -29,6 +29,38 @@ def build_linkedin_tools(
         except LinkedInError as exc:
             raise ToolError(str(exc)) from exc
 
+    @tool(description="Read a company's LinkedIn page (about, size, sector). "
+                      "Pass https://www.linkedin.com/company/<slug>/.")
+    async def linkedin_company_profile(company_url: str) -> Any:
+        try:
+            return await client.get_company_profile(company_url)
+        except LinkedInError as exc:
+            raise ToolError(str(exc)) from exc
+
+    @tool(description="Recent posts of a company's LinkedIn page: its news "
+                      "(hiring pushes, launches, leadership changes).")
+    async def linkedin_company_posts(company_url: str) -> Any:
+        try:
+            return await client.get_company_posts(company_url)
+        except LinkedInError as exc:
+            raise ToolError(str(exc)) from exc
+
+    @tool(description="Search LinkedIn job offers by keywords and optional "
+                      "location (e.g. 'sustainability manager', 'Paris').")
+    async def linkedin_search_jobs(keywords: str, location: str | None = None) -> Any:
+        try:
+            return await client.search_jobs(keywords, location)
+        except LinkedInError as exc:
+            raise ToolError(str(exc)) from exc
+
+    @tool(description="Read ONE LinkedIn job offer by URL (linkedin.com/jobs/...): "
+                      "team, department, requirements, recruiter if shown.")
+    async def linkedin_job_details(job_url: str) -> Any:
+        try:
+            return await client.get_job_details(job_url)
+        except LinkedInError as exc:
+            raise ToolError(str(exc)) from exc
+
     @tool(description="Record a verified contact to include in the report. "
                       "Only names/roles actually seen on LinkedIn; never invent.")
     async def keep_contact(
@@ -42,4 +74,8 @@ def build_linkedin_tools(
         })
         return {"kept": len(found)}
 
-    return [linkedin_search_people, linkedin_get_profile, keep_contact]
+    return [
+        linkedin_search_people, linkedin_get_profile, linkedin_company_profile,
+        linkedin_company_posts, linkedin_search_jobs, linkedin_job_details,
+        keep_contact,
+    ]

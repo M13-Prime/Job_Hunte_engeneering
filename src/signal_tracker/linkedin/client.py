@@ -121,3 +121,35 @@ class LinkedInClient:
         if "linkedin.com/in/" not in linkedin_url:
             raise LinkedInError("not a LinkedIn profile URL")
         return await self._call("get_person_profile", linkedin_url=linkedin_url)
+
+    # The tools below follow the stickerdaniel/linkedin-mcp-server tool names
+    # (get_company_profile, get_company_posts, search_jobs, get_job_details).
+    # Argument names are NOT verified against your installed version: run
+    # `python scripts/linkedin_probe.py` to print the real schemas.
+
+    async def get_company_profile(self, company_url: str) -> Any:
+        if "linkedin.com/company/" not in company_url:
+            raise LinkedInError("not a LinkedIn company URL")
+        return await self._call("get_company_profile", linkedin_url=company_url)
+
+    async def get_company_posts(self, company_url: str) -> Any:
+        """Recent posts of a company page (its LinkedIn 'news')."""
+        if "linkedin.com/company/" not in company_url:
+            raise LinkedInError("not a LinkedIn company URL")
+        return await self._call("get_company_posts", linkedin_url=company_url)
+
+    async def search_jobs(self, keywords: str, location: str | None = None) -> Any:
+        return await self._call("search_jobs", keywords=keywords, location=location)
+
+    async def get_job_details(self, job_url: str) -> Any:
+        if "linkedin.com/jobs/" not in job_url:
+            raise LinkedInError("not a LinkedIn job URL")
+        return await self._call("get_job_details", job_url=job_url)
+
+
+def company_url(slug: str) -> str:
+    """https://www.linkedin.com/company/<slug>/ from a slug or a full URL."""
+    slug = slug.strip().strip("/")
+    if slug.startswith("http"):
+        return slug.rstrip("/") + "/"
+    return f"https://www.linkedin.com/company/{slug}/"

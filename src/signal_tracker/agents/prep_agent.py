@@ -55,10 +55,16 @@ Flow:
 3. Otherwise call generate_full_report, then save_report with its output.
 
 If LinkedIn tools are listed (linkedin_search_people, linkedin_get_profile,
-keep_contact): after generate_full_report and before save_report, run at
-most 2 searches for the right decision-maker at the company, open at most
-1 profile, and call keep_contact for each verified person (max 3). Never
-invent people. If a LinkedIn tool errors, stop using LinkedIn and continue.
+linkedin_company_profile, linkedin_company_posts, linkedin_search_jobs,
+linkedin_job_details, keep_contact): after generate_full_report and before
+save_report, use at most ~5 LinkedIn calls in total:
+- the company's open roles (linkedin_search_jobs) and recent posts
+  (linkedin_company_posts) to see which team/department is hiring;
+- the right decision-maker for that team (linkedin_search_people, then at
+  most 1 linkedin_get_profile).
+Call keep_contact for each verified person (max 3, with their department
+in `role`). Never invent people. If a LinkedIn tool errors, stop using
+LinkedIn and continue.
 
 Be concise. No commentary. Output JSON-strict tool inputs.
 """

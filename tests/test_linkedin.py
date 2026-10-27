@@ -68,3 +68,79 @@ async def test_keep_contact_validates_and_records() -> None:
         "name": "A", "role": "CSO",
         "linkedin_url": "https://www.linkedin.com/in/a", "rationale": "r"})
     assert not ok.is_error and len(found) == 1
+
+
+@pytest.mark.asyncio
+async def test_all_tools_registered() -> None:
+    reg = ToolRegistry()
+    reg.extend(build_linkedin_tools(LinkedInClient(Settings()), []))
+    names = {t.name for t in reg.tools}
+    assert names == {
+        "linkedin_search_people", "linkedin_get_profile", "linkedin_company_profile",
+        "linkedin_company_posts", "linkedin_search_jobs", "linkedin_job_details",
+        "keep_contact",
+    }
+
+
+@pytest.mark.asyncio
+async def test_url_guards_on_company_and_job_tools() -> None:
+    client = LinkedInClient(Settings(linkedin_enabled=True))
+    for coro in (
+        client.get_company_profile("https://example.com/x"),
+        client.get_company_posts("https://linkedin.com/in/x"),
+        client.get_job_details("https://example.com/jobs/1"),
+    ):
+        with pytest.raises(LinkedInError):
+            await coro
+
+
+def test_company_url_builder() -> None:
+    from signal_tracker.linkedin.client import company_url
+
+    assert company_url("acme") == "https://www.linkedin.com/company/acme/"
+    assert company_url("https://www.linkedin.com/company/acme") == (
+        "https://www.linkedin.com/company/acme/"
+    )
+
+
+@pytest.mark.asyncio
+async def test_posts_collector_yields_hashed_items() -> None:
+    from signal_tracker.collectors.linkedin_posts import LinkedInPostsCollector, LinkedInWatch
+
+    class FakeClient:
+        async def get_company_posts(self, url: str) -> str:
+            return "Acme is hiring a head of sustainability for its new ESG team. " * 3
+
+    collector = LinkedInPostsCollector(
+        FakeClient(),  # type: ignore[arg-type]
+        [LinkedInWatch(name="Acme", slug="acme")],
+    )
+    items = [item async for item in collector.collect()]
+    assert len(items) == 1
+    assert items[0].source == "linkedin"
+    assert "linkedin.com/company/acme/posts/#h=" in items[0].url
+    assert "sustainability" in (items[0].content or "")
+
+
+@pytest.mark.asyncio
+async def test_posts_collector_stops_when_blocked() -> None:
+    from signal_tracker.collectors.linkedin_posts import LinkedInPostsCollector, LinkedInWatch
+
+    class BlockedClient:
+        async def get_company_posts(self, url: str) -> str:
+            raise LinkedInError("LinkedIn blocked or requires login: authwall")
+
+    collector = LinkedInPostsCollector(
+        BlockedClient(),  # type: ignore[arg-type]
+        [LinkedInWatch(name="A", slug="a"), LinkedInWatch(name="B", slug="b")],
+    )
+    assert [item async for item in collector.collect()] == []
+
+
+def test_watchlist_from_yaml_skips_incomplete() -> None:
+    from signal_tracker.collectors.linkedin_posts import LinkedInPostsCollector
+
+    watch = LinkedInPostsCollector.watchlist_from_yaml(
+        {"companies": [{"name": "A", "slug": "a"}, {"name": "B"}, {"slug": "c"}]}
+    )
+    assert [(w.name, w.slug) for w in watch] == [("A", "a")]
